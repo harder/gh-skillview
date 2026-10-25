@@ -88,16 +88,16 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   native registry lease is held, read through its handle (Windows byte locks
   reject second-handle reads). NativeStateDirectory publication requires its
   `writer.lock` handle to remain open. See `agent_docs/maintenance-update-plans.md`.
-  Reviewed local merges use separate schema 3 plans and immutable B/I/C byte+
+  New local-merge creation/editor is retired; existing saved local merges retain
+  separate schema 3 plans and immutable B/I/C byte+
   metadata archives; C remains the real source baseline while M has its own
   exact result evidence. Omit absent disposition fields from schema 1/2 JSON.
-  Creating a local review closes the original replacement approval, including
-  after partial capture. Private merge attempts are bounded and retained;
-  derive their history from immutable plan records as well as current staging
-  slots because promotion deliberately vacates the latter. A newest partial
-  attempt cannot revive an older completion. Reopened nested review writes
-  must flush their held directory namespace before the owning operation's
-  writer/device barrier. See `agent_docs/maintenance-local-dispositions.md`.
+  A retained historical local review closes the original replacement approval,
+  including partial capture. Private attempts stay bounded and retained; derive
+  history from immutable plan records as well as staging slots because promotion
+  vacates the latter. A newest partial attempt cannot revive older completion.
+  Keep these readers and validators for inspect/apply/recover/undo. See
+  `agent_docs/maintenance-local-dispositions.md`.
   Linux metadata enumeration cannot infer complete trusted-xattr visibility
   from namespace capability bits. Its permission witness is a fresh held
   `O_TMPFILE|O_EXCL` inode, never a retained filename; unknown coverage refuses
@@ -105,23 +105,11 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   `fremovexattr`. Verify exact attributes after every staged metadata change;
   preserve compatible I attributes and copy captured C attributes on new
   source nodes, separately from reviewed I-parent owner/group inheritance.
-  Captured custom resolutions use `IPayloadEvidenceReader`, not synthetic root
-  snapshots. Read inputs through `RegularFileInspection.Capture` on a retained
-  native handle; parse by target `SKILL.md`, never the input filename. Schema2
-  choices bind exact completed resolution manifests; schema1 omits that field.
-  Keep original source evidence when reusing captures. Charge incomplete and
-  unreferenced attempts to per-plan quotas and bound the draft scan first.
-  Updates-tab local review runs through the workflow coordinator off the UI
-  thread. Starting capture closes the earlier replacement approval even after
-  failure; uncertain private writes require a fresh review. Hold operation
-  ownership through queued UI completion, and require fresh retention approval
-  after building M. Keep printable update shortcuts out of the local editor's
-  file input, and bound rendered refusal summaries while retaining full evidence.
-  Interactive child containers need `CanFocus=true`; prove actual focus and
-  main-shell shortcut routing, not only direct key delivery to a text field.
-  Use `SingleRowButton` for actions assigned individual footer rows. In pinned
-  Terminal.Gui 2.5, `ShadowStyles.None` can retain margin space from a default
-  shadow; suppress construction via `InitializingShadowStyle` with null instead.
+  Saved custom resolutions use `IPayloadEvidenceReader`, not synthetic root
+  snapshots. Schema2 choices bind exact completed resolution manifests; schema1
+  omits that field. Keep original source evidence and charge incomplete and
+  unreferenced attempts to per-plan quotas; bound the draft scan first. Shared
+  native metadata primitives remain required by unpin and local reimport.
   Unix registry owners must explicitly `LOCK_UN` before closing, including
   failed initialization after acquisition: a fork can retain the open file
   description temporarily even with CLOEXEC. Duplicate-descriptor regressions

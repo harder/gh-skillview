@@ -22,7 +22,7 @@ public sealed partial class ReviewedUpdatesTabTests
             plan = plan with { SourceReview = new(1, "installed", "candidate", "i", "c", SourceUpdateReview.Hash(report), report) };
         }
         using var view = View([target], (_, _, _) => Task.FromResult(Result(plan)), (_, _, _) => throw new InvalidOperationException("No implicit apply"),
-            local: (_, _, _) => throw new InvalidOperationException("No implicit local review"));
+            preserve: (_, _, _) => throw new InvalidOperationException("No implicit local review"));
         await view.LoadForSubjectAsync(OperationSubject.From(target));
         Layout();
         var preview = view.SubViews.OfType<Markdown>().Single();
@@ -34,7 +34,7 @@ public sealed partial class ReviewedUpdatesTabTests
         Layout();
         Assert.True(view.RetainBoxForTests.Visible); Assert.True(view.ApplyButtonForTests.Visible);
         Assert.False(view.DryRunButtonForTests.Visible); Assert.False(view.ChooseVersionButtonForTests.Visible);
-        Assert.Equal(sourceReview, view.SourceReviewBoxForTests.Visible); Assert.False(view.BuildMergeButtonForTests.Visible);
+        Assert.Equal(sourceReview, view.SourceReviewBoxForTests.Visible);
         Assert.Contains("Preserve installed", view.SubViews.OfType<Button>().Where(button => button.Visible).Select(button => button.Text.ToString()));
         Assert.False(view.ApplyButtonForTests.Enabled);
 
@@ -114,6 +114,38 @@ public sealed partial class ReviewedUpdatesTabTests
         Assert.True(view.UnpinOnlyButtonForTests.Visible); Assert.Contains("pinned", view.PreviewTextForTests);
         view.SelectRowForTests(0);
         Assert.False(view.UnpinOnlyButtonForTests.Visible); Assert.Contains("ordinary", view.PreviewTextForTests);
+    }
+
+    [Fact]
+    public async Task LockOnlyConflictingAndUnknownPinsStayVisibleWithoutPreparingAChange()
+    {
+        var owner = new SkillPackage("test/repo", "github", null, null, null) { PinnedRef = "v1" };
+        var locked = Target("locked") with { Package = owner };
+        var conflict = Target("conflict") with { OwnershipClaims = [owner, owner with { PinnedRef = "v2" }] };
+        var unknown = Target("unknown") with { Validity = ValidityState.UnparsableFrontMatter };
+        var malformed = Target("malformed") with { Package = owner with { PinnedRef = " " } };
+        using var view = View([locked, conflict, unknown, malformed], (_, _, _) => throw new InvalidOperationException("No implicit prepare"),
+            (_, _, _) => throw new InvalidOperationException("No implicit apply"),
+            unpin: (_, _, _) => throw new InvalidOperationException("No implicit unpin"));
+        await view.LoadAsync();
+        var table = view.SubViews.OfType<TableView>().Single().Table!;
+        Assert.Equal("p-", table[0, 3]);
+        Assert.Equal("!-", table[1, 3]);
+        Assert.Equal("?-", table[2, 3]);
+        Assert.Equal("?-", table[3, 3]);
+        Assert.True(view.UnpinOnlyButtonForTests.Visible);
+        Assert.Contains("v1", view.PreviewTextForTests);
+        view.SelectRowForTests(1);
+        Assert.True(view.UnpinOnlyButtonForTests.Visible);
+        Assert.Contains("conflicting pin records", view.PreviewTextForTests);
+        Assert.Contains("Pin records disagree", view.PreviewTextForTests);
+        foreach (var row in new[] { 2, 3 })
+        {
+            view.SelectRowForTests(row);
+            Assert.False(view.UnpinOnlyButtonForTests.Visible);
+            Assert.Contains("pin state unknown", view.PreviewTextForTests);
+            Assert.Contains("Pin state could not be verified", view.PreviewTextForTests);
+        }
     }
 
     [Theory]

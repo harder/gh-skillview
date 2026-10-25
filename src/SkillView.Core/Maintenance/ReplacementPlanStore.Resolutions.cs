@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using SkillView.Inventory;
-using SkillView.Inventory.Models;
 
 namespace SkillView.Maintenance;
 
@@ -11,50 +10,7 @@ internal sealed partial class ReplacementPlanStore
     private sealed record ResolvedFile(ResolutionEntryReference Reference, CapturedResolutionArchive Archive, ArchivedPayloadEntry Entry);
     private sealed record ResolutionCapture(string Hash, CapturedResolutionArchive Archive, IReadOnlyDictionary<string, ArchivedPayloadEntry> Entries);
 
-    private LocalReviewSelection CaptureResolutionSelection(Session session, NativeStateDirectory draft, LocalReviewEvidence evidence,
-        IReadOnlyList<LocalPathChoice> choices, IReadOnlyList<LocalResolutionInput> inputs, InventorySnapshot inventory, CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-        var paths = evidence.Recorded.Snapshot.Entries.Concat(evidence.Installed.Snapshot.Entries).Concat(evidence.Source.Snapshot.Entries)
-            .Select(entry => entry.Path).ToHashSet(StringComparer.Ordinal);
-        if (choices.Count > PayloadSnapshot.MaxEntries + 1 || choices.Any(choice => choice is null || string.IsNullOrEmpty(choice.Path)
-                || choice.Side is not ("installed" or "source" or "resolved") || choice.Path != "/" && !paths.Contains(choice.Path)
-                || choice.Path == "/" && choice.Side == "resolved")
-            || choices.Select(choice => choice.Path).Distinct(StringComparer.Ordinal).Count() != choices.Count)
-            throw new IOException("Resolution choices need distinct captured target paths.");
-        var selected = choices.ToDictionary(choice => choice.Path, choice => choice.Side, StringComparer.Ordinal);
-        if (inputs.Count > PayloadSnapshot.MaxEntries || inputs.Any(input => input is null || string.IsNullOrEmpty(input.Path)
-                || string.IsNullOrWhiteSpace(input.SourceFile) || selected.GetValueOrDefault(input.Path) != "resolved")
-            || inputs.Select(input => input.Path).Distinct(StringComparer.Ordinal).Count() != inputs.Count)
-            throw new IOException("Resolution inputs need distinct captured target paths, each bound to one explicit resolved choice.");
-        var byInput = inputs.ToDictionary(input => input.Path, StringComparer.Ordinal);
-        var references = new Dictionary<string, ResolutionEntryReference>(StringComparer.Ordinal);
-        foreach (var choice in choices.Where(choice => choice.Side == "resolved" && !byInput.ContainsKey(choice.Path)))
-        {
-            if (!evidence.Resolutions.TryGetValue(choice.Path, out var prior))
-                throw new IOException("There is no previously reviewed frozen resolution to reuse: " + choice.Path);
-            references.Add(choice.Path, prior.Reference);
-        }
-        if (inputs.Count != 0)
-        {
-            var (usedBytes, usedManifestBytes, attempts) = ResolutionBudget(draft, token);
-            var name = Enumerable.Range(0, MaxResolutionArchives).Select(i => $"resolutions-{i:D2}")
-                .FirstOrDefault(candidate => !attempts.Contains(candidate))
-                ?? throw new IOException("Resolution capture history is full; retained partial evidence needs inspection or a new revision plan.");
-            var hash = CapturedResolutionArchive.Capture(draft, name, inputs,
-                CapturedResolutionArchive.MaxRetainedBytes - usedBytes, CapturedResolutionArchive.MaxRetainedManifestBytes - usedManifestBytes, token);
-            // Persist the new archive's name and contents before any choice can
-            // reference it. Reopened draft has no writer of its own; the held
-            // operation supplies the device barrier after this namespace flush.
-            draft.FlushNamespace(token); session.Operation.FlushPublication(token);
-            foreach (var input in inputs) references.Add(input.Path, new(input.Path, name, hash));
-            RequireLocalReviewReady(session, session.Plan.ReviewFingerprint, inventory, token);
-        }
-        return new(references.Count == 0 ? 1 : 2, evidence.HeaderFingerprint, choices.ToImmutableArray(),
-            references.Count == 0 ? null : new(references.Values.OrderBy(item => item.Path, StringComparer.Ordinal).ToImmutableArray()));
-    }
-
-    private static (long Bytes, long ManifestBytes, HashSet<string> Attempts) ResolutionBudget(NativeStateDirectory draft, CancellationToken token)
+    private static void ValidateResolutionBudget(NativeStateDirectory draft, CancellationToken token)
     {
         const int maxDraftEntries = MaxLocalSelections + MaxResolutionArchives + 4;
         var outer = draft.EnumerateEntries(token).Take(maxDraftEntries + 1).ToArray();
@@ -97,7 +53,6 @@ internal sealed partial class ReplacementPlanStore
                     throw new IOException("Retained resolution alternate streams exceed their cumulative raw byte budget.");
             }
         }
-        return (bytes, metadata, attempts);
     }
 
     private static ImmutableDictionary<string, ResolvedFile> LoadResolutions(NativeStateDirectory draft, LocalReviewSelection selection,

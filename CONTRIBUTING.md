@@ -102,3 +102,15 @@ python -m http.server 8000 --directory dist/skillview-site
 Open `http://localhost:8000` to preview it. The Pages workflow builds and
 publishes this output on site or media changes to `main`. The custom domain is
 configured in the repository's GitHub Pages settings.
+
+Saved schema-3 merge lifecycle proofs use the frozen historical producer, since
+new merge creation is retired. Pass `--old-app` with `--old-checkout` (or a
+verified `--old-source-receipt`) to `prove-local-merge-update.py` and the shared
+revision proof's `--merged` mode. The disk-full Docker wrapper takes the same
+producer through `--legacy-app` and `--legacy-checkout`. Current binaries perform
+apply/recovery/undo. See [saved disposition compatibility](agent_docs/maintenance-local-dispositions.md).
+
+Merge lifecycle fixtures use the source-reviewed last creator at `27efe94`,
+while `prove-old-native-plans.py` keeps the separate `0dba59be` pre-source-review
+shape. CI binds both exact producers through the existing native-input receipts;
+reviewed merge proofs require source acknowledgement before any current apply.

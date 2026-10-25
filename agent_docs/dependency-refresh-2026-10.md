@@ -47,3 +47,7 @@ build passed; full tests passed with 2,718 successful cases and 30 explicit
 platform skips; both gh 2.97.0 and 2.103.0 opt-in contract lanes passed 19/19.
 Standalone doctor/search/versioned preview, real extension `GH_PATH` selection,
 formatting, dependency-monitor script tests, and the static site checks passed.
+
+Tomlyn 2.10.1 was subsequently removed with the loading-policy simulator. The
+static package checker retains its narrow Gemini header rule without a TOML
+parser; no other dependency versions changed in that removal.

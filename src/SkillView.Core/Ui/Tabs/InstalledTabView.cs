@@ -41,7 +41,6 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action _onLeaveTab;
     private readonly Action _onGoToSearch;
     private readonly Action? _onStateChange;
-    private readonly Action<InstalledSkill>? _onEffectiveLoading;
     private readonly Action<InstalledSkill>? _onPackageCheck;
     private readonly Action<InstalledSkill>? _onLocalReimport;
     private readonly Action<InstalledSkill>? _onLocalSourceSwitch;
@@ -85,7 +84,6 @@ internal sealed class InstalledTabView : FrameView
         Action? onStateChange = null,
         CancellationToken lifetimeToken = default,
         Action<AggregateException>? onCancellationCallbackException = null,
-        Action<InstalledSkill>? onEffectiveLoading = null,
         Action<InstalledSkill>? onPackageCheck = null,
         Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null,
         Action<Exception>? onRemovalError = null, Func<string, bool>? openPath = null)
@@ -99,7 +97,6 @@ internal sealed class InstalledTabView : FrameView
         _onLeaveTab = onLeaveTab;
         _onGoToSearch = onGoToSearch;
         _onStateChange = onStateChange;
-        _onEffectiveLoading = onEffectiveLoading;
         _onPackageCheck = onPackageCheck;
         _onLocalReimport = onLocalReimport;
         _onLocalSourceSwitch = onLocalSourceSwitch;
@@ -349,8 +346,8 @@ internal sealed class InstalledTabView : FrameView
         }
         source = _pinFilter switch
         {
-            PinFilter.PinnedOnly => source.Where(s => s.Pinned),
-            PinFilter.UnpinnedOnly => source.Where(s => !s.Pinned),
+            PinFilter.PinnedOnly => source.Where(s => PinDisplayPolicy.From(s).HasPin),
+            PinFilter.UnpinnedOnly => source.Where(s => PinDisplayPolicy.From(s).State == PinDisplayState.Unpinned),
             _ => source,
         };
         _rows = ApplySort(source);
@@ -519,7 +516,7 @@ internal sealed class InstalledTabView : FrameView
     internal static string BuildSearchScopeText() => "name · path · agent · package";
 
     internal static string BuildLegendText() =>
-        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · E loading · K check · R local reimport";
+        "Legend: USR user · PRJ project · CUS custom · OK valid · SYM symlink · REV review · K check · R local reimport";
 
     private void ScheduleDeferredWidthStabilization()
     {
@@ -632,13 +629,6 @@ internal sealed class InstalledTabView : FrameView
         {
             key.Handled = true;
             if (GetSelectedSkill() is { } selected) _onPackageCheck(selected);
-            return;
-        }
-        if (!_filterField.HasFocus && key.AsRune.Value == 'E' && _onEffectiveLoading is not null
-            && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
-        {
-            key.Handled = true;
-            if (GetSelectedSkill() is { } selected) _onEffectiveLoading(selected);
             return;
         }
         if (!_filterField.HasFocus && key.AsRune.Value == 'R' && _onLocalReimport is not null
