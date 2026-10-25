@@ -494,7 +494,8 @@ internal sealed class InstallConfirmModal
                 customPathField.Text.ToString() ?? string.Empty,
                 agentBoxes,
                 entries,
-                _installAll) with { NavigationSource = InstallNavigationEvidence.SourceAnchor(_request.Repo, _request.SourcePath) };
+                _installAll) with
+            { NavigationSource = InstallNavigationEvidence.SourceAnchor(_request.Repo, _request.SourcePath) };
             operationName = "install";
             scopeSelector.Enabled = false;
             agentsView.Enabled = false;

@@ -161,10 +161,17 @@ public sealed class SkillViewAppTests
         var results = app.ResultsTableForTests.Table;
         var skill = new InstalledSkill
         {
-            Name = "installed", ResolvedPath = Path.Combine(Path.GetTempPath(), "handoff-host", "materialized"),
-            ScanRoot = Path.Combine(Path.GetTempPath(), "handoff-host"), Scope = Scope.User,
-            Agents = [], FrontMatter = new() { Upstream = "https://github.com/owner/repo", GithubPath = "skills/source" },
-            Validity = ValidityState.Valid, Provenance = Provenance.FsScan, Ignored = false, IsSymlinked = false, InstalledAt = null,
+            Name = "installed",
+            ResolvedPath = Path.Combine(Path.GetTempPath(), "handoff-host", "materialized"),
+            ScanRoot = Path.Combine(Path.GetTempPath(), "handoff-host"),
+            Scope = Scope.User,
+            Agents = [],
+            FrontMatter = new() { Upstream = "https://github.com/owner/repo", GithubPath = "skills/source" },
+            Validity = ValidityState.Valid,
+            Provenance = Provenance.FsScan,
+            Ignored = false,
+            IsSymlinked = false,
+            InstalledAt = null,
         };
         var snapshot = InventorySnapshot.Empty with { Skills = [skill], CapturedAt = DateTimeOffset.UtcNow };
         var overview = InstalledOverview.Build(snapshot, TestContext.Current.CancellationToken);

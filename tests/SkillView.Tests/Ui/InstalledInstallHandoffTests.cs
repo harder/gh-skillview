@@ -113,9 +113,12 @@ public sealed class InstalledInstallHandoffTests
         if (reason == "missing-destination")
         {
             Directory.CreateDirectory(roots[1]);
-            snapshot = snapshot with { ScannedRoots = snapshot.ScannedRoots.Add(new(roots[1], Scope.User, "universal")),
+            snapshot = snapshot with
+            {
+                ScannedRoots = snapshot.ScannedRoots.Add(new(roots[1], Scope.User, "universal")),
                 ConfiguredRoots = snapshot.ConfiguredRoots.Add(new(roots[1], Scope.User, "universal")),
-                Providers = snapshot.Providers.Add(new("gh", true, [roots[1]], DateTimeOffset.UtcNow)) };
+                Providers = snapshot.Providers.Add(new("gh", true, [roots[1]], DateTimeOffset.UtcNow))
+            };
         }
         var refusal = Assert.Throws<IOException>(() => fixture.Resolve(snapshot, roots, reason != "legacy"));
         if (reason == "missing-destination") Assert.Contains("every installation folder", refusal.Message);
@@ -136,7 +139,8 @@ public sealed class InstalledInstallHandoffTests
     {
         using var fixture = new Fixture();
         var options = new GhSkillInstallService.Options(Agents: ["universal"], Scope: "user", Path: mode == "custom" ? fixture.Root : null,
-            All: mode == "all", FromLocal: mode == "local", Upstream: mode == "upstream") { NavigationSource = fixture.Anchor };
+            All: mode == "all", FromLocal: mode == "local", Upstream: mode == "upstream")
+        { NavigationSource = fixture.Anchor };
         Assert.Null(InstallNavigationEvidence.Capture(options, [fixture.Root], fixture.Runner));
     }
 
@@ -183,7 +187,7 @@ public sealed class InstalledInstallHandoffTests
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Uses the isolated POSIX Git context for project-root discovery.");
         using var fixture = new Fixture();
         var options = new GhSkillInstallService.Options(Agents: ["codex"], Scope: "project", WorkingDirectory: fixture.Root)
-            { NavigationSource = fixture.Anchor };
+        { NavigationSource = fixture.Anchor };
         var roots = await GhPlacementCatalog.DestinationsAsync(options, fixture.Runner, TestContext.Current.CancellationToken);
         var evidence = InstallNavigationEvidence.Capture(options, roots, fixture.Runner)!;
         var folders = await SkillViewWorkflowCoordinator.CaptureInstallAgentFoldersAsync(evidence, fixture.Runner, TestContext.Current.CancellationToken);
@@ -323,10 +327,17 @@ public sealed class InstalledInstallHandoffTests
             File.WriteAllText(Path.Combine(path, "SKILL.md"), "---\nname: demo\n---\nInert fixture.");
             return Observe(new()
             {
-                Name = "demo", ResolvedPath = path, ScanRoot = root, Scope = Scope.User,
+                Name = "demo",
+                ResolvedPath = path,
+                ScanRoot = root,
+                Scope = Scope.User,
                 Agents = [new(agent, path, false, Scope: Scope.User)],
                 FrontMatter = new() { Name = "demo", Upstream = "https://github.com/" + repo, GithubPath = "skills/source" },
-                Validity = ValidityState.Valid, Provenance = Provenance.FsScan, Ignored = false, IsSymlinked = false, InstalledAt = null,
+                Validity = ValidityState.Valid,
+                Provenance = Provenance.FsScan,
+                Ignored = false,
+                IsSymlinked = false,
+                InstalledAt = null,
             });
         }
         internal InstalledSkill Observe(InstalledSkill skill) => skill with
@@ -334,9 +345,15 @@ public sealed class InstalledInstallHandoffTests
         internal InventorySnapshot Snapshot(params InstalledSkill[] skills)
         {
             var roots = skills.Select(skill => skill.ScanRoot).Distinct().Select(root => new ScanRoot(root, Scope.User, "universal")).ToImmutableArray();
-            return new() { Skills = skills.ToImmutableArray(), ConfiguredRoots = roots, ScannedRoots = roots,
+            return new()
+            {
+                Skills = skills.ToImmutableArray(),
+                ConfiguredRoots = roots,
+                ScannedRoots = roots,
                 Providers = roots.Select(root => new ProviderObservation("gh", true, [root.Path], DateTimeOffset.UtcNow)).ToImmutableArray(),
-                UsedGhSkillList = true, CapturedAt = DateTimeOffset.UtcNow };
+                UsedGhSkillList = true,
+                CapturedAt = DateTimeOffset.UtcNow
+            };
         }
         internal async Task<(InstallNavigationEvidence Evidence, IReadOnlyList<IReadOnlyList<string>> Folders)> AgentFolders(params string[] agents)
         {

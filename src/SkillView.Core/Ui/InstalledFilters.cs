@@ -80,8 +80,14 @@ internal sealed class InstalledFilters
                 sources.TryAdd(key, "Owner: " + owner.Provider + " / " + (owner.PluginName ?? owner.SourceUrl ?? owner.Source)
                     + (ownerContext is { } context ? " [" + context + "]" : ""));
                 sourceKeys.Add(key);
-                var claimedSource = SkillSourceIdentity.From(skill with { FrontMatter = SkillFrontMatter.Empty,
-                    Package = owner, OwnershipClaims = [], MetadataConflicts = [], ObservedSubject = null });
+                var claimedSource = SkillSourceIdentity.From(skill with
+                {
+                    FrontMatter = SkillFrontMatter.Empty,
+                    Package = owner,
+                    OwnershipClaims = [],
+                    MetadataConflicts = [],
+                    ObservedSubject = null
+                });
                 if (SourceKey(claimedSource) is { } claimKey)
                 {
                     sources.TryAdd(claimKey, "Source: " + InstalledOverview.SourceLabel(claimedSource));

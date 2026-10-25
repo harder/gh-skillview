@@ -231,23 +231,42 @@ public sealed class SkillViewWorkflowCoordinatorTests
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
             var environment = new Dictionary<string, string>
             {
-                ["HOME"] = home, ["USERPROFILE"] = home, ["PATH"] = "/usr/bin:/bin", ["FIXTURE_ROOT"] = Root,
-                ["XDG_CONFIG_HOME"] = Path.Combine(Root, "config"), ["XDG_STATE_HOME"] = Path.Combine(Root, "state"),
-                ["XDG_DATA_HOME"] = Path.Combine(Root, "data"), ["XDG_CACHE_HOME"] = Path.Combine(Root, "cache"),
-                ["CODEX_HOME"] = Path.Combine(home, ".codex"), ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, ".claude"),
+                ["HOME"] = home,
+                ["USERPROFILE"] = home,
+                ["PATH"] = "/usr/bin:/bin",
+                ["FIXTURE_ROOT"] = Root,
+                ["XDG_CONFIG_HOME"] = Path.Combine(Root, "config"),
+                ["XDG_STATE_HOME"] = Path.Combine(Root, "state"),
+                ["XDG_DATA_HOME"] = Path.Combine(Root, "data"),
+                ["XDG_CACHE_HOME"] = Path.Combine(Root, "cache"),
+                ["CODEX_HOME"] = Path.Combine(home, ".codex"),
+                ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, ".claude"),
                 ["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = Path.Combine(home, ".claude", "plugins"),
-                ["CLAUDE_CODE_PLUGIN_DIRS"] = "", ["CLAUDE_CODE_PLUGIN_SEED_DIR"] = "",
-                ["PI_CODING_AGENT_DIR"] = Path.Combine(home, ".pi"), ["GIT_DIR"] = Path.Combine(work, ".git"),
-                ["GIT_WORK_TREE"] = work, ["GIT_COMMON_DIR"] = Path.Combine(work, ".git"),
-                ["GIT_CONFIG_COUNT"] = "0", ["GIT_CONFIG_NOSYSTEM"] = "1", ["GIT_CONFIG_GLOBAL"] = "/dev/null"
+                ["CLAUDE_CODE_PLUGIN_DIRS"] = "",
+                ["CLAUDE_CODE_PLUGIN_SEED_DIR"] = "",
+                ["PI_CODING_AGENT_DIR"] = Path.Combine(home, ".pi"),
+                ["GIT_DIR"] = Path.Combine(work, ".git"),
+                ["GIT_WORK_TREE"] = work,
+                ["GIT_COMMON_DIR"] = Path.Combine(work, ".git"),
+                ["GIT_CONFIG_COUNT"] = "0",
+                ["GIT_CONFIG_NOSYSTEM"] = "1",
+                ["GIT_CONFIG_GLOBAL"] = "/dev/null"
             };
             Services = TuiServices.Build(new Logger(LogLevel.Debug), processEnvironment: environment, workingDirectory: work);
             var options = new GhSkillInstallService.Options(Agents: agents ?? ["universal"], Scope: "user", WorkingDirectory: work)
-                { NavigationSource = InstallNavigationEvidence.SourceAnchor("owner/repo", "skills/source/SKILL.md") };
+            { NavigationSource = InstallNavigationEvidence.SourceAnchor("owner/repo", "skills/source/SKILL.md") };
             var roots = GhPlacementCatalog.DestinationsAsync(options, Services.Runner, TestContext.Current.CancellationToken).GetAwaiter().GetResult();
             Evidence = InstallNavigationEvidence.Capture(options, roots, Services.Runner)!;
-            Report = new() { GhPath = script, GhVersionRaw = "2.103.2", GhVersion = null, GhMeetsMinimum = true,
-                Auth = GhAuthStatus.Unknown, GhSkillAvailable = true, LogDirectory = null };
+            Report = new()
+            {
+                GhPath = script,
+                GhVersionRaw = "2.103.2",
+                GhVersion = null,
+                GhMeetsMinimum = true,
+                Auth = GhAuthStatus.Unknown,
+                GhSkillAvailable = true,
+                LogDirectory = null
+            };
         }
         internal SkillViewWorkflowCoordinator Coordinator() => new(Services,
             new(InvocationMode.Standalone, DispatchMode.Tui, false, AppTheme.Default, [], null, []),

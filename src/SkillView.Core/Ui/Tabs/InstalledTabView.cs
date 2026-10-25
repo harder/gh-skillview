@@ -649,7 +649,9 @@ internal sealed class InstalledTabView : FrameView
     private string? FilterKey(int facet) => facet switch { 0 => _filters.Agent, 1 => _filters.Location, 2 => _filters.Source, _ => _filters.Issue };
     internal IReadOnlyList<InstalledFilterChoice> FilterChoices(int facet) => facet switch
     {
-        0 => _overview.Filters?.Agents ?? [], 1 => _overview.Filters?.Locations ?? [], 2 => _overview.Filters?.Sources ?? [],
+        0 => _overview.Filters?.Agents ?? [],
+        1 => _overview.Filters?.Locations ?? [],
+        2 => _overview.Filters?.Sources ?? [],
         _ => _overview.Filters?.IssueChoices(_issueView.Evidence, _issueView.Generation) ?? [],
     };
 
@@ -658,8 +660,13 @@ internal sealed class InstalledTabView : FrameView
         var choice = FilterChoices(facet).FirstOrDefault(c => c.Key == key);
         if (key is not null && choice is null) return;
         _chosenLabels[facet] = choice?.Label ?? "Any";
-        _filters = facet switch { 0 => _filters with { Agent = key }, 1 => _filters with { Location = key },
-            2 => _filters with { Source = key }, _ => _filters with { Issue = key } };
+        _filters = facet switch
+        {
+            0 => _filters with { Agent = key },
+            1 => _filters with { Location = key },
+            2 => _filters with { Source = key },
+            _ => _filters with { Issue = key }
+        };
         RefreshAll();
     }
 
@@ -712,7 +719,9 @@ internal sealed class InstalledTabView : FrameView
                     {
                         label = c.Key switch
                         {
-                            "unknown-source" => "Unknown", "conflicting-source" => "Conflict", "managed-owner" => "Managed",
+                            "unknown-source" => "Unknown",
+                            "conflicting-source" => "Conflict",
+                            "managed-owner" => "Managed",
                             _ when c.Key.StartsWith("source:", StringComparison.Ordinal) => label.Replace("Source: ", "", StringComparison.Ordinal).Split(" / ")[0],
                             _ => label.Replace("Owner: ", "", StringComparison.Ordinal).Split(" / ").Last().Split(" [")[0],
                         };
@@ -753,10 +762,16 @@ internal sealed class InstalledTabView : FrameView
         if (key is not null && !choices.Any(c => c.Key == key)) entries.Add(new(key, _chosenLabels[facet] + " (unavailable; 0 matches)"));
         entries.AddRange(choices);
         using var dialog = new Dialog { Title = FilterTitles[facet] + " — captured choices", Width = Dim.Percent(95), Height = 12, SchemeName = SchemeNames.Dialog };
-        var hint = new Label { X = 1, Y = 0, Width = Dim.Fill(2), Height = 2,
+        var hint = new Label
+        {
+            X = 1,
+            Y = 0,
+            Width = Dim.Fill(2),
+            Height = 2,
             Text = facet == 3 && _issueView.Evidence?.IsCurrent(_snapshot, _issueView.Generation) != true
                 ? "Issues not loaded. Visit Issues first. Unknown is not clean."
-                : "Choose directly with arrows/Enter; Esc cancels. No scan runs." };
+                : "Choose directly with arrows/Enter; Esc cancels. No scan runs."
+        };
         var list = new ListView { X = 1, Y = 2, Width = Dim.Fill(2), Height = Dim.Fill(1) };
         list.SetSource(new ObservableCollection<string>(entries.Select(c => (c.Key == (key ?? "") ? "* " : "  ") + c.Label)));
         list.SelectedItem = Math.Max(0, entries.FindIndex(c => c.Key == (key ?? "")));
@@ -980,11 +995,16 @@ internal sealed class InstalledTabView : FrameView
         }
         _actionsMenu?.Dispose();
         var key = _selectedKey;
-        _actionsMenu = new PopoverMenu(actions.Select(a => new MenuItem { Title = a.Label, Action = () =>
+        _actionsMenu = new PopoverMenu(actions.Select(a => new MenuItem
+        {
+            Title = a.Label,
+            Action = () =>
         {
             if (CanActOnSelection && _selectedKey == key && GetSelectedSkill() is { } current
                 && current.ResolvedPath == skill.ResolvedPath) a.Run();
-        } }).ToArray()) { App = App };
+        }
+        }).ToArray())
+        { App = App };
         _actionsMenu.MakeVisible();
     }
 
