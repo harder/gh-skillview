@@ -32,6 +32,7 @@ internal sealed partial class UpdatesTabView
 
     private void ClearUndo()
     {
+        ClearResourceNote();
         _undoResult = null;
         _undoReview = null;
         _undoApproval.Value = CheckState.UnChecked;
@@ -39,6 +40,7 @@ internal sealed partial class UpdatesTabView
 
     private void RememberUndo(UpdateResult result, UpdateResult displayResult, bool applying)
     {
+        ClearResourceNote();
         if (!applying || !result.Succeeded || result.Cancelled || result.ReconciliationPartial
             || !result.MutationAttempted || result.SavedPlan is not { Succeeded: true, Canceled: false, Status: "installed", MutationObserved: true } plan
             || !SavedUpdateCoordinator.IsRevisionUpdate(plan)) return;
@@ -78,6 +80,9 @@ internal sealed partial class UpdatesTabView
             || !execute && _undoReview is not null) return;
         using var ownership = _operationCancellations.TryBegin(_lifetimeToken);
         if (ownership is null) return;
+        ClearResourceNote();
+        _resourceIntent = null;
+        ShowResultPreview(_undoResult, false);
         var token = ownership.Token;
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var inspected = _undoReview;

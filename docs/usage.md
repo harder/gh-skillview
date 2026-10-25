@@ -548,6 +548,33 @@ Other copies remain **package not checked for this inventory capture** with thei
 own captured-scan semantics.
 This evidence is transient; CLI check schema 2 and queue schema 1 JSON are unchanged.
 
+For one eligible missing `references/` resource, **Installed → More actions →
+Review replacement for <path>** opens the existing update review for that exact
+physical copy. It appears only with a current complete payload check, valid
+tracked source, no pin and unambiguous supported ownership. Multiple distinct
+missing resource targets leave the ordinary update review available. Partial
+reference coverage and other Reviews remain visible.
+
+This replaces the **whole package**, retaining the original, including local
+edits and extras, for Undo. Choose **Review update** for latest (which may change
+revision), or **Choose version...** for one Git tag. The saved full comparison
+must show the resource absent in Installed and a regular file in Candidate before
+the review identifies it as a resource replacement. A candidate without that file
+keeps the ordinary review and Skip. Source acknowledgement and retention approval
+are independent and both required.
+
+After apply, the result and Undo are available immediately while a separate
+owned follow-up says **“Verifying package…”**. A fresh check of the exact installed
+path must match the saved candidate and verify the resource before reporting **“This resource was restored;
+other checks remain incomplete.”** Other findings stay Reviews or Problems;
+this does not establish package health. A failed or incomplete check reports
+**“Replacement installed; package verification incomplete.”** Native success and
+Undo remain available independently of that check. The result note belongs only
+to this activation's applied plan. Entering Undo, another operation, cancellation
+or leaving the review clears it; saved plans do not replay it. Undo restores the
+original missing-resource state and local edits. Run **K** again after Refresh
+to check that restored original.
+
 JSON schema 2 and the dialog show four independent assessments: portable metadata
 format, agent compatibility, payload integrity,
 and source review. A valid header can coexist with a broken asset or incompatible

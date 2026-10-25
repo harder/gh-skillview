@@ -4,6 +4,19 @@ Thanks for helping improve SkillView. Report bugs and feature requests in [GitHu
 
 ## Development
 
+For the opt-in targeted resource replacement journey, prepare official checksummed
+gh hosts with `tests/native/prepare-gh-proof-tool.py`, then run
+`TMPDIR=/var/tmp python3 tests/native/prove-reviewed-update-tui.py --app <built-skillview> --gh <verified-gh> --resource-replacement --columns 120 --rows 36 --output <receipt.json>`.
+Repeat at `--columns 80 --rows 24`. This uses actual network requests and native
+apply/Undo in a retained private HOME/state/CWD; skill code is never executed.
+Delegated gh authentication and unchanged native admission are required.
+The hidden cli/cli `.github/skills/cli-exercise` fixture installs unpinned with
+`--allow-hidden-dirs`. Its recorded `refs/tags/` prefix is removed once for the
+existing tag choice, with ref/tree asserted before and after preparation. A
+different frozen subtree stops the proof. Package B uses gh 2.97.0 and 2.103.2
+for local evidence only; CI's 2.102.0 lane is unchanged. Machine receipts do not
+replace the human release walkthrough.
+
 Build requirements:
 
 - the .NET SDK selected by [`global.json`](global.json)

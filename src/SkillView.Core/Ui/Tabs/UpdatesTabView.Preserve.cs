@@ -21,6 +21,8 @@ internal sealed partial class UpdatesTabView
         if (_review is not { PinPolicy: null } plan || _preserveRunner is null || _loadCancellations.HasActive) return;
         using var ownership = _operationCancellations.TryBegin(_lifetimeToken);
         if (ownership is null) return;
+        _resourceIntent = null;
+        ClearUndo();
         var token = ownership.Token;
         var generation = Interlocked.Increment(ref _reviewGeneration);
         _retainBox.Value = _sourceReviewBox.Value = CheckState.UnChecked;

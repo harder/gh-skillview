@@ -377,7 +377,7 @@ public sealed partial class SkillViewApp
     // No inventory discovery route: callers supply exactly one observed copy.
     private void OpenUpdatesWorkspace(OperationSubject? selected) => OpenUpdatesWorkspace(selected, prepareImmediately: true);
 
-    private void OpenUpdatesWorkspace(OperationSubject? selected, bool prepareImmediately)
+    private void OpenUpdatesWorkspace(OperationSubject? selected, bool prepareImmediately, PackageCheckFact? resourceFact = null, string? resourceTarget = null)
     {
         if (selected is null || _updatesTab is null || _updatesTab.Visible) return;
         _tabBeforeUpdateReview = _activeTab;
@@ -385,7 +385,7 @@ public sealed partial class SkillViewApp
         ShowSearchPanes(false);
         if (_installedTab is not null) _installedTab.Visible = false;
         if (_changesTab is not null) _changesTab.Visible = false;
-        _updatesTab.ActivateExactReview(selected, prepareImmediately);
+        _updatesTab.ActivateExactReview(selected, prepareImmediately, resourceFact, resourceTarget);
         RefreshShellChrome();
     }
 

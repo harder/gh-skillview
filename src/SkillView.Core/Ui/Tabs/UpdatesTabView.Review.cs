@@ -100,6 +100,8 @@ internal sealed partial class UpdatesTabView
     {
         if (_undoReview is not null || _operationCancellations.HasActive || _loadCancellations.HasActive) return Task.CompletedTask;
         if (_review is null) return _inventoryNeedsRefresh ? LoadAsync() : Task.CompletedTask;
+        _resourceIntent = null;
+        ClearResourceNote();
         _review = null;
         _retainBox.Value = CheckState.UnChecked;
         _sourceReviewBox.Value = CheckState.UnChecked;
@@ -111,7 +113,8 @@ internal sealed partial class UpdatesTabView
         return Task.CompletedTask;
     }
 
-    private async Task ExecuteReviewOperationAsync(Func<CancellationToken, Task<UpdateResult>> operation, bool applying = false, bool unpinOnly = false)
+    private async Task ExecuteReviewOperationAsync(Func<CancellationToken, Task<UpdateResult>> operation, bool applying = false, bool unpinOnly = false,
+        ResourceIntent? preparingResource = null)
     {
         using var ownership = _operationCancellations.TryBegin(_lifetimeToken);
         if (ownership is null) return;
@@ -119,6 +122,8 @@ internal sealed partial class UpdatesTabView
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var token = ownership.Token;
         var capturedReview = applying ? _review : null;
+        var resource = applying ? _resourceIntent : preparingResource;
+        var resourceRevisionTag = applying ? _options?.Tag : null;
         var invalidated = false;
         SetBusy(true);
         SetOperationControlsEnabled(false);
@@ -136,6 +141,7 @@ internal sealed partial class UpdatesTabView
                 _inventoryNeedsRefresh |= result.MutationAttempted;
                 SaveOutcomes(result.Outcomes);
                 _review = applying ? null : result.SavedPlan;
+                if (!applying) BindResourceReview(preparingResource, _review);
                 _retainBox.Value = CheckState.UnChecked;
                 _sourceReviewBox.Value = CheckState.UnChecked;
                 var itemResult = result;
@@ -153,6 +159,11 @@ internal sealed partial class UpdatesTabView
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);
                 if (_preview.Visible) _preview.SetFocus();
+                if (applying)
+                {
+                    StartResourceVerification(resource, itemResult, resourceRevisionTag);
+                    _resourceIntent = null;
+                }
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -164,6 +175,8 @@ internal sealed partial class UpdatesTabView
             await _runOnUi(() =>
             {
                 if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
+                _resourceIntent = null;
+                ClearResourceNote();
                 if (applying)
                 {
                     _inventoryNeedsRefresh = true;

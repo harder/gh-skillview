@@ -34,8 +34,8 @@ internal sealed partial class UpdatesTabView
     }
 
     private void ShowResultPreview(UpdateResult result, bool unpinOnly) =>
-        ShowPreview(UpdateReviewPresentation.Result(result, _review is not null),
-            UpdateScreen.RenderResult(result, unpinOnly: unpinOnly));
+        ShowPreview(UpdateReviewPresentation.Result(result, _review is not null) + ResourcePresentation(result),
+            UpdateScreen.RenderResult(result, unpinOnly: unpinOnly) + ResourcePresentation(result));
 
     private void ShowPlanPreview(ReplacementResult plan, bool awaitingReview) =>
         ShowPreview(UpdateReviewPresentation.Plan(plan, awaitingReview), UpdateScreen.RenderPlan(plan));
@@ -53,7 +53,9 @@ internal sealed partial class UpdatesTabView
     {
         if (_undoReview is not null || _review is not null || _choosingVersion || _inventoryNeedsRefresh) return;
         if (_target is not { } target) return;
-        ShowPreview(UpdateReviewPresentation.Selection(target), "## Selected installation\n\n" + InstalledScreen.RenderDetail(target, showDetails: true, showShortcuts: false));
+        var disclosure = _resourceIntent is { } intent ? "\n\nReview replacement for " + MarkdownTableFormatter.FormatCodeSpan(intent.Target)
+            + ". " + PackageResourceReplacement.Disclosure : "";
+        ShowPreview(UpdateReviewPresentation.Selection(target) + disclosure, "## Selected installation\n\n" + InstalledScreen.RenderDetail(target, showDetails: true, showShortcuts: false) + disclosure);
     }
 
     // Only layout and visibility change here. Review/apply admission stays in

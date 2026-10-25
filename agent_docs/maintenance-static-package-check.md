@@ -99,3 +99,10 @@ The dialog uses `ModalOperationTracker` ownership through queued completion.
 Closing cancels and drains its worker before disposing controls; parent lifetime
 cancellation suppresses a queued successful result. All UI mutations are dispatched
 through the application while the dialog is active.
+
+Installed's conditional resource-replacement action is separate from checking.
+Its narrow fact/intent/full-comparison/postcheck contract is in
+[package-check contracts](contracts-package-checks.md). It uses ordinary
+schema-2 saved whole-package replacement and both existing approvals; it is not
+an automated fix, resource editor or parser extension. The static checker still
+does no remote work or mutation.

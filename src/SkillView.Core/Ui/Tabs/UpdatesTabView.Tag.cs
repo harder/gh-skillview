@@ -52,8 +52,8 @@ internal sealed partial class UpdatesTabView
             _runTask(() => ReloadChosenTagAsync(selected, tag, hidden, reloadSubject, loadGeneration, viewState, chooserError), "updates.reload-after-version-choice");
             return;
         }
-        if (chooserError is not null) { _status.Text = $" version chooser failed: {chooserError}; no candidate prepared"; return; }
-        if (tag is null) { _status.Text = " version selection canceled; no candidate prepared"; return; }
+        if (chooserError is not null) { _resourceIntent = null; _status.Text = $" version chooser failed: {chooserError}; no candidate prepared"; return; }
+        if (tag is null) { _resourceIntent = null; _status.Text = " version selection canceled; no candidate prepared"; return; }
         _runTask(() => RunChosenTagAsync(selected, tag, hidden), "updates.choose-version");
     }
 
@@ -133,6 +133,6 @@ internal sealed partial class UpdatesTabView
         _options = options;
         _outcomes.Clear();
         _results = new();
-        await ExecuteReviewOperationAsync(token => _updateRunner(ghPath, options, token)).ConfigureAwait(false);
+        await PrepareSelectedAsync(ghPath, options).ConfigureAwait(false);
     }
 }
