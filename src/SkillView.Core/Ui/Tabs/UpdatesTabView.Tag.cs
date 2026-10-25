@@ -11,21 +11,17 @@ internal sealed partial class UpdatesTabView
 {
     private bool _versionReloadPending;
     private OperationSubject? _versionReloadSubject;
-    private sealed record VersionChoiceViewState(string[] MarkedIds, string SelectedId, string? ContextId,
-        CheckState All, CheckState Unpin, View? Focused);
+    private sealed record VersionChoiceViewState(string? ContextId, CheckState Unpin, View? Focused);
 
     private void ChooseVersion()
     {
         if (_choosingVersion || _undoReview is not null || _inventoryNeedsRefresh || _lifetimeToken.IsCancellationRequested || _operationCancellations.HasActive
-            || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
-        var row = _table.GetSelectedRow();
-        if (row < 0 || row >= _skills.Count) { _status.Text = " select one physical installation first"; return; }
-        var selected = _skills[row];
+            || _loadCancellations.HasActive || _review is not null) return;
+        if (_target is not { } selected) return;
         if (selected.Pinned)
         { _status.Text = " pin retained; plan and apply a separate unpin review before choosing a tag"; return; }
-        var viewState = new VersionChoiceViewState(_wrapper?.CheckedRows.Where(index => index >= 0 && index < _skills.Count)
-            .Select(index => _skills[index].InstallationId).ToArray() ?? [], selected.InstallationId,
-            _drillInSubject?.InstallationId, _allBox.Value, _unpinBox.Value, SubViews.FirstOrDefault(view => view.HasFocus));
+        var viewState = new VersionChoiceViewState(_drillInSubject?.InstallationId,
+            _unpinBox.Value, SubViews.FirstOrDefault(view => view.HasFocus));
         string? tag = null;
         string? chooserError = null;
         var loadGeneration = Interlocked.Read(ref _loadGeneration);
@@ -51,7 +47,7 @@ internal sealed partial class UpdatesTabView
         }
         if (_lifetimeToken.IsCancellationRequested || loadGeneration != Interlocked.Read(ref _loadGeneration)) return;
         var hidden = _hiddenBox.Value == Terminal.Gui.Views.CheckState.Checked;
-        if (reload)
+        if (reload && reloadSubject is not null)
         {
             _runTask(() => ReloadChosenTagAsync(selected, tag, hidden, reloadSubject, loadGeneration, viewState, chooserError), "updates.reload-after-version-choice");
             return;
@@ -62,31 +58,21 @@ internal sealed partial class UpdatesTabView
     }
 
     private async Task ReloadChosenTagAsync(InstalledSkill selected, string? tag, bool hidden,
-        OperationSubject? subject, long generation, VersionChoiceViewState viewState, string? chooserError)
+        OperationSubject subject, long generation, VersionChoiceViewState viewState, string? chooserError)
     {
         if (!IsCurrentLoad(generation)) return;
-        if (_choosingVersion || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive)
+        if (_choosingVersion || _review is not null || _operationCancellations.HasActive)
         {
             _status.Text = " version choice not prepared; finish the current review, then refresh inventory";
             return;
         }
-        var capture = await LoadForSubjectCoreAsync(subject).ConfigureAwait(false);
+        var capture = await LoadForSubjectAsync(subject).ConfigureAwait(false);
         if (capture is not { } fresh) return; // The loader preserves failures/cancellation.
         await _runOnUi(() =>
         {
             if (!IsCurrentLoad(fresh.Generation)) return;
-            if (subject?.InstallationId == viewState.ContextId)
+            if (subject.InstallationId == viewState.ContextId)
             {
-                // Keep selection/marks by physical ID when rows reorder. A new
-                // Changes drill-in retains its deliberate broad-option reset.
-                var rows = _skills.Select((skill, index) => (skill.InstallationId, Index: index))
-                    .GroupBy(row => row.InstallationId).Where(group => group.Count() == 1)
-                    .ToDictionary(group => group.Key, group => group.Single().Index, StringComparer.Ordinal);
-                _wrapper?.CheckedRows.Clear();
-                foreach (var id in viewState.MarkedIds)
-                    if (rows.TryGetValue(id, out var marked)) _wrapper?.CheckedRows.Add(marked);
-                if (rows.TryGetValue(viewState.SelectedId, out var current)) _table.SetSelectedRow(current);
-                _allBox.Value = viewState.All;
                 _unpinBox.Value = viewState.Unpin;
                 viewState.Focused?.SetFocus();
             }
@@ -102,12 +88,12 @@ internal sealed partial class UpdatesTabView
             }
             var target = MaintenanceQueueBuilder.ResolveInstallation(fresh.Snapshot, OperationSubject.From(selected));
             if (target is null || !SameVersionChoice(selected, target)
-                || subject is not null && (subject.InstallationId != selected.InstallationId || !PathIdentity.Equals(subject.Path, selected.ResolvedPath)))
+                || (subject.InstallationId != selected.InstallationId || !PathIdentity.Equals(subject.Path, selected.ResolvedPath)))
             {
                 _status.Text = " installation changed, missing or ambiguous; choose its version again";
                 return;
             }
-            if (_choosingVersion || _loadCancellations.HasActive || _operationCancellations.HasActive || _review is not null || _queue.Count > 0)
+            if (_choosingVersion || _loadCancellations.HasActive || _operationCancellations.HasActive || _review is not null)
             {
                 _status.Text = " version choice not prepared; finish the current review, then refresh inventory";
                 return;
@@ -134,7 +120,7 @@ internal sealed partial class UpdatesTabView
     {
         if (_lifetimeToken.IsCancellationRequested) return;
         if (string.IsNullOrWhiteSpace(tag)) { _status.Text = " enter one Git tag; no candidate prepared"; return; }
-        if (_choosingVersion || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0)
+        if (_choosingVersion || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null)
         {
             _status.Text = " version choice not prepared; finish the current operation or review, then refresh inventory";
             return;
@@ -144,9 +130,9 @@ internal sealed partial class UpdatesTabView
         if (selected.Pinned) { _status.Text = " pin retained; unpin separately before choosing a tag"; return; }
         var options = new GhSkillUpdateService.Options([selected.Name], false, false, false,
             Targets: [selected], AllowHiddenDirectories: hidden, Tag: tag);
-        _queueOptions = options;
-        _queueOutcomes.Clear();
-        _queueResults = new();
-        await ExecuteReviewOperationAsync(token => _updateRunner(ghPath, options, token), dryRun: false).ConfigureAwait(false);
+        _options = options;
+        _outcomes.Clear();
+        _results = new();
+        await ExecuteReviewOperationAsync(token => _updateRunner(ghPath, options, token)).ConfigureAwait(false);
     }
 }

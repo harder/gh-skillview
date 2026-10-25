@@ -14,12 +14,11 @@ internal sealed partial class UpdatesTabView
     private CheckBox _sourceReviewBox = null!;
     private CheckBox _retainBox = null!;
     private Button _applyButton = null!;
-    private Button _nextButton = null!;
+    private Button _finishButton = null!;
     private ReplacementResult? _review;
-    private Queue<InstalledSkill> _queue = new();
-    private GhSkillUpdateService.Options? _queueOptions;
-    private readonly List<InstallationUpdateOutcome> _queueOutcomes = [];
-    private UpdateResultAccumulator _queueResults = new();
+    private GhSkillUpdateService.Options? _options;
+    private readonly List<InstallationUpdateOutcome> _outcomes = [];
+    private UpdateResultAccumulator _results = new();
     private long _reviewGeneration;
 
     private void InitializeReviewControls()
@@ -46,11 +45,11 @@ internal sealed partial class UpdatesTabView
             Text = "Replace reviewed",
             Enabled = false
         };
-        _nextButton = new SingleRowButton
+        _finishButton = new SingleRowButton
         {
             X = Pos.Right(_applyButton) + 2,
             Y = Pos.AnchorEnd(2),
-            Text = "Next / skip",
+            Text = "Skip review",
             Enabled = false
         };
         _retainBox.ValueChanged += (_, _) => RefreshReviewControls();
@@ -59,12 +58,12 @@ internal sealed partial class UpdatesTabView
             args.Handled = true;
             _runTask(ApplyReviewAsync, "updates.apply-reviewed");
         };
-        _nextButton.Accepting += (_, args) =>
+        _finishButton.Accepting += (_, args) =>
         {
             args.Handled = true;
-            _runTask(SkipAndPrepareNextAsync, "updates.next-review");
+            _runTask(FinishReviewAsync, "updates.close-review");
         };
-        TuiHelpers.ApplyScheme(Theming.SchemeNames.Base, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
+        TuiHelpers.ApplyScheme(Theming.SchemeNames.Base, _sourceReviewBox, _retainBox, _applyButton, _finishButton);
     }
 
     private void RefreshReviewControls()
@@ -79,20 +78,11 @@ internal sealed partial class UpdatesTabView
         _retainBox.Text = _review?.PinPolicy is not null
             ? "Retain original; clear only pin policy for all affected consumers"
             : "Retain original, including local edits; apply this reviewed plan";
-        _nextButton.Text = _inventoryNeedsRefresh && _review is null && _queue.Count == 0 ? "Refresh inventory" : "Next / skip";
-        _nextButton.Enabled = idle && (_review is not null || _queue.Count > 0 || _inventoryNeedsRefresh);
+        _finishButton.Text = _inventoryNeedsRefresh && _review is null ? "Refresh inventory" : "Skip review";
+        _finishButton.Enabled = idle && (_review is not null || _inventoryNeedsRefresh);
         _preserveButton.Enabled = idle && _review is { PinPolicy: null } && _preserveRunner is not null;
         RefreshUndoControls(idle);
         RefreshPresentation();
-    }
-
-    private async Task PrepareNextAsync()
-    {
-        if (_operationCancellations.HasActive || _review is not null || _queueOptions is null || !_queue.TryDequeue(out var target)) return;
-        var ghPath = _ghPathProvider();
-        if (ghPath is null) { _status.Text = " gh unavailable; remaining targets were not started"; return; }
-        var options = _queueOptions with { Targets = [target], Skills = [target.Name], All = false };
-        await ExecuteReviewOperationAsync(token => _updateRunner(ghPath, options, token), dryRun: false).ConfigureAwait(false);
     }
 
     private async Task ApplyReviewAsync()
@@ -100,47 +90,39 @@ internal sealed partial class UpdatesTabView
         if (_review is not { } captured || _applyRunner is null || _retainBox.Value != CheckState.Checked
             || captured.SourceReview is not null && _sourceReviewBox.Value != CheckState.Checked
             || _operationCancellations.HasActive || _loadCancellations.HasActive) return;
-        var hidden = _queueOptions?.AllowHiddenDirectories ?? false;
+        var hidden = _options?.AllowHiddenDirectories ?? false;
         if (captured.SourceReview is not null) captured = captured with { AcknowledgeSourceReview = _sourceReviewBox.Value == CheckState.Checked };
-        await ExecuteReviewOperationAsync(token => _applyRunner(captured, hidden, token), dryRun: false, applying: true,
+        await ExecuteReviewOperationAsync(token => _applyRunner(captured, hidden, token), applying: true,
             unpinOnly: captured.PinPolicy is not null).ConfigureAwait(false);
     }
 
-    private Task SkipAndPrepareNextAsync()
+    private Task FinishReviewAsync()
     {
         if (_undoReview is not null || _operationCancellations.HasActive || _loadCancellations.HasActive) return Task.CompletedTask;
-        if (_inventoryNeedsRefresh && _review is null && _queue.Count == 0)
-            return LoadForSubjectAsync(_drillInSubject);
-        if (_review is { } review)
-        {
-            SaveOutcomes([new(review.Subject.InstallationId, review.OriginalPath, "skipped", null, null, [], 0, [],
-                $"Saved plan {review.Id} retained without applying; manifest: {review.PlanPath}")]);
-            _review = null;
-        }
+        if (_review is null) return _inventoryNeedsRefresh ? LoadAsync() : Task.CompletedTask;
+        _review = null;
         _retainBox.Value = CheckState.UnChecked;
         _sourceReviewBox.Value = CheckState.UnChecked;
-        if (_queue.Count > 0) return PrepareNextAsync();
-        _queueOptions = null;
-        var next = _inventoryNeedsRefresh ? "Refresh inventory before another review." : "Choose an installation for another review.";
-        _status.Text = " review queue complete; " + next;
-        ShowPreview("## Review queue complete\n\nSaved evidence remains available in F2 Details. " + next, _technicalPreview);
+        _options = null;
+        const string next = "Return to Installed or Issues to choose another copy.";
+        _status.Text = " review closed; " + next;
+        ShowPreview("## Review closed\n\nThe prepared change was retained without applying. Saved evidence remains available in F2 Details. " + next, _technicalPreview);
         SetOperationControlsEnabled(true);
         return Task.CompletedTask;
     }
 
-    private async Task ExecuteReviewOperationAsync(Func<CancellationToken, Task<UpdateResult>> operation, bool dryRun, bool applying = false, bool unpinOnly = false)
+    private async Task ExecuteReviewOperationAsync(Func<CancellationToken, Task<UpdateResult>> operation, bool applying = false, bool unpinOnly = false)
     {
         using var ownership = _operationCancellations.TryBegin(_lifetimeToken);
         if (ownership is null) return;
         if (!applying) ClearUndo();
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var token = ownership.Token;
-        var initiatingFocus = SubViews.FirstOrDefault(view => view.HasFocus);
         var capturedReview = applying ? _review : null;
         var invalidated = false;
         SetBusy(true);
         SetOperationControlsEnabled(false);
-        _status.Text = dryRun ? " checking availability…" : applying ? " applying the reviewed candidate…"
+        _status.Text = applying ? " applying the reviewed candidate…"
             : unpinOnly ? " capturing installed content for a pin-only review…" : " preparing one exact candidate…";
         try
         {
@@ -151,36 +133,26 @@ internal sealed partial class UpdatesTabView
             await _runOnUi(() =>
             {
                 if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
-                if (!dryRun)
-                {
-                    _inventoryNeedsRefresh |= result.MutationAttempted;
-                    SaveOutcomes(result.Outcomes);
-                    _review = applying ? null : result.SavedPlan;
-                    _retainBox.Value = CheckState.UnChecked;
-                    _sourceReviewBox.Value = CheckState.UnChecked;
-                    var itemResult = result;
-                    result = _queueResults.Append(result) with { Outcomes = _queueOutcomes.ToImmutableArray() };
-                    RememberUndo(itemResult, result, applying);
-                }
-                ShowResultPreview(result, dryRun, unpinOnly);
-                _status.Text = dryRun ? result.Succeeded ? " availability check complete; no saved-plan quota consumed" : " availability check failed; inspect outcomes"
-                    : _review?.PinPolicy is not null ? " pin-only review required · inspect all consumers, approve retention, then Apply unpin only"
-                    : _review is not null ? $" review required · {_queue.Count} remaining · choose Preserve installed or approve Replace reviewed"
+                _inventoryNeedsRefresh |= result.MutationAttempted;
+                SaveOutcomes(result.Outcomes);
+                _review = applying ? null : result.SavedPlan;
+                _retainBox.Value = CheckState.UnChecked;
+                _sourceReviewBox.Value = CheckState.UnChecked;
+                var itemResult = result;
+                result = _results.Append(result) with { Outcomes = _outcomes.ToImmutableArray() };
+                RememberUndo(itemResult, result, applying);
+                ShowResultPreview(result, unpinOnly);
+                _status.Text = _review?.PinPolicy is not null ? " pin-only review required · inspect all consumers, approve retention, then Apply unpin only"
+                    : _review is not null ? " review required · choose Preserve installed or approve Replace reviewed"
                     : result.Cancelled ? " canceled; inspect saved evidence before recovery"
-                    : !result.Succeeded ? $" failed/refused: {TuiHelpers.ErrorSnippet(result.ErrorMessage)} · {_queue.Count} remaining"
-                    : _queue.Count > 0 ? $" {result.Outcomes.LastOrDefault()?.Status ?? "complete"} · {_queue.Count} remaining · Next / skip continues"
-                    : $" {result.Outcomes.LastOrDefault()?.Status ?? "complete"} · no remaining items · {(_inventoryNeedsRefresh ? "Refresh inventory before another review" : "F2 Details for outcome")}";
-                if (_review is null && _queue.Count == 0) _queueOptions = null;
+                    : !result.Succeeded ? $" failed/refused: {TuiHelpers.ErrorSnippet(result.ErrorMessage)}"
+                    : $" {result.Outcomes.LastOrDefault()?.Status ?? "complete"} · {(_inventoryNeedsRefresh ? "Refresh inventory before another review" : "F2 Details for outcome")}";
+                if (_review is null) _options = null;
                 SetBusy(false);
                 // Ownership remains held until the queued callback returns.
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);
-                if (dryRun && _table.Visible)
-                {
-                    if (initiatingFocus is { Visible: true, Enabled: true, CanFocus: true }) initiatingFocus.SetFocus();
-                    else _table.SetFocus();
-                }
-                else if (_preview.Visible) _preview.SetFocus();
+                if (_preview.Visible) _preview.SetFocus();
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -205,10 +177,10 @@ internal sealed partial class UpdatesTabView
                             "recovery-required", null, null, [], 0, [], "Unexpected apply failure; inspect the saved plan before recovery.")]
                     };
                     SaveOutcomes(failure.Outcomes);
-                    ShowResultPreview(_queueResults.Append(failure) with { Outcomes = _queueOutcomes.ToImmutableArray() }, false, unpinOnly);
+                    ShowResultPreview(_results.Append(failure) with { Outcomes = _outcomes.ToImmutableArray() }, unpinOnly);
                 }
                 _status.Text = $" operation failed: {TuiHelpers.ErrorSnippet(ex.Message)}; inspect saved evidence";
-                if (_review is null && _queue.Count == 0) _queueOptions = null;
+                if (_review is null) _options = null;
                 SetBusy(false);
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);
@@ -220,13 +192,13 @@ internal sealed partial class UpdatesTabView
     {
         foreach (var outcome in outcomes)
         {
-            _queueOutcomes.RemoveAll(prior => prior.InstallationId == outcome.InstallationId);
-            _queueOutcomes.Add(outcome);
+            _outcomes.RemoveAll(prior => prior.InstallationId == outcome.InstallationId);
+            _outcomes.Add(outcome);
         }
     }
 
     internal Task ApplyReviewForTestsAsync() => ApplyReviewAsync();
-    internal Task NextReviewForTestsAsync() => SkipAndPrepareNextAsync();
+    internal Task FinishReviewForTestsAsync() => FinishReviewAsync();
     internal CheckBox SourceReviewBoxForTests => _sourceReviewBox;
     internal CheckBox RetainBoxForTests => _retainBox;
     internal Button ApplyButtonForTests => _applyButton;

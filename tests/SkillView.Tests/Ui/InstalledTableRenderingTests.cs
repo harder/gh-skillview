@@ -1,7 +1,9 @@
 using System.Drawing;
+using System.Collections.Immutable;
 using SkillView.Inventory.Models;
 using SkillView.Ui;
 using SkillView.Ui.Tabs;
+using SkillView.Maintenance;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
@@ -15,6 +17,54 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class InstalledTableRenderingTests
 {
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 36)]
+    public void AvailabilityRefreshPreservesFilterSelectionAndTableAndDetailScroll(int width, int height)
+    {
+        using var app = Application.Create().Init("ansi");
+        app.Driver!.SetScreenSize(width, height);
+        using var window = new Window();
+        var skills = Enumerable.Range(0, 60).Select(index => MaintenanceQueueTests.Skill("/skills/skill-" + index.ToString("D2"), "https://github.com/owner/repo")
+            with
+        { Name = "skill-" + index.ToString("D2") }).ToImmutableArray();
+        var snapshot = InventorySnapshot.Empty with { Skills = skills };
+        var availability = new UpdateAvailabilitySession();
+        var request = availability.Begin(snapshot, 1, "context");
+        var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
+            _ => Task.FromResult(snapshot), (_, _, _) => Task.CompletedTask, () => { }, () => { }, availability: availability)
+        { Width = Dim.Fill(), Height = Dim.Fill() };
+        window.Add(view);
+        view.LoadSeeded(snapshot);
+        var session = app.Begin(window);
+        try
+        {
+            view.SetFilterTextForTests("skill");
+            var table = view.SubViews.OfType<TableView>().Single();
+            view.FocusList();
+            window.Layout(); window.Draw(new DrawContext());
+            for (var index = 0; index < 30; index++) app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.CursorDown));
+            view.NewKeyDownEvent(new Key(KeyCode.F2));
+            window.Layout(); window.Draw(new DrawContext());
+            var rowOffset = table.RowOffset;
+            Assert.True(rowOffset > 0);
+            var detail = view.SubViews.OfType<Markdown>().Single();
+            detail.ScrollVertical(5);
+            window.Draw(new DrawContext());
+            var detailOffset = detail.Viewport.Y;
+            Assert.True(detailOffset > 0);
+            availability.Publish(request, 1, "context", skills[30], new(UpdateAvailabilityStatus.Available, "gh reports a new tree.", DateTimeOffset.Now));
+            view.RefreshAvailability();
+            window.Layout(); window.Draw(new DrawContext());
+            Assert.Equal("skill", view.GetFilterText());
+            Assert.Equal(skills[30].InstallationId, view.GetSelectedSkill()!.InstallationId);
+            Assert.Equal(rowOffset, table.RowOffset);
+            Assert.Equal(detailOffset, detail.Viewport.Y);
+            Assert.Equal("Available", table.Table![30, 4]);
+        }
+        finally { app.End(session!); }
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

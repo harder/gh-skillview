@@ -31,8 +31,9 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
 
 - Ordinary CLI/TUI updates use `SavedUpdateCoordinator`: prepare one immutable
   candidate, review, then apply its saved ID/fingerprint with explicit retention
-  approval. Only availability checks use the low-level mutable gh update adapter
-  in dry-run mode. Never prepare every sibling before applying the first: native
+  approval. Main-view availability checks use the narrow exact-target read path on
+  `SkillUpdateCoordinator` and the gh adapter in dry-run mode; they never capture
+  full payloads or prepare saved plans. Never prepare every sibling before applying the first: native
   parent/root generations change. Keep the next preparation after prior apply
   reconciliation, which must survive canceled view/UI dispatch. Availability
   checks cannot consume retained-plan quota. See `docs/saved-updates.md`.
@@ -48,8 +49,8 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
 - One-time version choice uses the existing schema-2 saved update path for an
   exact Git tag and one physical installation. Never fall back to latest or
   forward tag options to mutable gh update adapters. Existing pins require a
-  separate unpin review. TUI version choice targets the current row regardless
-  of marks/All; every shared consumer remains affected. It creates no lasting
+  separate unpin review. TUI version choice targets its one exact seeded copy;
+  every shared consumer remains affected. It creates no lasting
   version policy: later ordinary updates still follow latest.
 
 - Local source switching uses schema6 `switch-local-source`, a separate
@@ -179,7 +180,8 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   Validate persisted schema-2 owner transitions against exact fresh or historical
   serialization; no-op preparation changes must not strand older recovery plans.
   Preserve bounded stdout/stderr and earlier mutation/failure evidence across
-  the captured update queue without reusing its prior Apply target. See
+  each saved operation and any backend batch without reusing a prior Apply target.
+  The TUI operation surface has one seeded copy and no browser queue. See
   `agent_docs/maintenance-update-outcomes.md` for the contract and proof commands.
 
 - Ordinary Cleanup Ignore and CLI `ignore` write only the private sibling

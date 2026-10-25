@@ -19,6 +19,15 @@ namespace SkillView.Ui;
 /// consistent and avoids duplicating truncation / label logic.
 internal static class TuiHelpers
 {
+    internal static void RestoreMarkdownScroll(Markdown pane, System.Drawing.Point location)
+    {
+        if (pane.Frame.Width <= 0 || pane.Frame.Height <= 0) return;
+        // Markdown resets its viewport when new text is laid out. Complete that
+        // layout before restoring the reader's offset after a check refresh.
+        pane.Layout();
+        pane.Viewport = pane.Viewport with { X = location.X, Y = location.Y };
+    }
+
     internal static AppTheme CurrentTheme { get; private set; } = AppTheme.Default;
 
     internal static void SetTheme(AppTheme theme) => CurrentTheme = theme;

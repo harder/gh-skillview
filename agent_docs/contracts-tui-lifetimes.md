@@ -250,3 +250,17 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   available. Report removal preflight failures in the owned UI completion with
   readable guidance and full exception logging; canceled owners must not publish
   stale failures. Keep focus-gain bookkeeping separate from visibility handoffs.
+
+- Update availability is app-owned transient observation in
+  `UpdateAvailabilitySession`, shared by Installed and Issues. Checks are explicit,
+  use at most four exact-copy dry-runs, and never prepare candidates or capture
+  payloads. Catalog invalidation cancels checks and marks prior observations stale;
+  queued publication checks request, catalog generation, app lifetime and exact
+  source/owner evidence. Main review opens the saved-update operation for one
+  exact subject without an inventory browser or second copy picker.
+
+- Updates operation review requires an exact seeded subject. Keep its inventory
+  loader restricted to that subject across refresh and version-choice deferral;
+  a failed/missing/ambiguous capture clears the actionable target. The retired
+  full inventory browser, marks/All, UI sibling queue and dry-run action must
+  not be reintroduced as test helpers. Main-view availability remains separate.

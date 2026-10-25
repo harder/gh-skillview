@@ -1,4 +1,5 @@
 using SkillView.Inventory.Models;
+using SkillView.Maintenance;
 using SkillView.Ui.Theming;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
@@ -45,6 +46,13 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action<InstalledSkill>? _onLocalReimport;
     private readonly Action<InstalledSkill>? _onLocalSourceSwitch;
     private readonly CancellationToken _lifetimeToken;
+    private readonly UpdateAvailabilitySession? _availability;
+    private readonly Action? _onCheckUpdates;
+    private readonly Action<InstalledSkill>? _onReviewUpdate;
+    private readonly Button _checkUpdates;
+    private readonly Button _reviewUpdate;
+    private readonly Label _updateStatus;
+    private bool _disposed;
 
     private readonly TextField _filterField;
     private readonly TableView _table;
@@ -86,7 +94,9 @@ internal sealed class InstalledTabView : FrameView
         Action<AggregateException>? onCancellationCallbackException = null,
         Action<InstalledSkill>? onPackageCheck = null,
         Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null,
-        Action<Exception>? onRemovalError = null, Func<string, bool>? openPath = null)
+        Action<Exception>? onRemovalError = null, Func<string, bool>? openPath = null,
+        UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null,
+        Action<InstalledSkill>? onReviewUpdate = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
@@ -101,12 +111,20 @@ internal sealed class InstalledTabView : FrameView
         _onLocalReimport = onLocalReimport;
         _onLocalSourceSwitch = onLocalSourceSwitch;
         _lifetimeToken = lifetimeToken;
+        _availability = availability;
+        _onCheckUpdates = onCheckUpdates;
+        _onReviewUpdate = onReviewUpdate;
         _loadCancellations = new CancellationOperationSlot(onCancellationCallbackException);
         _removeCancellations = new CancellationOperationSlot(onCancellationCallbackException);
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
         Visible = false;
+        _checkUpdates = new SingleRowButton { X = 0, Y = 2, Text = "Check updates (C)", Visible = availability is not null };
+        _reviewUpdate = new SingleRowButton { X = Pos.Right(_checkUpdates) + 1, Y = 2, Text = "Review update (u)", Visible = availability is not null };
+        _updateStatus = new Label { X = Pos.Right(_reviewUpdate) + 1, Y = 2, Width = Dim.Fill(), Text = "Updates not checked", Visible = availability is not null };
+        _checkUpdates.Accepting += (_, e) => { e.Handled = true; _onCheckUpdates?.Invoke(); };
+        _reviewUpdate.Accepting += (_, e) => { e.Handled = true; ReviewSelectedUpdate(); };
 
         var filterLabel = new Label { Text = "Filter:", X = 0, Y = 0 };
         _filterField = new TextField
@@ -128,6 +146,7 @@ internal sealed class InstalledTabView : FrameView
         {
             X = 0,
             Y = 1,
+            Height = 1,
             Width = Dim.Fill(),
             Text = BuildLegendText(),
             Enabled = false,
@@ -234,8 +253,8 @@ internal sealed class InstalledTabView : FrameView
         TuiHelpers.ApplyScheme(SchemeNames.Base,
             this, filterLabel, searchScopeLabel, legendLabel, _filterField, _table, _detail, _footer, _spinner);
 
-        Add(filterLabel, searchScopeLabel, legendLabel, _filterField, _table, _detail, _spinner, _footer);
-        Disposing += (_, _) => CancelPendingWork();
+        Add(filterLabel, searchScopeLabel, legendLabel, _filterField, _table, _detail, _spinner, _footer, _checkUpdates, _reviewUpdate, _updateStatus);
+        Disposing += (_, _) => { _disposed = true; CancelPendingWork(); };
     }
 
     /// Kick off a snapshot load and reveal the tab. Safe to call repeatedly —
@@ -417,6 +436,7 @@ internal sealed class InstalledTabView : FrameView
             ["Loc"] = s => InstalledInventoryFormatter.DescribeTableLocation(s),
             ["Agents"] = s => InstalledInventoryFormatter.DescribeAgents(s),
         };
+        if (_availability is not null) columns["Updates"] = s => _availability.Get(s).TableLabel;
         if (_hasPackages)
         {
             columns["Package"] = s => InstalledInventoryFormatter.DescribeTablePackageSource(s.Package?.Source);
@@ -435,6 +455,7 @@ internal sealed class InstalledTabView : FrameView
                 case "Loc": cs.MinWidth = LocationColumnWidth; cs.MaxWidth = LocationColumnWidth; break;
                 case "State": cs.MinWidth = StateColumnWidth; cs.MaxWidth = StateColumnWidth; break;
                 case "Agents": cs.MinWidth = AgentsColumnWidth; cs.MaxWidth = AgentsColumnWidth; break;
+                case "Updates": cs.MinWidth = 11; cs.MaxWidth = 11; break;
             }
         }
         ConfigureCategoryColors();
@@ -463,8 +484,8 @@ internal sealed class InstalledTabView : FrameView
         // Four/five columns consume one separator each (including the final
         // border). Spending the whole viewport prevents a selected blank cell
         // from appearing beyond the last border.
-        var available = Math.Max(2, width - (_hasPackages ? 5 : 4));
-        var fixedCols = LocationColumnWidth + StateColumnWidth + AgentsColumnWidth;
+        var available = Math.Max(2, width - (_hasPackages ? 5 : 4) - (_availability is null ? 0 : 1));
+        var fixedCols = LocationColumnWidth + StateColumnWidth + AgentsColumnWidth + (_availability is null ? 0 : 11);
         var remaining = Math.Max(2, available - fixedCols);
         if (_hasPackages)
         {
@@ -560,7 +581,7 @@ internal sealed class InstalledTabView : FrameView
     internal void FocusList()
     {
         _lastFocusedTarget = FocusTarget.Table;
-        if (_table.Visible) _table.SetFocus();
+        if (_table.Visible && _rows.Count > 0) _table.SetFocus();
         else if (_loading.Visible) _loading.SetFocus();
         else _detail.SetFocus();
     }
@@ -581,9 +602,12 @@ internal sealed class InstalledTabView : FrameView
     private void RefreshAll()
     {
         if (_snapshot is null) return;
+        var emptyListHadFocus = _rows.Count == 0 && _detail.HasFocus;
         ApplyFilter();
         RecomputeColumnWidths();
         BuildTableSource();
+        if (_rows.Count == 0 && _table.HasFocus) _detail.SetFocus();
+        else if (emptyListHadFocus && _rows.Count > 0) _table.SetFocus();
         RefreshOperationStatus();
         RefreshSelectedDetail();
         _onStateChange?.Invoke();
@@ -617,6 +641,18 @@ internal sealed class InstalledTabView : FrameView
     private void OnKeyDown(object? sender, Key key)
     {
         if (key.Handled) return;
+        if (!_filterField.HasFocus && key.AsRune.Value == 'C' && _onCheckUpdates is not null)
+        {
+            key.Handled = true;
+            _onCheckUpdates();
+            return;
+        }
+        if (!_filterField.HasFocus && (key.AsRune.Value is 'u' or 'U' || key.KeyCode == KeyCode.Enter) && _onReviewUpdate is not null)
+        {
+            key.Handled = true;
+            ReviewSelectedUpdate();
+            return;
+        }
         if (key.KeyCode == KeyCode.F2)
         {
             key.Handled = true;
@@ -713,7 +749,29 @@ internal sealed class InstalledTabView : FrameView
 
     private string RenderDetail(InstalledSkill skill)
     {
-        return InstalledScreen.RenderDetail(skill, _showDetails);
+        var observation = _availability?.Get(skill);
+        return (observation is null ? "" : observation.Detail + "\n**C:** check/cancel updates · **u / Enter:** review this copy\n\n"
+            + (_showDetails && observation.Diagnostic.Length > 0 ? "````\n" + (TerminalEscapeSanitizer.Sanitize(observation.Diagnostic) ?? "").Replace("`", "'") + "\n````\n\n" : ""))
+            + InstalledScreen.RenderDetail(skill, _showDetails);
+    }
+
+    private void ReviewSelectedUpdate()
+    {
+        if (CanActOnSelection && GetSelectedSkill() is { } selected) _onReviewUpdate?.Invoke(selected);
+    }
+
+    internal void RefreshAvailability()
+    {
+        if (_disposed || _lifetimeToken.IsCancellationRequested || _availability is null) return;
+        _checkUpdates.Text = _availability.Running ? "Cancel check (C)" : "Check updates (C)";
+        _checkUpdates.Enabled = !_availability.Stopping;
+        _updateStatus.Text = _availability.Summary;
+        _reviewUpdate.Enabled = CanActOnSelection && GetSelectedSkill() is not null;
+        // Keep rows, selection and table offsets while updating live cell getters.
+        _table.Update();
+        var detailOffset = _detail.Viewport.Location;
+        RefreshSelectedDetail();
+        TuiHelpers.RestoreMarkdownScroll(_detail, detailOffset);
     }
 
     private bool IsCurrentLoad(long loadGeneration) =>
@@ -839,6 +897,7 @@ internal sealed class InstalledTabView : FrameView
         }
 
         RefreshFooter();
+        RefreshAvailability();
     }
 
     private void SetContentVisibility(bool loading, bool removing)

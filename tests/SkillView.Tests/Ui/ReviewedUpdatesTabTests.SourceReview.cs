@@ -1,3 +1,4 @@
+using SkillView.Inventory.Models;
 using SkillView.Maintenance;
 using Terminal.Gui.Views;
 using Xunit;
@@ -15,7 +16,7 @@ public sealed partial class ReviewedUpdatesTabTests
         ReplacementResult? received = null;
         using var view = View([target], (_, _, _) => Task.FromResult(Result(review)), (saved, _, _) =>
         { received = saved; return Task.FromResult(Result(saved with { Status = "installed" }, true)); });
-        await view.LoadAsync(); view.AllBoxForTests.Value = CheckState.Checked; await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(target)); await view.ReviewUpdateAsync();
         view.ToggleDetailsForTests();
         Assert.Contains(review.SourceReview.Fingerprint, view.PreviewTextForTests);
         Assert.Contains("not-reviewed", view.PreviewTextForTests);

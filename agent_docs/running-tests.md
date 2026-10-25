@@ -133,8 +133,8 @@ unchanged, then opens frozen source Details, acknowledges source review, explici
 approves retention and applies. Filesystem manifests
 independently compare candidate bytes/modes/native objects; CLI inspection and
 undo prove restoration of the original objects and exact registry bytes. An
-unselected manual installation remains unchanged, including when the all checkbox
-is enabled for row/marked shortcuts. Ctrl+Q must exit successfully. The script
+unrelated manual installation remains unchanged: all three actions review only the copy seeded from Installed, and the operation surface has no inventory
+browser, marks or All checkbox. Ctrl+Q must exit successfully. The script
 retains JSON screen/evidence output and a raw terminal transcript at the supplied
 output path; all skill, agent and manager fixture state is disposable.
 

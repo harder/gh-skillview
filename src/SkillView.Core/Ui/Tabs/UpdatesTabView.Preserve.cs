@@ -29,19 +29,18 @@ internal sealed partial class UpdatesTabView
         _status.Text = " verifying installed payload and owner…";
         try
         {
-            var result = await _preserveRunner(plan, _queueOptions?.AllowHiddenDirectories ?? false, token).ConfigureAwait(false);
+            var result = await _preserveRunner(plan, _options?.AllowHiddenDirectories ?? false, token).ConfigureAwait(false);
             await _runOnUi(() =>
             {
                 if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
                 SaveOutcomes([new(result.Subject.InstallationId, result.OriginalPath, "preserved", null, null, [], 0, [], result.Message)]);
                 ShowPlanPreview(result, awaitingReview: false);
                 _review = null;
-                _status.Text = " installed payload preserved; no maintenance preference recorded · Next / skip continues";
+                _status.Text = " installed payload preserved; no maintenance preference recorded · Review update prepares this copy again";
                 SetBusy(false);
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);
-                if (_table.Visible) _table.SetFocus();
-                else if (_preview.Visible) _preview.SetFocus();
+                if (_preview.Visible) _preview.SetFocus();
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -54,7 +53,7 @@ internal sealed partial class UpdatesTabView
                 await _runOnUi(() =>
                 {
                     if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
-                    _status.Text = $" preserve refused: {TuiHelpers.ErrorSnippet(ex.Message)}; refresh or Next / skip";
+                    _status.Text = $" preserve refused: {TuiHelpers.ErrorSnippet(ex.Message)}; refresh or Skip review";
                     SetBusy(false);
                     ownership.Dispose();
                     SetOperationControlsEnabled(true);

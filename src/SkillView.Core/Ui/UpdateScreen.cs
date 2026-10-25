@@ -3,25 +3,19 @@ using SkillView.Maintenance;
 
 namespace SkillView.Ui;
 
-/// Static helpers for rendering update results as Markdown. The interactive
-/// view is now <see cref="Tabs.UpdatesTabView"/>; the modal Show() subloop
-/// was retired in Phase 5 of the winget-tui redesign. RenderResult stays on
-/// this type so the UpdateScreenTests assertions don't need updating.
+/// Shared Markdown evidence for exact saved updates, undo and local reimport.
 public static class UpdateScreen
 {
-    internal static string RenderResult(UpdateResult result, bool dryRun, bool allChecked, List<string> skills, bool unpinOnly = false, bool localReimport = false, bool localSourceSwitch = false)
+    internal static string RenderResult(UpdateResult result, string? skillName = null, bool unpinOnly = false, bool localReimport = false, bool localSourceSwitch = false)
     {
         var sb = new System.Text.StringBuilder();
-        var heading = localSourceSwitch || result.SavedPlan?.LocalSourceSwitch is not null ? "Local source switch results" : dryRun ? "Dry-run results" : localReimport || result.SavedPlan?.LocalImport is not null ? "Local reimport results" : unpinOnly || result.SavedPlan?.PinPolicy is not null ? "Unpin-only results" : "Update results";
+        var heading = localSourceSwitch || result.SavedPlan?.LocalSourceSwitch is not null ? "Local source switch results" : localReimport || result.SavedPlan?.LocalImport is not null ? "Local reimport results" : unpinOnly || result.SavedPlan?.PinPolicy is not null ? "Unpin-only results" : "Update results";
         sb.AppendLine($"## {heading}");
         sb.AppendLine();
         if (result.SavedPlan is { } plan) sb.AppendLine(RenderPlan(plan));
-        var scope = allChecked
-            ? "_all skills_"
-            : skills.Count == 1
-                ? MarkdownTableFormatter.FormatCodeSpan(skills[0])
-                : $"{skills.Count} skills";
-        sb.AppendLine($"**Scope:** {scope}  ·  **Exit:** {result.ExitCode}  ·  **Entries:** {result.Entries.Length}");
+        var scope = skillName ?? result.SavedPlan?.Subject.Name;
+        if (scope is not null) sb.Append($"**Scope:** {MarkdownTableFormatter.FormatCodeSpan(scope)}  ·  ");
+        sb.AppendLine($"**Exit:** {result.ExitCode}  ·  **Entries:** {result.Entries.Length}");
         sb.AppendLine();
         if (!result.Succeeded)
         {

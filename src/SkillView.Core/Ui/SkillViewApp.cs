@@ -73,8 +73,7 @@ public sealed partial class SkillViewApp
     // Remembered before Doctor took over so Esc returns to where the user was.
     private SkillViewTab _tabBeforeDoctor = SkillViewTab.Discover;
     private bool _inDoctor;
-    // Set when Updates is drilled into from the Changes queue so Esc returns to Changes.
-    private bool _openedUpdatesFromChanges;
+    private SkillViewTab _tabBeforeUpdateReview = SkillViewTab.Discover;
 
     private const string ItemActionsText = "[Enter] Preview    [i] Install    [o] Open    [?] More";
 

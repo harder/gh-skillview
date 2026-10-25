@@ -17,7 +17,7 @@ namespace SkillView.Tests.Ui;
 public sealed class MaintenanceQueueKeyboardTests
 {
     [Fact]
-    public async Task EmptyFindingsKeepUpdateShortcutReachableThroughApplicationKeyboard()
+    public async Task EmptyFindingsKeepCheckShortcutReachableThroughApplicationKeyboard()
     {
         using var app = Application.Create().Init("ansi");
         app.Driver!.SetScreenSize(80, 24);
@@ -25,7 +25,7 @@ public sealed class MaintenanceQueueKeyboardTests
         var updatesOpened = false;
         window.KeyDown += (_, key) =>
         {
-            if (key.AsRune.Value != 'u') return;
+            if (key.AsRune.Value != 'C') return;
             updatesOpened = true;
             key.Handled = true;
         };
@@ -38,7 +38,7 @@ public sealed class MaintenanceQueueKeyboardTests
         try
         {
             Assert.True(view.SubViews.OfType<Markdown>().Single().HasFocus);
-            app.Keyboard.RaiseKeyDownEvent(new Key('u'));
+            app.Keyboard.RaiseKeyDownEvent(new Key('C'));
             Assert.True(updatesOpened);
         }
         finally { app.End(session!); }
@@ -108,9 +108,8 @@ public sealed class MaintenanceQueueKeyboardTests
         var session = app.Begin(window);
         try
         {
-            var table = view.SubViews.OfType<TableView>().Single();
             var preview = view.SubViews.OfType<Markdown>().Single();
-            Assert.False(table.Visible); Assert.True(preview.HasFocus);
+            Assert.Empty(view.SubViews.OfType<TableView>()); Assert.True(preview.HasFocus);
             app.Keyboard.RaiseKeyDownEvent(new Key('c'));
             Assert.Equal(new[] { "compare-plan" }, calls);
             Assert.Contains("Review this change", view.PreviewTextForTests);

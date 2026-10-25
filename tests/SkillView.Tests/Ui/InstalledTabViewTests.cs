@@ -79,7 +79,7 @@ public sealed class InstalledTabViewTests
         Assert.False(view.FilterHasFocusForTests);
         pending.SetResult(InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow });
         await load;
-        Assert.True(view.TableHasFocusForTests);
+        Assert.True(view.SubViews.OfType<Markdown>().Single().HasFocus);
         Assert.False(view.FilterHasFocusForTests);
     }
 

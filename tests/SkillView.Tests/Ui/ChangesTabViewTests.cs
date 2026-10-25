@@ -126,14 +126,14 @@ public sealed class ChangesTabViewTests
         Assert.Equal(0, view.RowCountForTests);
         var detail = view.SubViews.OfType<Markdown>().Single().Text.ToString();
         Assert.Contains("No local problems found. Updates not checked.", detail);
-        Assert.Contains("**u:** open Updates", detail);
+        Assert.Contains("**C:** Check updates", detail);
         Assert.DoesNotContain("omitted", detail);
         Assert.Contains("0 Problems", view.StatusTextForTests);
         Assert.Contains("Updates not checked", view.StatusTextForTests);
         Assert.Contains("0 Review", view.StatusTextForTests);
         Assert.Equal("0 Problems · Updates not checked · 0 Review", view.GetQueueLabel());
         Assert.DoesNotContain("0 Updates", view.GetQueueLabel());
-        Assert.Contains("u Updates", view.StatusTextForTests);
+        Assert.Contains("**Enter / u:**", detail);
     }
 
     [Fact]

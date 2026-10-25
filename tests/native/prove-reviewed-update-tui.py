@@ -252,11 +252,9 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
                 return
         raise AssertionError("TUI condition timed out\n" + text())
 
-    def click(label, offset=1, table=False):
+    def click(label, offset=1):
         rows = ["".join(row) for row in screen]
         found = [(row.index(label), i) for i, row in enumerate(rows) if label in row]
-        if table:
-            found = [(xx, yy) for xx, yy in found if xx < 54]
         assert found, "Missing control " + label + "\n" + text()
         # Status/instruction text can repeat an action label. Prefer the actual
         # Terminal.Gui button rather than the last textual occurrence.
@@ -273,28 +271,15 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
         click("Installed")
         wait(lambda: "2 skill(s)" in text(), 60)
         send("u")
-        wait(
-            lambda: (
-                "Include hidden directories" in text()
-                and "installed skill(s)" in text()
-            ),
-            60,
-        )
+        # Main entry immediately prepares. This fixture is pinned, so wait for its
+        # read-only pin refusal before changing the explicit unpin option.
+        wait(lambda: "Include hidden directories" in text() and "pin retained" in text().lower(), 60)
         click("Unpin with update")
         click("Include hidden directories")
-        if a.shortcut in ("u", "U"):
-            click("all")  # row/marked shortcuts must not widen to this selection
-        click("gh-skill", table=True)  # marking must target the table, not the last checkbox
-        if a.shortcut == "U":
-            send(" ")
-            read(0.1)
-            send("U")
-        elif a.shortcut == "button":
-            send(" ")
-            read(0.1)
+        if a.shortcut == "button":
             click("Review update")
         else:
-            send("u")
+            send(a.shortcut)  # u and U both review this exact seeded copy.
         wait(lambda: len(list(state.rglob("plan.json"))) == 1, 180)
         wait(lambda: "review required" in text().lower(), 30)
         planfile = next(state.rglob("plan.json"))
@@ -304,8 +289,6 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
             wait(lambda: "installed payload preserved" in text(), 60)
             assert manifest(payload) == original and registry.read_bytes() == original_registry
             assert not (planfile.parent / "original").exists()
-            click("Next / skip")
-            click("gh-skill", table=True)
             send("u")
             wait(lambda: len(list(state.rglob("plan.json"))) == 2, 180)
             wait(lambda: "review required" in text().lower(), 30)
@@ -343,7 +326,7 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
             ),
             60,
         )
-        wait(lambda: "changed · no remaining items" in text(), 60)
+        wait(lambda: "changed · Refresh inventory" in text(), 60)
         assert manifest(payload) == approved
         assert manifest(planfile.parent / "original") == original
         assert manifest(unrelated) == unrelated_before
@@ -402,7 +385,7 @@ with tempfile.TemporaryDirectory(prefix="skillview-reviewed-tui-") as tmp:
             "cliInspectionAndNativeUndoVerified": True,
             "originalRegistryBytesRestored": True,
             "unrelatedInstallationUnchanged": True,
-            "allCheckboxDidNotWidenShortcut": a.shortcut in ("u", "U"),
+            "exactSeedDidNotWidenToUnrelatedCopy": True,
             "planId": saved["id"],
             "reviewScreen": screenshot,
             "resultScreen": result_screen,

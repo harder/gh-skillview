@@ -66,14 +66,12 @@ public sealed class UnpinKeyboardTests
         { Width = Dim.Fill(), Height = Dim.Fill() };
         window.Add(view);
         window.KeyDown += (_, key) => { if (!key.Handled && key.AsRune.Value == 'p') shellReceivedShortcut = true; };
-        await view.LoadAsync();
+        await view.LoadForSubjectAsync(OperationSubject.From(target));
         var session = app.Begin(window);
         try
         {
-            var table = view.SubViews.OfType<TableView>().Single();
-            // SetFocus reports whether focus changed, so an already focused
-            // table legitimately returns false. Assert actual focus instead.
-            table.SetFocus(); Assert.True(table.HasFocus);
+            var preview = view.SubViews.OfType<Markdown>().Single();
+            preview.SetFocus(); Assert.True(preview.HasFocus);
             Press(new Key('p'));
             Assert.Equal(1, planned); Assert.Equal(0, applied); Assert.False(shellReceivedShortcut);
             Assert.False(view.ApplyButtonForTests.Enabled);

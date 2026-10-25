@@ -29,6 +29,15 @@ internal sealed class ChangesTabView : FrameView
     private readonly Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? _activateEntryAsync;
     private readonly ChangesSelectionGate _selectionRequests;
     private long _selectionGeneration;
+    private readonly UpdateAvailabilitySession? _availability;
+    private readonly Action? _onCheckUpdates;
+    private readonly Button _checkUpdates;
+    private readonly Button _reviewFinding;
+    private readonly Label _updateStatus;
+    private InventorySnapshot? _snapshot;
+    private bool _disposed;
+    private string? _returnSelectionId;
+    private int _returnRowOffset;
 
     private readonly TabLoadingView _loading = new("Loading local findings…");
     private readonly TableView _table;
@@ -38,6 +47,8 @@ internal sealed class ChangesTabView : FrameView
     private IReadOnlyList<ChangesQueueRow> _rows = Array.Empty<ChangesQueueRow>();
     private string _coverageDetail = string.Empty;
     private int _omittedRows;
+    private int _availabilityOmittedRows;
+    private int OmittedRows => _omittedRows + _availabilityOmittedRows;
     private ChangesQueueProjection? _projection;
     private bool _partial;
     private bool _showDetails;
@@ -56,9 +67,12 @@ internal sealed class ChangesTabView : FrameView
         Action<MaintenanceQueueEntry>? onActivateEntry = null,
         Action<Func<Task>, string>? runTask = null,
         Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? activateEntryAsync = null,
-        Action? onRefresh = null, string? homeDirectory = null)
+        Action? onRefresh = null, string? homeDirectory = null,
+        UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null)
     {
         _homeDirectory = homeDirectory;
+        _availability = availability;
+        _onCheckUpdates = onCheckUpdates;
         _onRefresh = onRefresh;
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
@@ -74,11 +88,16 @@ internal sealed class ChangesTabView : FrameView
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
         Visible = false;
+        _checkUpdates = new SingleRowButton { X = 0, Y = 0, Text = "Check updates (C)", Visible = availability is not null };
+        _reviewFinding = new SingleRowButton { X = Pos.Right(_checkUpdates) + 1, Y = 0, Text = "Review (Enter)", Visible = availability is not null };
+        _updateStatus = new Label { X = Pos.Right(_reviewFinding) + 1, Y = 0, Width = Dim.Fill(), Text = "Updates not checked", Visible = availability is not null };
+        _checkUpdates.Accepting += (_, e) => { e.Handled = true; _onCheckUpdates?.Invoke(); };
+        _reviewFinding.Accepting += (_, e) => { e.Handled = true; if (!_loading.Visible) ActivateSelectedRow(); };
 
         _table = new TableView
         {
             X = 0,
-            Y = 0,
+            Y = availability is null ? 0 : 1,
             Width = Dim.Percent(60),
             Height = Dim.Fill(1),
             FullRowSelect = true,
@@ -92,7 +111,7 @@ internal sealed class ChangesTabView : FrameView
         _detail = new Markdown
         {
             X = Pos.Right(_table) + 1,
-            Y = 0,
+            Y = availability is null ? 0 : 1,
             Width = Dim.Fill(),
             Height = Dim.Fill(1),
             Text = "## Issues\n\n_Select a finding to inspect its details._",
@@ -121,6 +140,7 @@ internal sealed class ChangesTabView : FrameView
 
         _table.KeyDown += OnTableKeyDown;
         _loading.KeyDown += OnTableKeyDown;
+        _detail.KeyDown += OnTableKeyDown;
         KeyDown += (_, key) =>
         {
             if (key.Handled || _loading.Visible || key.KeyCode != KeyCode.F2 || _rows.Count == 0 && _coverageDetail.Length == 0) return;
@@ -130,13 +150,19 @@ internal sealed class ChangesTabView : FrameView
             _status.Text = BuildStatusText();
         };
 
-        Add(_table, _detail, _spinner, _status, _loading);
-        Disposing += (_, _) => CancelPendingLoad();
+        Add(_table, _detail, _spinner, _status, _loading, _checkUpdates, _reviewFinding, _updateStatus);
+        Disposing += (_, _) => { _disposed = true; CancelPendingLoad(); };
     }
 
     /// Load the maintenance queue from the inventory snapshot.
     internal async Task LoadAsync()
     {
+        var selectedRow = _table.GetSelectedRow();
+        if (selectedRow >= 0 && selectedRow < _rows.Count)
+        {
+            _returnSelectionId = _rows[selectedRow].Entry.Id;
+            _returnRowOffset = _table.RowOffset;
+        }
         CancelSelectedRequest();
         var gen = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
@@ -170,12 +196,13 @@ internal sealed class ChangesTabView : FrameView
             await _runOnUi(() =>
             {
                 if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested) return;
+                _snapshot = snapshot;
                 _cachedQueue = cached;
                 _projection = projection;
                 _partial = cached.Partial || projection.CoverageDetail.Length > 0;
                 _coverageDetail = projection.CoverageDetail;
                 _omittedRows = projection.OmittedRows;
-                LoadRows(projection.Rows, loadCancellation.Token);
+                LoadRows(AvailabilityRows(), loadCancellation.Token);
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
@@ -216,13 +243,16 @@ internal sealed class ChangesTabView : FrameView
 
         RecomputeColumnWidths();
         _table.Update();
+        var restoredRow = rows.Select((row, index) => (row, index))
+            .FirstOrDefault(item => item.row.Entry.Id == _returnSelectionId);
+        _table.SetSelectedRow(restoredRow.row is null ? 0 : restoredRow.index);
+        _table.RowOffset = _returnRowOffset;
         _status.Text = BuildStatusText();
         UpdateDetail(renderToken);
 
         SetLoading(false);
         if (_rows.Count > 0)
         {
-            _table.SetSelectedRow(0);
             _table.SetFocus();
         }
         else
@@ -240,7 +270,8 @@ internal sealed class ChangesTabView : FrameView
     internal int RowCountForTests => _rows.Count;
     internal string StatusTextForTests => _status.Text.ToString();
 
-    internal string GetQueueLabel() => _projection?.Counts ?? string.Empty;
+    internal string GetQueueLabel() => (_projection?.Counts ?? string.Empty).Replace(
+        ChangesQueueProjection.UpdatesNotChecked, _availability?.Summary ?? ChangesQueueProjection.UpdatesNotChecked, StringComparison.Ordinal);
 
     // Internals ------------------------------------------------------------
 
@@ -285,10 +316,12 @@ internal sealed class ChangesTabView : FrameView
                     ? "No local problems found in checked locations. Discovery is incomplete.\n"
                     : $"No local problems found. {ChangesQueueProjection.UpdatesNotChecked}.\n");
             if (_rows.Count > 0 || _partial) detail += $"\n{ChangesQueueProjection.UpdatesNotChecked}.\n";
-            detail += "\n**u:** open Updates to check availability or review a saved update. **r:** refresh local inventory. Routine inspection is in **Installed (2)**.\n";
+            if (_availability is not null)
+                detail = detail.Replace(ChangesQueueProjection.UpdatesNotChecked, _availability.Summary, StringComparison.Ordinal);
+            detail += "\n**C:** Check updates / cancel. **Enter / u:** review selected finding. **r:** refresh local inventory. Routine inspection is in **Installed (2)**.\n";
             if (_showDetails) detail += _coverageDetail;
             else if (_coverageDetail.Length > 0) detail += "\nDiscovery/checks incomplete. Press **F2** for coverage details.\n";
-            if (_omittedRows > 0) detail += $"\n{_omittedRows} additional findings omitted by the row limit. Counts include these findings; queue --json makes a fresh full capture.\n";
+            if (OmittedRows > 0) detail += $"\n{OmittedRows} additional findings omitted by the row limit. Counts include these findings; Installed retains per-copy update results; queue --json makes a fresh local capture.\n";
             token.ThrowIfCancellationRequested();
             _detail.Text = detail;
         }
@@ -298,8 +331,8 @@ internal sealed class ChangesTabView : FrameView
     private string BuildStatusText()
     {
         if (_projection is null) return string.Empty;
-        return " " + (_partial ? "Scan incomplete · " : "") + _projection.Counts + " · u Updates"
-            + (_omittedRows > 0 ? $" · {_rows.Count} shown, {_omittedRows} omitted" : "")
+        return " " + (_partial ? "Scan incomplete · " : "") + _projection.Counts.Replace(ChangesQueueProjection.UpdatesNotChecked, _availability?.Summary ?? ChangesQueueProjection.UpdatesNotChecked, StringComparison.Ordinal)
+            + (OmittedRows > 0 ? $" · {_rows.Count} shown, {OmittedRows} omitted" : "")
             + (_rows.Count > 0 || _coverageDetail.Length > 0 ? $" · F2 {(_showDetails ? "Summary" : "Details")}" : "");
     }
 
@@ -329,7 +362,13 @@ internal sealed class ChangesTabView : FrameView
             _onLeaveTab();
             return;
         }
-        if (key.KeyCode == KeyCode.Enter)
+        if (key.AsRune.Value == 'C' && _onCheckUpdates is not null)
+        {
+            key.Handled = true;
+            _onCheckUpdates();
+            return;
+        }
+        if (key.KeyCode == KeyCode.Enter || key.AsRune.Value is 'u' or 'U')
         {
             key.Handled = true;
             if (!_loading.Visible) ActivateSelectedRow();
@@ -340,6 +379,58 @@ internal sealed class ChangesTabView : FrameView
             _onRefresh?.Invoke();
             _runTask(LoadAsync, "changes.refresh-disk");
         }
+    }
+
+    private IReadOnlyList<ChangesQueueRow> AvailabilityRows()
+    {
+        if (_projection is null) return [];
+        if (_availability is null || _snapshot is null) return _projection.Rows;
+        var updates = _snapshot.Skills.Select(skill => (Skill: skill, Check: _availability.Get(skill)))
+            .Where(item => item.Check.Status == UpdateAvailabilityStatus.Available)
+            .Select(item => new ChangesQueueRow("Updates", item.Skill.Name + " · " + DisplayPath.Abbreviate(item.Skill.ResolvedPath, _homeDirectory),
+                [new MaintenanceQueueEntry("update-" + UpdateAvailability.Address(item.Skill), "upstream-update", item.Skill.Name,
+                    OperationSubject.From(item.Skill), [item.Skill.ResolvedPath], "gh-dry-run", item.Check.Reason,
+                    "review-update", false, item.Skill.Pinned)])
+            { Availability = item.Check }).ToArray();
+        _availabilityOmittedRows = Math.Max(0, _projection.Rows.Count + updates.Length - ChangesQueueBuilder.MaxRows);
+        return _projection.Rows.Where(row => row.Kind == "Problem").Concat(updates)
+            .Concat(_projection.Rows.Where(row => row.Kind != "Problem")).Take(ChangesQueueBuilder.MaxRows).ToArray();
+    }
+
+    internal void RefreshAvailability()
+    {
+        if (_disposed || _lifetimeToken.IsCancellationRequested || _availability is null) return;
+        _checkUpdates.Text = _availability.Running ? "Cancel check (C)" : "Check updates (C)";
+        _checkUpdates.Enabled = !_availability.Stopping;
+        _updateStatus.Text = _availability.Summary;
+        _reviewFinding.Enabled = !_loading.Visible && _rows.Count > 0;
+        if (_loading.Visible || _projection is null) return;
+        var selected = _table.GetSelectedRow();
+        var id = selected >= 0 && selected < _rows.Count ? _rows[selected].Entry.Id : null;
+        var offset = _table.RowOffset;
+        var detailOffset = _detail.Viewport.Location;
+        var rows = AvailabilityRows();
+        // Progress/reasons can change without changing any findings.
+        if (!_rows.Select(row => row.Entry.Id).SequenceEqual(rows.Select(row => row.Entry.Id)))
+        {
+            var hadFocus = _table.HasFocus;
+            _rows = rows;
+            _table.Table = new EnumerableTableSource<ChangesQueueRow>(_rows, new Dictionary<string, Func<ChangesQueueRow, object>>
+            { ["Kind"] = row => row.Kind, ["Title"] = row => row.Title });
+            var restored = rows.Select((row, i) => (row, i)).FirstOrDefault(item => item.row.Entry.Id == id);
+            _table.SetSelectedRow(restored.row is null ? Math.Clamp(selected, 0, Math.Max(0, rows.Count - 1)) : restored.i);
+            _table.RowOffset = offset;
+            RecomputeColumnWidths();
+            if (hadFocus && rows.Count == 0) _detail.SetFocus();
+        }
+        else _rows = rows;
+        _table.Update();
+        UpdateDetail();
+        var currentRow = _table.GetSelectedRow();
+        if (id is not null && currentRow >= 0 && currentRow < _rows.Count && _rows[currentRow].Entry.Id == id)
+            TuiHelpers.RestoreMarkdownScroll(_detail, detailOffset);
+        _status.Text = BuildStatusText();
+        _onStateChange?.Invoke();
     }
 
     internal void CancelPendingLoad()

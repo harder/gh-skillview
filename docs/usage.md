@@ -12,7 +12,7 @@ The TUI is organized around three primary tabs in a persistent top header — **
 |---|---|---|
 | **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Opens when no skills are installed. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Lists installed skills across the local inventory, filter, cycle sort, cycle a pinned/unpinned filter, inspect details, open the folder, or remove. | `2`, click the pill, or `←/→` |
-| **Issues** △ | Local Problems and Review suggestions, with incomplete discovery separate. Updates are not checked. Enter reviews the exact issue or opens the existing copy chooser. | `3`, click the pill, or `←/→` |
+| **Issues** △ | Problems, checked Updates and Review suggestions, with incomplete discovery/checks separate. Checks are explicit. Enter reviews the exact issue or opens the existing copy chooser. | `3`, click the pill, or `←/→` |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, `gh skill` availability, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
 | **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and options for hidden-dir scanning, installing from a republished skill's upstream source, or local installs. | `I` from a Discover result, or **Advanced…** from the compact modal |
@@ -102,7 +102,8 @@ Issues tab:
 | `Enter` | Review the selected maintenance item without changing files |
 | `F2` | Switch between its issue summary and technical details |
 | `r` | Refresh disk inventory; upstream availability and running-session state remain unknown |
-| `u` | Open the existing Updates workspace; choose Check updates explicitly |
+| `C` | Check updates for the inventory, or cancel a running check |
+| `u` | Review the selected finding (alias for Enter) |
 
 Routine valid installs show **No local problems found. Updates not checked.**
 The list excludes generic installation-review opportunities and absence from gh
@@ -115,24 +116,33 @@ overrides can be intentional. Enter opens the existing copy chooser, where an
 exact copy must be chosen before update/version or cleanup review. Other faults
 at those locations remain separate Problems.
 
-The persistent header and counts say **Updates not checked**, without a numeric
-update count. The Issues footer keeps **u Updates** available even for an empty
-list. Family details report omitted fields only when fields were actually omitted.
-Counts cover findings after filtering and family grouping, including findings
-beyond the row limit. Hidden routine observations are not omitted issues.
-Incomplete discovery/checks are shown separately and never imply a healthy scan;
-F2 exposes captured coverage diagnostics even when there are no findings.
+**Check updates (C)** is visible in both Installed and Issues. Nothing checks
+upstream automatically at startup. Checks run for all captured physical copies,
+up to four at a time, while you browse or switch tabs. **C** or **Cancel check**
+stops unfinished checks. Installed shows each copy's result beside its name;
+Issues adds **Updates** findings with a direct **Enter / u** review action.
+There is no separate update-discovery browser or second copy-selection step.
+
+Results are session observations tied to the exact copy, source/ref/tree, pin,
+owner and child process context. Details show the check time and reason. Results
+can be Not checked, Checking, No upstream update, Update available, Pinned,
+Unsupported, Unknown, Failed, Canceled or Stale. Empty/unrecognized output,
+request failures and incomplete coverage cannot establish currency. **No upstream
+update** compares recorded trees; it does not verify installed file integrity.
+Refreshing disk inventory or running an operation marks previous checks stale;
+check again explicitly. Pins are skipped, and managed/plugin copies require their
+owning tool. F2 shows retained diagnostic output.
 
 Each finding retains its installation address ID and exact frozen entries.
 Cleanup issues reopen only that issue at that physical address after a fresh
 inventory capture. A missing or ambiguous ID refuses the hand-off instead of
-choosing a same-name sibling. **u** opens the existing Updates workspace;
-**Check updates** explicitly checks availability. **c** within Updates compares
-installed content with one immutable saved candidate and opens its plan review
-(**u** there also prepares review). Entering Issues and pressing **r** perform
-local capture only, with no startup network availability scan or payload hashing.
-Updates selection from an exact copy keeps only that installation selected on
-refresh, clearing prior batch and `--all` choices.
+choosing a same-name sibling. Installed's **Review update (u / Enter)** and an
+Issues **Updates** finding immediately prepare the existing saved-candidate
+review for the chosen copy. Source acknowledgement, original retention, fresh
+admission, verification and undo remain separate steps. Entering Issues or
+pressing **r** only refreshes local inventory; it does not check upstream.
+The exact-copy operation review remains restricted to that copy on refresh.
+
 The TUI caps visible rows and selected-detail text, reports omitted row/field
 counts, and omits exact fields whole. `queue --json` makes a fresh capture with
 full evidence; keep the same global workspace/profile/scan-root options.
@@ -166,9 +176,8 @@ The summary explains the target, revision, affected consumers, local changes and
 retained original. Press **F2** or **Details (F2)** for the existing fingerprints,
 frozen source diffs, complete diagnostics and recovery evidence; F2 returns to
 the summary. Switching views changes neither the candidate nor its approvals.
-In the general Updates list, an availability check returns focus to the control
-that started it, so table navigation and marking can continue. The button
-mnemonics are **Alt+C** for Check updates and **Alt+R** for Review update.
+Checks in the main views preserve selection and filters. The operation review
+uses the saved-update controls; availability observations grant no apply authority.
 
 Review controls appear when applicable. Source review and retention remain
 separate declarations: inspect the frozen source changes and omissions in Details,
@@ -177,9 +186,10 @@ reviews change only the verified pin. Compare local and source files in Details,
 then choose **Preserve installed**, skip, or approve **Replace reviewed** with the
 original retained. New merge creation and the built-in editor have been removed;
 existing saved merge plans still support inspection, admitted apply, recovery and
-undo through the specialist update commands. **Next / skip**
-continues a batch one installation at a time, preserving earlier outcomes and
-diagnostics in Details. A completed disk operation does not prove that an agent
+undo through the specialist update commands. **Skip review** closes the prepared
+change without applying it and retains its saved evidence. Updates review stays
+with one exact copy; choose another in Installed or Issues. A completed disk
+operation does not prove that an agent
 reloaded the skill.
 
 After an attempted write, the result and Details stay available. Press
@@ -351,7 +361,7 @@ same user, and storage hardware still determines power-loss guarantees.
 For `update`, select an exact installation with `--path <installed-directory>`
 or `--install-id <id>` from `list --json`. A name shared by several installations
 requires one of these selectors. `--all` selects the captured inventory; in the
-Updates tab, applying marked rows still applies only those rows. `--agent` and
+operation review, only the exact selected copy is reviewed and applied. `--agent` and
 `--scope` are install options and are rejected for updates.
 
 A local install can be reimported from its same recorded absolute source path:
@@ -393,7 +403,8 @@ not started. It compares the complete payload with its recorded upstream tree,
 including scripts, extras, links and Unix permissions. `--force` never approves
 replacement. Apply the saved plan with explicit `retain-original` approval; local
 edits and extras stay in the retained original and are not automatically merged.
-The TUI queues a separate review and approval for each target. See
+The TUI reviews one exact copy at a time, with independent source and retention
+approval. Choose another copy in Installed or Issues after completing the operation. See
 [saved updates](saved-updates.md) for commands, recovery and undo.
 
 To remove a verified pin without fetching or updating the source, select the
@@ -414,9 +425,9 @@ pin syntax, ambiguous ownership and incomplete coverage are refused. A verified
 already-unpinned installation produces no plan and consumes no retained-plan
 quota.
 
-In Updates, select a row and choose **Plan unpin only** (`p`). Review the exact
-saved fingerprint and every affected consumer, check retention approval, then
-choose **Apply unpin only**. The existing **unpin** checkbox belongs to updating
+From Installed, review the exact pinned copy and choose **Plan unpin only** (`p`).
+Review the exact saved fingerprint and every affected consumer, check retention approval, then
+choose **Apply unpin only**. The **Unpin with update** checkbox belongs to updating
 to the latest source and is separate from this operation. Every exposure of the
 selected physical installation shares the pin change; this action does not
 detach one consumer. Publication swaps in a verified directory, so active object
@@ -429,7 +440,7 @@ Update JSON schema 2 retains gh output streams and per-installation outcomes and
 adds `savedPlan` plus exact `applyArguments` when a candidate is prepared.
 An already-current installation reports `unchanged`, no saved plan and zero
 changed files; its installed objects and owner bytes remain untouched. The
-Updates queue retains earlier output and outcomes if a later target fails.
+exact-copy review retains preparation and apply diagnostics in Details.
 Preparation is distinct from installed mutation. A disk change does not prove
 that an already-running agent session has reloaded the skill.
 

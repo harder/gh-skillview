@@ -9,7 +9,7 @@ using Terminal.Gui.App;
 
 namespace SkillView.Ui;
 
-internal sealed class SkillViewWorkflowCoordinator
+internal sealed partial class SkillViewWorkflowCoordinator
 {
     private readonly DisplayInventoryCache _displayInventory;
     private readonly TuiServices _services;
@@ -83,6 +83,10 @@ internal sealed class SkillViewWorkflowCoordinator
             return;
         }
 
+        // A mutating dialog may fail after starting; retire earlier observations
+        // before handing over control, even when its eventual result is partial.
+        _services.ListAdapter.Invalidate();
+
         if (!forceAdvanced)
         {
             var compact = new InstallConfirmModal(
@@ -151,6 +155,10 @@ internal sealed class SkillViewWorkflowCoordinator
         {
             return;
         }
+
+        // A mutating dialog may fail after starting; retire earlier observations
+        // before handing over control, even when its eventual result is partial.
+        _services.ListAdapter.Invalidate();
 
         var modal = new InstallConfirmModal(
             app,
@@ -228,6 +236,7 @@ internal sealed class SkillViewWorkflowCoordinator
                         ghPath,
                         request,
                         listing.Skills);
+                    _services.ListAdapter.Invalidate();
                     var result = picker.Show();
                     if (result.Outcome == RepoSkillPickerModal.Outcome.Installed && result.InstalledCount > 0)
                     {
@@ -336,6 +345,7 @@ internal sealed class SkillViewWorkflowCoordinator
         var screen = new CleanupScreen(app, _services.RemoveService, _services.Logger, candidates,
             snapshot.ProtectedRoots.ToArray(), snapshot.Skills, ownershipRunner: _services.Runner,
             captureInventory: token => CaptureInventoryAsync(report, token));
+        _services.ListAdapter.Invalidate();
         screen.Show();
         var changed = screen.RemovedCount > 0 || screen.RemovedFileCount > 0 || screen.RemovedDirectoryCount > 0
             || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved;
@@ -441,6 +451,7 @@ internal sealed class SkillViewWorkflowCoordinator
         var review = request.Review ?? throw new ArgumentException("Inspect the saved local reimport before continuing.");
         RequireSelectedLocalReimport(selected, review, sourceSwitch);
         if (request.Id != review.Id) throw new ArgumentException("The saved ID differs from the reviewed local reimport.");
+        _services.ListAdapter.Invalidate();
         if (request.Action == LocalReimportAction.Apply)
             return new(Preparation: await Task.Run(() => _services.SavedUpdates.ApplyAsync(review,
                 disposition, inventory,
@@ -539,6 +550,7 @@ internal sealed class SkillViewWorkflowCoordinator
         InventorySnapshot snapshot,
         RemoveDialogPlan plan)
     {
+        _services.ListAdapter.Invalidate();
         RemoveService.RemoveReport? compactAttemptReport = null;
 
         // Compact path: a single skill with no second-confirm warnings and no
@@ -728,6 +740,7 @@ internal sealed class SkillViewWorkflowCoordinator
     internal async Task<SkillView.Gh.Models.UpdateResult> ApplyReviewedUpdateAsync(
         SkillView.Maintenance.ReplacementResult review, bool allowHidden, CancellationToken token)
     {
+        _services.ListAdapter.Invalidate();
         var ghPath = _getGhPath();
         var inventory = await CaptureUpdateInventoryAsync(ghPath, allowHidden, token).ConfigureAwait(false);
         return await Task.Run(() => _services.SavedUpdates.ApplyAsync(review, review.PinPolicy is not null ? "unpin-only" : review.LocalDisposition is null ? "retain-original" : "merge-reviewed", inventory,
@@ -744,6 +757,7 @@ internal sealed class SkillViewWorkflowCoordinator
     internal async Task<SkillView.Gh.Models.UpdateResult> UndoReviewedUpdateAsync(
         SkillView.Maintenance.ReplacementResult review, bool allowHidden, CancellationToken token)
     {
+        _services.ListAdapter.Invalidate();
         var ghPath = _getGhPath();
         var inventory = await CaptureUpdateInventoryAsync(ghPath, allowHidden, token).ConfigureAwait(false);
         return await Task.Run(() => _services.SavedUpdates.UndoAsync(review, inventory,
@@ -772,12 +786,6 @@ internal sealed class SkillViewWorkflowCoordinator
         var inventory = await CaptureUpdateInventoryAsync(_getGhPath(), allowHidden, token).ConfigureAwait(false);
         return await Task.Run(() => _services.SavedUpdatePlans.PreserveInstalled(plan.Id, plan.PlanFingerprint, inventory, token), token).ConfigureAwait(false);
     }
-
-    /// Drill into the Updates workspace from the Changes queue.
-    /// Calls <paramref name="activateUpdates"/> with <paramref name="hideChanges"/> so the caller
-    /// controls the concrete tab-view types; the coordinator stays decoupled from UI types.
-    internal void OpenUpdatesFromChanges(Action hideChanges, Action<Action> activateUpdates) =>
-        activateUpdates(hideChanges);
 
 }
 

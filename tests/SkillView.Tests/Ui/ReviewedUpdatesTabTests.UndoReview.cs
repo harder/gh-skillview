@@ -17,7 +17,7 @@ public sealed partial class ReviewedUpdatesTabTests
         using var view = View([target], (_, _, _) => Task.FromResult(Result(plan)), (_, _, _) => Task.FromResult(Result(applied, true)),
             inspectUndo: (_, _, _) => Task.FromResult(applied), undo: (saved, _, _) => Task.FromResult(Result(saved with { Status = nativeState }, true) with
             { Succeeded = false, ReconciliationPartial = true, ErrorMessage = "Post-undo inventory incomplete" }));
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(target)); await view.ReviewUpdateAsync();
         view.RetainBoxForTests.Value = CheckState.Checked; await view.ApplyReviewForTestsAsync();
         await view.InspectUndoForTestsAsync(); view.UndoApprovalForTests.Value = CheckState.Checked; await view.UndoForTestsAsync();
         Assert.Contains("verification incomplete", view.PreviewTextForTests);
@@ -27,34 +27,6 @@ public sealed partial class ReviewedUpdatesTabTests
         Assert.Equal(nativeState == "restored", view.PreviewTextForTests.Contains("Original restored", StringComparison.Ordinal));
         Assert.Equal(nativeState == "restored", view.StatusTextForTests.Contains("original restored", StringComparison.Ordinal));
         Assert.False(view.UndoButtonForTests.Visible); Assert.True(view.SubViews.OfType<Button>().Single(b => b.Text == "Refresh inventory").Enabled);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task EarlierQueueFailureDoesNotHideUndoForTheLastCleanApply(bool earlierPartial)
-    {
-        var first = Target("first"); var second = Target("second"); var last = Review(second) with { Status = "installed", MutationObserved = true };
-        using var view = View([first, second], (_, options, _) =>
-        {
-            var target = Assert.Single(options.Targets!);
-            return Task.FromResult(target == first ? Result() with
-            {
-                Succeeded = false,
-                ReconciliationPartial = earlierPartial,
-                ErrorMessage = "First item refused",
-                Outcomes = [new(first.InstallationId, first.ResolvedPath, "refused", null, null, [], 0, [], "First item refused")]
-            }
-                : Result(Review(second)));
-        }, (_, _, _) => Task.FromResult(Result(last, true)),
-            inspectUndo: (saved, _, _) => { Assert.Same(last, saved); return Task.FromResult(last); },
-            undo: (_, _, _) => throw new InvalidOperationException("Inspection must not undo"));
-        await view.LoadAsync(); view.MarkRowForTests(0); view.MarkRowForTests(1); await view.RunForTestsAsync(false, true);
-        await view.NextReviewForTestsAsync(); view.RetainBoxForTests.Value = CheckState.Checked; await view.ApplyReviewForTestsAsync();
-        Assert.True(view.UndoButtonForTests.Visible); Assert.True(view.UndoButtonForTests.Enabled);
-        await view.InspectUndoForTestsAsync(); Assert.Contains(second.ResolvedPath, view.PreviewTextForTests);
-        view.CancelUndoForTests(); view.ToggleDetailsForTests();
-        Assert.Contains("First item refused", view.PreviewTextForTests); Assert.Contains(last.PlanPath, view.PreviewTextForTests);
     }
 
     [Theory]
@@ -73,7 +45,7 @@ public sealed partial class ReviewedUpdatesTabTests
         using var view = View([target], (_, _, _) => Task.FromResult(Result(plan)), (_, _, _) => Task.FromResult(Result(applied, true) with
         { ReconciliationPartial = kind == "partial", Cancelled = kind == "canceled" }),
             inspectUndo: (_, _, _) => throw new InvalidOperationException("No inspection allowed"), undo: (_, _, _) => throw new InvalidOperationException("No undo allowed"));
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(target)); await view.ReviewUpdateAsync();
         view.RetainBoxForTests.Value = CheckState.Checked; await view.ApplyReviewForTestsAsync();
         Assert.False(view.UndoButtonForTests.Visible); await view.InspectUndoForTestsAsync();
     }
@@ -89,7 +61,7 @@ public sealed partial class ReviewedUpdatesTabTests
             duringUndo ? Task.FromResult(Result(applied, true)) : throw new InvalidOperationException("Unexpected apply failure"),
             changed: () => invalidations++, inspectUndo: (_, _, _) => Task.FromResult(applied),
             undo: (_, _, _) => throw new InvalidOperationException("Unexpected undo failure"));
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(target)); await view.ReviewUpdateAsync();
         view.RetainBoxForTests.Value = CheckState.Checked; await view.ApplyReviewForTestsAsync();
         if (duringUndo)
         {
@@ -109,7 +81,7 @@ public sealed partial class ReviewedUpdatesTabTests
         var target = Target("demo"); var plan = Review(target); var applied = plan with { Status = "installed", MutationObserved = true };
         using var view = View([target], (_, _, _) => Task.FromResult(Result(plan)), (_, _, _) => Task.FromResult(Result(applied, true)),
             inspectUndo: (_, _, _) => throw new IOException("Fresh inspection failure\u001b[31m"), undo: (_, _, _) => throw new InvalidOperationException());
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(target)); await view.ReviewUpdateAsync();
         view.RetainBoxForTests.Value = CheckState.Checked; await view.ApplyReviewForTestsAsync(); await view.InspectUndoForTestsAsync();
         view.ToggleDetailsForTests();
         Assert.Contains("Fresh inspection failure", view.PreviewTextForTests); Assert.Contains(plan.Id, view.PreviewTextForTests);
