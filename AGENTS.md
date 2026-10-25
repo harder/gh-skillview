@@ -63,8 +63,10 @@ subsystem rules in these guides; keep this root file short. The
   `dotnet restore --force-evaluate`, lock review, then another locked restore.
 - Build: `dotnet build`; style: `dotnet format SkillView.sln --no-restore --verify-no-changes`;
   full tests: `dotnet test --no-build`.
-- Run scoped formatting from the repository root or pass absolute `--include`
-  paths. Solution-relative and project-relative paths differ.
+- Run scoped formatting from the repository root with repository-relative
+  `--include` paths. SDK 10.0.113 can select zero files for absolute-only paths
+  and exit 0. Confirm selection with reports/diagnostics; always run the full
+  solution style check above before finishing.
 - Specific test project: `dotnet test --project PATH`. xUnit 4 uses MTP-native
   filters; see [running tests](agent_docs/running-tests.md).
 - Product publishes must run sequentially because App and extension share Core

@@ -126,6 +126,28 @@ transport is disabled. Use `--app <built host> --output <evidence.json>` and rep
 `--gh <binary>` for minimum/current contracts. CI runs it on both native hosts
 for every RID.
 
+### Scoped formatting
+
+Run scoped formatting from the repository root with repository-relative
+`--include` paths. With the pinned SDK **10.0.113**, absolute-only include paths
+can select zero files and exit 0, even when those files have formatting errors.
+This behavior was reproduced on that SDK; do not assume the same behavior for
+other SDK versions.
+
+Use formatter reports (`--report <path>`) or diagnostic output to confirm the
+intended file selection. Exit 0, an empty report or zero formatted files alone
+does not establish selection. For example, from the repository root:
+
+```sh
+dotnet format SkillView.sln --no-restore --verify-no-changes --include src/SkillView.Core/Ui/InstalledScreen.cs --verbosity diagnostic
+```
+
+Always finish with the full solution check, without `--include` restrictions:
+
+```sh
+dotnet format SkillView.sln --no-restore --verify-no-changes
+```
+
 ### Reviewed update PTY proof (POSIX)
 
 After building, run `tests/native/prove-reviewed-update-tui.py` with an

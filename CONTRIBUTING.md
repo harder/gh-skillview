@@ -70,6 +70,11 @@ changes, and confirm `dotnet restore --locked-mode` still passes. See
 
 CI also verifies formatting with `dotnet format SkillView.sln --no-restore
 --verify-no-changes`, lints GitHub Actions, and checks the static site.
+Run scoped formatting from the repository root with repository-relative
+`--include` paths. The pinned SDK 10.0.113 formatter can select zero files for
+absolute-only paths and exit 0; confirm selection using reports or diagnostics.
+Always run the full solution formatting check above before finishing. See
+[scoped formatting](agent_docs/running-tests.md#scoped-formatting) for details.
 
 ### Run locally
 
