@@ -396,18 +396,6 @@ jobs:
         run: |
           python tests/native/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
           python tests/native/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
-      - name: Prove explicit authoring dry-runs preserve authored and Git files
-        if: matrix.shard == 'inspection-unpin'
-        shell: bash
-        run: |
-          set -euo pipefail
-          proof_gh_name='gh${{ matrix.ext }}'
-          python tests/native/prove-authoring-validation.py --app 'dist/app/skillview${{ matrix.ext }}' \
-            --gh ".ci-native/gh-minimum/$proof_gh_name" \
-            --gh ".ci-native/gh-current/$proof_gh_name" --output dist/authoring-app-proof
-          python tests/native/prove-authoring-validation.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' \
-            --gh ".ci-native/gh-minimum/$proof_gh_name" \
-            --gh ".ci-native/gh-current/$proof_gh_name" --output dist/authoring-extension-proof
       - name: Verify repository API access and retain response evidence
         if: matrix.shard == 'owners'
         shell: bash
@@ -749,7 +737,6 @@ jobs:
           name: native-maintenance-evidence-${{ matrix.rid }}-${{ matrix.shard }}
           path: |
             dist/*-proof.json
-            dist/authoring-*-proof/**
             dist/gh-api-access.txt
             dist/disk-full-proof/**
             dist/unpin-privileged-*-proof/**

@@ -87,7 +87,8 @@ internal static class MaintenanceQueueFormatter
             yield return ("Coverage", "Other consumers may exist; discovery is incomplete.");
         if (impact is { RetainedExposures.IsEmpty: false })
             yield return ("Other consumers", "Other recorded exposures are retained by this link-only action; see details.");
-        if (entry.Pinned) yield return ("Pinned", "Routine updates leave this version pinned.");
+        var pin = PinPolicy(entry);
+        if (pin is not null && pin.State != PinDisplayState.Unpinned) yield return ("Pin policy", pin.Guidance);
         if (entry.CleanupSuppressed) yield return ("Cleanup", "Cleanup suggestions are suppressed for this installation.");
         yield return ("Location", DisplayPath.Abbreviate(entry.Subject.Path, homeDirectory));
     }
@@ -180,7 +181,7 @@ internal static class MaintenanceQueueFormatter
         yield return ("Recorded tree", subject.Revision.RecordedTree);
         yield return ("Pinned ref", subject.Revision.PinnedRef);
         yield return ("Cleanup suppression", entry.CleanupSuppressed ? "suppressed" : "no recorded suppression");
-        yield return ("Pin", entry.Pinned ? "recorded pin; explicit unpin review required" : "no recorded pin");
+        if (PinPolicy(entry) is { } pin) yield return ("Pin", pin.Description);
         yield return ("Disablement", entry.DisablementState);
         yield return ("Migration", entry.MigrationState);
         yield return ("Update availability", entry.UpdateState);
@@ -206,6 +207,7 @@ internal static class MaintenanceQueueFormatter
             yield return ("Owner source", owner.Source);
             yield return ("Owner mode", owner.InstallationMode);
             yield return ("Owner registry", owner.LockFilePath);
+            yield return ("Owner pinned ref", owner.PinnedRef);
         }
         var impact = entry.Cleanup?.Impact ?? OperationImpact.Payload(subject, "review-observation");
         yield return ("Payload retained", impact.PayloadRetained.ToString());
@@ -222,4 +224,8 @@ internal static class MaintenanceQueueFormatter
             yield return ("Exposure agent version", exposure.Membership.AgentVersion);
         }
     }
+
+    private static PinDisplayPolicy? PinPolicy(MaintenanceQueueEntry entry) => entry.Cleanup is { Skill: null } ? null
+        : entry.PinDisplay ?? (entry.Cleanup?.Skill is { } skill ? PinDisplayPolicy.From(skill)
+            : PinDisplayPolicy.FromRecorded(entry.Subject, entry.Pinned));
 }

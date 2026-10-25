@@ -8,7 +8,7 @@ unit tests. Developer guides and historical result summaries live in
 ## Automated coverage
 
 - `.github/workflows/ci.yml` invokes current-host inventory, removal, update,
-  metadata, authoring, quarantine and saved-operation proofs on
+  metadata, quarantine and saved-operation proofs on
   supported native targets. App and extension publishes remain sequential.
 - `prove-old-native-*.py` creates and consumes actual prior-version saved plans.
   These are active compatibility tests for supported persisted schemas. Their

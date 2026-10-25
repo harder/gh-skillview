@@ -338,7 +338,7 @@ internal sealed partial class UpdatesTabView : FrameView
             {
                 ["Name"] = row => TuiHelpers.Truncate(row.S.Name, _nameW),
                 ["Scope"] = row => row.S.Scope.ToString(),
-                ["Flags"] = row => (row.S.Pinned ? "p" : "-") + (row.S.IsSymlinked ? "s" : "-"),
+                ["Flags"] = row => PinDisplayPolicy.From(row.S).Flag + (row.S.IsSymlinked ? "s" : "-"),
             });
         _wrapper = new CheckBoxTableSourceWrapperByIndex(_table, inner);
         _table.Table = _wrapper;
