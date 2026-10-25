@@ -49,7 +49,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _footer;
-    private readonly TabLoadingView _loading = new("Loading installed skills…");
+    private readonly TabLoadingView _loading = new("Loading installed skills…") { CanFocus = true };
     private bool _showDetails;
     private readonly SpinnerView _spinner;
     private InventorySnapshot? _snapshot;
@@ -299,6 +299,7 @@ internal sealed class InstalledTabView : FrameView
 
     private void Populate(InventorySnapshot snapshot)
     {
+        var focusTarget = _lastFocusedTarget;
         _loading.SetLoading(false);
         _table.Visible = true;
         _detail.Visible = true;
@@ -318,6 +319,7 @@ internal sealed class InstalledTabView : FrameView
         ScheduleDeferredWidthStabilization();
         _idleStatusMessage = null;
         _detail.Text = _rows.Count == 0 ? "(no matches)" : RenderDetail(_rows[0]);
+        _lastFocusedTarget = focusTarget;
         RestoreFocus();
         _onStateChange?.Invoke();
         RefreshOperationStatus();
@@ -558,7 +560,8 @@ internal sealed class InstalledTabView : FrameView
     internal void FocusList()
     {
         _lastFocusedTarget = FocusTarget.Table;
-        _table.SetFocus();
+        if (_loading.Visible) _loading.SetFocus();
+        else _table.SetFocus();
     }
 
     private void RestoreFocus()
@@ -569,7 +572,7 @@ internal sealed class InstalledTabView : FrameView
                 _filterField.SetFocus();
                 break;
             default:
-                _table.SetFocus();
+                FocusList();
                 break;
         }
     }
@@ -799,8 +802,9 @@ internal sealed class InstalledTabView : FrameView
     {
         var loading = Volatile.Read(ref _loadActive) != 0;
         var removing = Volatile.Read(ref _removeActive) != 0;
-        _loading.SetLoading(loading && !removing);
         var focusTarget = _lastFocusedTarget;
+        _loading.SetLoading(loading && !removing);
+        if (_loading.Visible && focusTarget == FocusTarget.Table) _loading.SetFocus();
         _table.Visible = !loading;
         _detail.Visible = !loading || removing;
         _lastFocusedTarget = focusTarget;

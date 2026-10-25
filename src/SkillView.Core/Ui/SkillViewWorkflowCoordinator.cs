@@ -61,7 +61,7 @@ internal sealed class SkillViewWorkflowCoordinator
         _displayInventory = new(() => _services.ListAdapter.Generation, async token =>
         {
             var report = await GetOrProbeReportAsync(token).ConfigureAwait(false);
-            return await CaptureInventoryAsync(report, token).ConfigureAwait(false);
+            return await CaptureInventoryCoreAsync(report, token).ConfigureAwait(false);
         }, _runBackground);
     }
 
@@ -364,7 +364,7 @@ internal sealed class SkillViewWorkflowCoordinator
 
 
     internal Task<InventorySnapshot> CaptureDisplayInventoryAsync(EnvironmentReport report, CancellationToken token) =>
-        _displayInventory.GetAsync(token, ct => CaptureInventoryAsync(report, ct));
+        _displayInventory.GetAsync(token, ct => CaptureInventoryCoreAsync(report, ct));
 
     public Task<InventorySnapshot> CaptureInventorySnapshotAsync(CancellationToken cancellationToken = default)
     {
@@ -499,9 +499,8 @@ internal sealed class SkillViewWorkflowCoordinator
 
         // Display snapshots can be reused across tabs; removal preflight needs
         // current consumers/owners in addition to native execution validation.
-        _services.ListAdapter.Invalidate();
         var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
-        snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
+        snapshot = await CaptureInventoryAsync(report, cancellationToken, bypassGhCache: true).ConfigureAwait(false);
         var plan = await BuildRemoveDialogPlanAsync(target, snapshot, cancellationToken)
             .ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
@@ -704,22 +703,26 @@ internal sealed class SkillViewWorkflowCoordinator
     }
 
     internal async Task<InventorySnapshot> CaptureInventoryAsync(
-        EnvironmentReport report, CancellationToken cancellationToken, string? scopeFilter = null)
+        EnvironmentReport report, CancellationToken cancellationToken, bool bypassGhCache = false)
     {
         var capturedGeneration = _services.ListAdapter.Generation;
-        var snapshot = await _services.InventoryService.CaptureAsync(
+        var snapshot = await CaptureInventoryCoreAsync(report, cancellationToken, bypassGhCache).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        // Operation captures may seed browsing; display workers publish through
+        // DisplayInventoryCache.LoadAsync alone.
+        _displayInventory.PublishFresh(snapshot, capturedGeneration);
+        return snapshot;
+    }
+
+    private Task<InventorySnapshot> CaptureInventoryCoreAsync(
+        EnvironmentReport report, CancellationToken cancellationToken, bool bypassGhCache = false) =>
+        _services.InventoryService.CaptureAsync(
             report.GhPath,
             new LocalInventoryService.Options(
                 ScanRoots: _options.ScanRoots, WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles,
-                AllowHiddenDirs: false,
-                FilterScope: scopeFilter),
-            cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        // A fresh operation capture may seed browsing after it completes; it
-        // never obtains operation authority from the display cache.
-        if (scopeFilter is null) _displayInventory.PublishFresh(snapshot, capturedGeneration);
-        return snapshot;
-    }
+                AllowHiddenDirs: false)
+            { BypassGhCache = bypassGhCache },
+            cancellationToken);
 
     internal async Task<SkillView.Gh.Models.UpdateResult> PrepareUpdatesAsync(string ghPath,
         SkillView.Gh.GhSkillUpdateService.Options options, CancellationToken token)

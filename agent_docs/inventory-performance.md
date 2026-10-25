@@ -157,8 +157,8 @@ nested comparisons. Their filesystem work has been removed from the inner loop.
 ## Freshness, cancellation and memory
 
 - A display snapshot expires one minute after successful completion. `r` from a list explicitly invalidates it; existing mutation invalidations also advance
-  the display generation. Failed captures are not cached. Partial captures keep
-  their coverage warnings rather than becoming complete through caching.
+  the display generation. Failed, partial or root-incomplete captures are not retained for reuse.
+  Current waiters still receive the partial capture with its coverage warnings.
 - One shared display capture is admitted per catalog generation. Invalidation
   detaches an obsolete flight so new callers can start a fresh capture immediately;
   obsolete workers remain app-owned and drain normally. Their completions cannot
@@ -174,9 +174,10 @@ nested comparisons. Their filesystem work has been removed from the inner loop.
 - Raw case/alias predicates still verify index hits. The index's case-insensitive
   buckets are candidate routing, not ownership authority. Original names, paths,
   conflicts and all consumers are retained.
-- Fresh removal preflight explicitly bypasses the display cache and invalidates
-  catalog observations. Cleanup/copies reviews and saved-operation workflows
-  retain their existing fresh capture paths and native execution checks. A
+- Fresh removal preflight bypasses both display and gh catalog caches for its
+  own capture without invalidating or canceling unrelated catalog work.
+  Cleanup/copies reviews and saved-operation workflows retain their existing
+  fresh capture paths and native execution checks. A
   completed full-context fresh capture can seed browsing in that same generation;
   older captures cannot overwrite a newer observation. Post-mutation display
   rescans share the same flight with the active-tab refresh, avoiding a second

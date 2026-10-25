@@ -228,9 +228,13 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
 - Display inventory captures share a flight only within the current catalog
   generation. Refresh detaches obsolete work without releasing app ownership;
   stale completions cannot clear the new flight. Scheduling must report refused
-  admission so every display waiter settles during shutdown. Removal preflight
+  admission so every display waiter settles during shutdown. Partial or
+  root-incomplete snapshots are shared with current waiters but not reused;
+  retain their ordering evidence so an older complete flight cannot hide them.
+  The next tab visit retries. Removal preflight
   resolves the selected installation uniquely in its fresh snapshot and uses
-  that fresh target for both target construction and confirmation.
+  that fresh target for both target construction and confirmation. Its gh
+  catalog captures bypass the cache without invalidating other operations.
 - Installed scope cycling filters the shared full snapshot in-process. Summary
   home shortening uses the captured child HOME/USERPROFILE and CWD; exact review
   paths remain unshortened. Cleanup/Updates previews explicitly request technical

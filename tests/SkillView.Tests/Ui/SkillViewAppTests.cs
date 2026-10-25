@@ -22,6 +22,99 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class SkillViewAppTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedSearchRestoresPreviousResultsAndActions(bool throws)
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var previous = new SearchResultSkill("Previous", "description", null, "owner/repo", "old", null);
+        app.LoadSearchResultsForTests([previous]);
+        var actions = app.DiscoverActionsForTests;
+        var preview = app.PreviewTextForTests;
+        var pending = new TaskCompletionSource<SearchResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var search = app.RunSearchForTestsAsync("new query", _ => pending.Task);
+        Assert.False(app.ResultsTableForTests!.Visible);
+        Assert.Equal(1, app.ResultsTableForTests.Table!.Rows);
+        if (throws) pending.SetException(new IOException("search-failed-sentinel"));
+        else pending.SetResult(new([], 1, "search-failed-sentinel"));
+        await search;
+        Assert.True(app.ResultsTableForTests.Visible);
+        Assert.Equal(1, app.ResultsTableForTests.Table!.Rows);
+        Assert.Equal(actions, app.DiscoverActionsForTests);
+        Assert.Equal(preview, app.PreviewTextForTests);
+        Assert.Contains("search-failed-sentinel", app.StatusTextForTests);
+        Assert.False(app.StatusStripForTests!.IsBusyForTests);
+    }
+
+    [Fact]
+    public async Task EmptySuccessfulSearchReplacesPreviousResultsAndActions()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.LoadSearchResultsForTests([new("Previous", null, null, "owner/repo", "old", null)]);
+        await app.RunSearchForTestsAsync("empty query", _ => Task.FromResult(new SearchResponse([], 0, null)));
+        Assert.Equal(0, app.ResultsTableForTests!.Table!.Rows);
+        Assert.DoesNotContain("Install", app.DiscoverActionsForTests);
+        Assert.False(app.StatusStripForTests!.IsBusyForTests);
+    }
+
+    [Fact]
+    public async Task SupersededSearchCannotRestoreOldResultsOrEndNewerLoadingFeedback()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.LoadSearchResultsForTests([new("Previous", null, null, "owner/repo", "old", null)]);
+        var old = new TaskCompletionSource<SearchResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var current = new TaskCompletionSource<SearchResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var first = app.RunSearchForTestsAsync("first", _ => old.Task);
+        var second = app.RunSearchForTestsAsync("second", _ => current.Task);
+        old.SetResult(new([new("Obsolete", null, null, "owner/repo", "obsolete", null)], 0, null));
+        await first;
+        Assert.False(app.ResultsTableForTests!.Visible);
+        Assert.True(app.StatusStripForTests!.IsBusyForTests);
+        current.SetResult(new([new("Current", null, null, "owner/repo", "current", null)], 0, null));
+        await second;
+        Assert.True(app.ResultsTableForTests.Visible);
+        Assert.Equal(1, app.ResultsTableForTests.Table!.Rows);
+        Assert.Contains("Current", app.PreviewTextForTests);
+        Assert.False(app.StatusStripForTests.IsBusyForTests);
+    }
+
+    [Fact]
+    public async Task SearchBusyOwnerIsReleasedEvenWhenLoadingCleanupThrows()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var loading = Assert.IsType<TabLoadingView>(app.DiscoverTabForTests!.SubViews.Single(child => child is TabLoadingView));
+        loading.VisibleChanged += (_, _) =>
+        {
+            if (!loading.Visible) throw new InvalidOperationException("cleanup-dispatch-sentinel");
+        };
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => app.RunSearchForTestsAsync("failed", _ =>
+            Task.FromResult(new SearchResponse([], 1, "search-failed-sentinel"))));
+        Assert.Equal("cleanup-dispatch-sentinel", exception.Message);
+        Assert.False(app.StatusStripForTests!.IsBusyForTests);
+    }
+
+    [Theory]
+    [InlineData((int)TuiHelpers.NotificationLevel.Success)]
+    [InlineData((int)TuiHelpers.NotificationLevel.Error)]
+    [InlineData((int)TuiHelpers.NotificationLevel.Info)]
+    public void TabChangesPreserveOutcomeErrorAndOperationStatus(int level)
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.StopBackgroundAdmissionForTests();
+        app.SetStatusForTests("retained-operation-status", (TuiHelpers.NotificationLevel)level);
+        app.ActivateTabForTests(SkillViewTab.Installed);
+        Assert.Equal("retained-operation-status", app.StatusTextForTests);
+        app.ActivateTabForTests(SkillViewTab.Changes);
+        Assert.Equal("retained-operation-status", app.StatusTextForTests);
+        Assert.Contains(app.CurrentHintsForTests, hint => hint.Key == "c" && hint.Label == "Cleanup");
+    }
+
     private static GhAuthStatus LoggedInAuth(string? activeHost = "github.com") => new()
     {
         LoggedIn = true,

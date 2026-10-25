@@ -16,6 +16,47 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledNavigationTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task LoadingRetainsNonTextFocusAndLetsGlobalShortcutsBubble(bool refresh)
+    {
+        using var app = Application.Create().Init();
+        app.Driver!.SetScreenSize(120, 36);
+        var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var view = new SkillView.Ui.Tabs.InstalledTabView(action => { action(); return Task.CompletedTask; },
+            (_, _) => { }, token => pending.Task.WaitAsync(token), (_, _, _) => Task.CompletedTask,
+            () => { }, () => { })
+        { Visible = true, Width = Dim.Fill(), Height = Dim.Fill() };
+        using var window = new Terminal.Gui.Views.Window();
+        window.Add(view);
+        if (refresh) view.LoadSeeded(InventorySnapshot.Empty);
+        var session = app.Begin(window);
+        Task? load = null;
+        try
+        {
+            view.FocusList();
+            load = view.LoadAsync();
+            view.FocusList(); // Same focus request as cold tab activation.
+            var loading = Assert.IsType<TabLoadingView>(view.SubViews.Single(child => child is TabLoadingView));
+            Assert.True(loading.HasFocus);
+            Assert.False(view.FilterHasFocusForTests);
+            var received = new List<int>();
+            window.KeyDown += (_, key) => received.Add(key.AsRune.Value);
+            foreach (var key in new[] { '?', 'd', '3', 'q' })
+                app.Keyboard.RaiseKeyDownEvent(new Key(key));
+            Assert.Equal(new int[] { '?', 'd', '3', 'q' }, received);
+            Assert.Equal(string.Empty, view.GetFilterText());
+            Assert.False(view.FilterHasFocusForTests);
+        }
+        finally
+        {
+            view.CancelPendingWork();
+            app.End(session!);
+        }
+        return load ?? Task.CompletedTask;
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(50)]

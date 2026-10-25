@@ -48,6 +48,7 @@ public sealed class LocalInventoryService
         IReadOnlyList<string>? WorkspaceDirectories = null,
         IReadOnlyList<ScanRootResolver.AgentProfileRoot>? Profiles = null)
     {
+        internal bool BypassGhCache { get; init; }
         internal bool DiscoverNestedSkillFiles { get; init; }
         internal bool IncludeRootSkillFiles { get; init; }
     }
@@ -96,7 +97,7 @@ public sealed class LocalInventoryService
             ? Task.FromResult(new GhCapture(
                 ImmutableArray<GhSkillListRecord>.Empty,
                 TimeSpan.Zero, false, "gh unavailable"))
-            : CaptureGhAsync(ghPath, cancellationToken);
+            : CaptureGhAsync(ghPath, cancellationToken, options.BypassGhCache);
 
         await Task.WhenAll(localTask, ghTask).ConfigureAwait(false);
         var local = await localTask.ConfigureAwait(false);
@@ -129,7 +130,7 @@ public sealed class LocalInventoryService
             }, async (index, token) =>
             {
                 captures[index] = await _listAdapter.CaptureAsync(ghPath, directory: ordinaryRoots[index].Path,
-                    cancellationToken: token).ConfigureAwait(false);
+                    cancellationToken: token, bypassCache: options.BypassGhCache).ConfigureAwait(false);
             }).ConfigureAwait(false);
             var records = ImmutableArray.CreateBuilder<GhSkillListRecord>();
             records.AddRange(ghRecords);
@@ -261,13 +262,13 @@ public sealed class LocalInventoryService
 
     private async Task<GhCapture> CaptureGhAsync(
         string ghPath,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool bypassCache)
     {
         var stopwatch = Stopwatch.StartNew();
         var records = await _listAdapter
             // Filter physical rows only after reconciliation, preserving every
             // gh observation needed to explain their other consumers/conflicts.
-            .CaptureAsync(ghPath, cancellationToken: cancellationToken)
+            .CaptureAsync(ghPath, cancellationToken: cancellationToken, bypassCache: bypassCache)
             .ConfigureAwait(false);
         stopwatch.Stop();
         return new GhCapture(records.Records, stopwatch.Elapsed, records.Succeeded, records.Error);

@@ -185,6 +185,68 @@ public sealed class DisplayInventoryCacheTests
         Assert.Same(InventorySnapshot.Empty, await cache.GetAsync(TestContext.Current.CancellationToken));
     }
 
+    [Theory]
+    [InlineData("provider")]
+    [InlineData("roots")]
+    [InlineData("scan")]
+    public async Task IncompleteCaptureIsSharedWithCurrentWaitersButRetriedOnNextVisit(string kind)
+    {
+        var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var partial = kind switch
+        {
+            "provider" => InventorySnapshot.Empty with { Providers = [new("gh", false, [], DateTimeOffset.UtcNow, "transient")] },
+            "roots" => InventorySnapshot.Empty with { ConfiguredRootsComplete = false },
+            _ => InventorySnapshot.Empty with { Diagnostics = new() { InaccessiblePaths = ["denied"] } },
+        };
+        var calls = 0;
+        var cache = new DisplayInventoryCache(() => 0, _ => ++calls == 1 ? pending.Task : Task.FromResult(InventorySnapshot.Empty), Start);
+        var first = cache.GetAsync(TestContext.Current.CancellationToken);
+        var second = cache.GetAsync(TestContext.Current.CancellationToken);
+        pending.SetResult(partial);
+        Assert.Same(partial, await first);
+        Assert.Same(partial, await second);
+        Assert.Equal(1, calls);
+        Assert.Same(InventorySnapshot.Empty, await cache.GetAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(2, calls);
+        Assert.Same(InventorySnapshot.Empty, await cache.GetAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task NewerIncompleteOperationRetiresOlderCompletedDisplayData()
+    {
+        var calls = 0;
+        var fresh = InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow.AddSeconds(1) };
+        var cache = new DisplayInventoryCache(() => 0, _ =>
+        {
+            calls++;
+            return Task.FromResult(fresh);
+        }, Start);
+        cache.PublishFresh(InventorySnapshot.Empty, 0);
+        cache.PublishFresh(InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow, ConfiguredRootsComplete = false }, 0);
+        Assert.Same(fresh, await cache.GetAsync(TestContext.Current.CancellationToken));
+        Assert.Same(fresh, await cache.GetAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task OlderCompletedFlightCannotHideNewerIncompleteOperationEvidence()
+    {
+        var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var fresh = InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(30) };
+        var cache = new DisplayInventoryCache(() => 0, _ => ++calls == 1 ? pending.Task : Task.FromResult(fresh), Start);
+        var loading = cache.GetAsync(TestContext.Current.CancellationToken);
+        var partial = InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(20), ConfiguredRootsComplete = false };
+        cache.PublishFresh(partial, 0);
+        pending.SetResult(InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(10) });
+        Assert.Same(partial, await loading);
+        Assert.Same(fresh, await cache.GetAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(2, calls);
+        Assert.Same(fresh, await cache.GetAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(2, calls);
+    }
+
     private static bool Start(Func<CancellationToken, Task> work, string operation)
     {
         _ = work(CancellationToken.None);

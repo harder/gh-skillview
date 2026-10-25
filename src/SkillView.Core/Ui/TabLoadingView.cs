@@ -4,7 +4,8 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
-/// Prominent, non-focusable loading feedback owned by its tab's current request.
+/// Prominent loading feedback owned by its tab's current request.
+/// Tabs may opt into focus to retain non-text shortcut routing during a load.
 internal sealed class TabLoadingView : View
 {
     private readonly SpinnerView _spinner;

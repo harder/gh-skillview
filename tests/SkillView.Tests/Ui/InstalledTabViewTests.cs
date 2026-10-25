@@ -12,6 +12,23 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledTabViewTests
 {
     [Fact]
+    public async Task CompletedLoadReturnsNonTextFocusToTable()
+    {
+        var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; },
+            (_, _) => { }, _ => pending.Task, (_, _, _) => Task.CompletedTask, () => { }, () => { });
+        view.LoadSeeded(InventorySnapshot.Empty);
+        view.FocusList();
+        var load = view.LoadAsync();
+        view.FocusList();
+        Assert.False(view.FilterHasFocusForTests);
+        pending.SetResult(InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow });
+        await load;
+        Assert.True(view.TableHasFocusForTests);
+        Assert.False(view.FilterHasFocusForTests);
+    }
+
+    [Fact]
     public void EffectiveLoadingShortcutUsesSelectedSkillAndDoesNotInterceptFilterTyping()
     {
         InstalledSkill? selected = null;

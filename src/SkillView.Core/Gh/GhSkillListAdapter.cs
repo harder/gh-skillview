@@ -52,8 +52,15 @@ public sealed class GhSkillListAdapter
         string? scope = null,
         string? agent = null,
         string? directory = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool bypassCache = false)
     {
+        if (bypassCache)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var loaded = await LoadAsync(ghPath, scope, agent, directory, cancellationToken).ConfigureAwait(false);
+            return new CaptureResult(loaded.Records, loaded.ShouldCache, loaded.Error, FromCache: false);
+        }
         // Root and environment changes must not reuse another context's catalog.
         var contextKey = $"{scope}\n{Environment.CurrentDirectory}\n{directory}\n" +
             $"{Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR")}\n{Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR")}\n" +

@@ -62,7 +62,8 @@ public sealed partial class SkillViewApp
         string? owner = null,
         int? limit = null,
         string? agent = null,
-        bool allowHiddenDirs = false)
+        bool allowHiddenDirs = false,
+        Func<CancellationToken, Task<SearchResponse>>? search = null)
     {
         if (_ghPath is null)
         {
@@ -85,17 +86,17 @@ public sealed partial class SkillViewApp
             await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
-                ReplaceSearchResults(Array.Empty<SearchResultSkill>());
-                UpdateMetadataPane();
-                SetPreviewText(TuiHelpers.PreviewHint);
+                UpdateDiscoverActions();
                 _discoverTab?.SetLoading(true);
             }, discoverToken).ConfigureAwait(false);
             var options = new GhSkillSearchService.Options(
                 Owner: owner,
                 Limit: limit ?? GhSkillSearchService.DefaultLimit);
-            var response = await _services.SearchService
-                .SearchAsync(_ghPath, query, options, cancellationToken)
-                .ConfigureAwait(false);
+            var response = await (search is null
+                ? _services.SearchService.SearchAsync(_ghPath, query, options, cancellationToken)
+                : search(cancellationToken)).ConfigureAwait(false);
+            if (!response.Succeeded)
+                throw new IOException(response.ErrorMessage ?? $"gh search exited {response.ExitCode}");
             var results = response.Results;
             var filteredResults = await FilterResultsByAgentAsync(
                 results,
@@ -158,15 +159,21 @@ public sealed partial class SkillViewApp
         }
         finally
         {
-            if (IsDiscoverWorkspaceActive(discoverGeneration))
+            try
             {
-                await InvokeAsync(() =>
+                if (IsDiscoverWorkspaceActive(discoverGeneration))
                 {
-                    if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
-                        _discoverTab?.SetLoading(false);
-                }, GetRunLifetimeToken()).ConfigureAwait(false);
+                    await InvokeAsync(() =>
+                    {
+                        if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
+                            _discoverTab?.SetLoading(false);
+                    }, GetRunLifetimeToken()).ConfigureAwait(false);
+                }
             }
-            EndBusyOperation(busyOperation);
+            finally
+            {
+                EndBusyOperation(busyOperation);
+            }
         }
     }
 

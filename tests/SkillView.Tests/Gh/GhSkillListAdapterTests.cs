@@ -1,10 +1,45 @@
 using SkillView.Gh;
+using SkillView.Logging;
+using SkillView.Subprocess;
 using Xunit;
 
 namespace SkillView.Tests.Gh;
 
 public class GhSkillListAdapterTests
 {
+    [Fact]
+    public async Task BypassedCaptureDoesNotJoinCancelOrOverwriteOtherCatalogWork()
+    {
+        var pending = new TaskCompletionSource<ProcessResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        CancellationToken sharedToken = default;
+        var adapter = new GhSkillListAdapter((executable, arguments, token) =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                sharedToken = token;
+                return pending.Task.WaitAsync(token);
+            }
+            return Task.FromResult(new ProcessResult(executable, arguments, 0, "[]", "", TimeSpan.Zero));
+        }, new Logger());
+        var generation = adapter.Generation;
+        var original = adapter.CaptureAsync("fixture", cancellationToken: TestContext.Current.CancellationToken);
+        var fresh = await adapter.CaptureAsync("fixture", cancellationToken: TestContext.Current.CancellationToken, bypassCache: true);
+        Assert.True(fresh.Succeeded);
+        Assert.False(fresh.FromCache);
+        Assert.Equal(generation, adapter.Generation);
+        Assert.False(sharedToken.IsCancellationRequested);
+        Assert.False(original.IsCompleted);
+        var sibling = adapter.CaptureAsync("fixture", cancellationToken: TestContext.Current.CancellationToken);
+        Assert.False(sibling.IsCompleted);
+        Assert.Equal(2, calls);
+        pending.SetResult(new ProcessResult("fixture", [], 0, "[]", "", TimeSpan.Zero));
+        Assert.True((await original).Succeeded);
+        Assert.True((await sibling).Succeeded);
+        Assert.True((await adapter.CaptureAsync("fixture", cancellationToken: TestContext.Current.CancellationToken)).FromCache);
+        Assert.Equal(2, calls);
+    }
+
     // Upstream-canonical payload per cli/cli PR #13418 (closes #13245).
     // Field set: skillName, hosts[], scope, sourceURL, version, pinned, path.
     [Fact]

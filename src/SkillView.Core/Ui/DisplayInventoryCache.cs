@@ -27,7 +27,10 @@ internal sealed class DisplayInventoryCache(
             lock (_gate)
             {
                 var current = generation();
+                // Keep the latest observation for ordering, but let a later
+                // visit retry incomplete coverage immediately.
                 if (_snapshot is not null && _snapshotGeneration == current
+                    && !_snapshot.IsPartial && _snapshot.ConfiguredRootsComplete
                     && _now() - _completedAt < TimeSpan.FromMinutes(1)) return _snapshot;
                 // Detach obsolete work so a refresh starts immediately. The app
                 // still owns and drains the old worker and its existing waiters.

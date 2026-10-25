@@ -15,6 +15,30 @@ public sealed class InventoryProviderOutcomeTests : IDisposable
     private readonly DirectoryInfo temporary = Directory.CreateTempSubdirectory("skillview-provider-outcome-");
     public void Dispose() => temporary.Delete(true);
 
+    [Fact]
+    public async Task FreshInventoryBypassesBothDefaultAndRootCatalogsWithoutInvalidation()
+    {
+        var root = CreateSkillRoot("fresh-catalog", "visible");
+        var logger = new Logger();
+        var calls = new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
+        var adapter = new GhSkillListAdapter((executable, arguments, token) =>
+        {
+            calls.AddOrUpdate(DirectoryArgument(arguments) ?? "default", 1, (_, count) => count + 1);
+            return Task.FromResult(new ProcessResult(executable, arguments, 0, "[]", "", TimeSpan.Zero));
+        }, logger);
+        var service = CreateService(logger, adapter);
+        var options = new LocalInventoryService.Options([root], true);
+        await service.CaptureAsync("protocol-fixture", options, TestContext.Current.CancellationToken);
+        var generation = adapter.Generation;
+        await service.CaptureAsync("protocol-fixture", options with { BypassGhCache = true }, TestContext.Current.CancellationToken);
+        Assert.Equal(generation, adapter.Generation);
+        Assert.Equal(2, calls["default"]);
+        Assert.Equal(2, calls[root]);
+        await service.CaptureAsync("protocol-fixture", options, TestContext.Current.CancellationToken);
+        Assert.Equal(2, calls["default"]);
+        Assert.Equal(2, calls[root]);
+    }
+
     [Theory]
     [InlineData("credentials", false, "credentials-unavailable-sentinel")]
     [InlineData("network", false, "network-unavailable-sentinel")]

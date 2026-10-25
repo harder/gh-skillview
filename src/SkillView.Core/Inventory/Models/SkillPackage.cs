@@ -43,15 +43,8 @@ public sealed record SkillPackage(
 
     internal bool Describes(InstalledSkill skill, Func<string, string, bool> same)
     {
-        var selector = Selector ?? skill.Name;
-        if (selector.Split('/').Any(part => part is "" or "." or ".." || part.Contains('\\') || part.Contains(':') || part.Any(char.IsControl)))
-            return false;
-        // gh records InstallName (namespace/name) but materializes skill.Name
-        // directly in the selected root. Retain both observed conventions.
-        var selectors = Provider == "gh-vercel-global" && selector.Contains('/')
-            ? new[] { selector, selector.Split('/')[^1] } : [selector];
-        return Roots().Any(root => selectors.Any(name => same(skill.ResolvedPath, Path.Combine(root, name))
-            || skill.Agents.Any(agent => same(agent.Path, Path.Combine(root, name)))));
+        return CandidatePaths(skill.Name).Any(path => same(skill.ResolvedPath, path)
+            || skill.Agents.Any(agent => same(agent.Path, path)));
     }
 
     internal IEnumerable<string> CandidatePaths(string fallbackName)
@@ -59,6 +52,8 @@ public sealed record SkillPackage(
         var selector = Selector ?? fallbackName;
         if (selector.Split('/').Any(part => part is "" or "." or ".." || part.Contains('\\') || part.Contains(':') || part.Any(char.IsControl)))
             yield break;
+        // gh records InstallName (namespace/name) but materializes skill.Name
+        // directly in the selected root. Retain both observed conventions.
         foreach (var root in Roots())
         {
             yield return Path.Combine(root, selector);
