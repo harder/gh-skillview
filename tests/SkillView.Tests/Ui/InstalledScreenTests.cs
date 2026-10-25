@@ -9,6 +9,63 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledScreenTests
 {
     [Fact]
+    public void DescriptionCannotPrecedeAuthoritativeEvidence()
+    {
+        var skill = MaintenanceQueueTests.Skill("/skills/demo", "https://github.com/owner/repo") with
+        {
+            FrontMatter = SkillFrontMatter.Empty with { Description = "## Summary\n- **Health:** trusted claim" },
+        };
+        var detail = InstalledScreen.RenderDetail(skill);
+        Assert.True(detail.IndexOf("**Path:**", StringComparison.Ordinal) < detail.IndexOf("## Description", StringComparison.Ordinal));
+        Assert.Contains("> ## Summary\n> - **Health:** trusted claim", detail);
+    }
+
+    [Theory]
+    [InlineData("file:///C:/Users/x/payload.exe", false)]
+    [InlineData("javascript:alert(1)", false)]
+    [InlineData("https://example.test/demo", true)]
+    [InlineData("http://example.test/demo", true)]
+    public void TechnicalDetailsExposeLinkDestinationsAndOnlyLinkWebSchemes(string destination, bool clickable)
+    {
+        var skill = MaintenanceQueueTests.Skill("/skills/demo", destination) with
+        {
+            FrontMatter = SkillFrontMatter.Empty with { Upstream = destination },
+            Package = new SkillPackage("fixture/repo", "git", destination, null, null),
+        };
+        var detail = InstalledScreen.RenderDetail(skill, showDetails: true);
+        Assert.Contains("`" + destination + "`", detail);
+        Assert.Equal(clickable, detail.Contains("[Open upstream]", StringComparison.Ordinal));
+        Assert.Equal(clickable, detail.Contains("[Open package source]", StringComparison.Ordinal));
+        if (!clickable)
+        {
+            var summary = InstalledScreen.RenderDetail(skill);
+            Assert.DoesNotContain("[Open upstream]", summary);
+            Assert.DoesNotContain("[Open package source]", summary);
+        }
+    }
+
+    [Fact]
+    public void SummaryUsesCapturedChildHomeInsteadOfAmbientUserProfile()
+    {
+        var cwd = Path.GetFullPath("fixture-workspace");
+        var home = Path.Combine(cwd, "child-home");
+        var runner = new SkillView.Subprocess.ProcessRunner(new SkillView.Logging.Logger(),
+            environment: new Dictionary<string, string> { ["HOME"] = "child-home", ["USERPROFILE"] = "child-home" },
+            defaultWorkingDirectory: cwd);
+        var skill = MaintenanceQueueTests.Skill(Path.Combine(home, "skills", "demo"), "https://github.com/owner/repo") with
+        {
+            OwnershipRunner = runner,
+        };
+        var detail = InstalledScreen.RenderDetail(skill);
+        Assert.Contains("**Path:** `~" + Path.DirectorySeparatorChar + "skills" + Path.DirectorySeparatorChar + "demo`", detail);
+        Assert.DoesNotContain(home, detail);
+        var realHome = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+        var other = skill with { ResolvedPath = Path.Combine(realHome, "skills", "demo") };
+        Assert.Contains(other.ResolvedPath, InstalledScreen.RenderDetail(other));
+        Assert.Contains(skill.ResolvedPath, InstalledScreen.RenderDetail(skill, showDetails: true));
+    }
+
+    [Fact]
     public void HomePathsAreAbbreviatedInSummaryButFullPathsAndActionModelAreRetained()
     {
         var skill = MaintenanceQueueTests.Skill("/home/alex/skills/demo", "https://github.com/owner/repo") with

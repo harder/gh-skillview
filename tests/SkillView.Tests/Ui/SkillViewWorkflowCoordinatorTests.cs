@@ -76,6 +76,38 @@ public sealed class SkillViewWorkflowCoordinatorTests
         Assert.False(evaluated);
     }
 
+    [Fact]
+    public async Task RemovalPlanResolvesFreshConsumersAndSubjectBeforeEvaluation()
+    {
+        var selected = MakeSkill();
+        var fresh = selected with { Agents = [new("claude", "/agents/demo", true, Scope: Scope.User)] };
+        fresh = fresh with { ObservedSubject = OperationSubject.From(fresh) };
+        var snapshot = Snapshot(fresh);
+        var plan = await SkillViewWorkflowCoordinator.BuildRemoveDialogPlanAsync(selected, snapshot,
+            TestContext.Current.CancellationToken, (target, _, _) => new(target, []));
+        Assert.Same(fresh, plan.Target);
+        Assert.Contains(plan.Targets, target => target.Kind == RemoveTargetKind.AgentSymlink);
+        Assert.Contains(plan.Target.Agents, agent => agent.AgentId == "claude");
+        Assert.Same(fresh.ObservedSubject, plan.Target.ObservedSubject);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RemovalPlanRefusesMissingOrAmbiguousFreshSelection(bool ambiguous)
+    {
+        var selected = MakeSkill();
+        var snapshot = Snapshot(selected) with { Skills = ambiguous ? [selected, selected] : [] };
+        var evaluated = false;
+        await Assert.ThrowsAsync<IOException>(() => SkillViewWorkflowCoordinator.BuildRemoveDialogPlanAsync(
+            selected, snapshot, TestContext.Current.CancellationToken, (target, _, _) =>
+            {
+                evaluated = true;
+                return new(target, []);
+            }));
+        Assert.False(evaluated);
+    }
+
     private static InventorySnapshot Snapshot(InstalledSkill skill) => new()
     {
         Skills = [skill],

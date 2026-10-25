@@ -22,7 +22,7 @@ internal sealed class SkillViewWorkflowCoordinator
     private readonly Action<string, TuiHelpers.NotificationLevel> _setStatusWithLevel;
     private readonly Action<Action> _invoke;
     private readonly Func<Action, CancellationToken, Task<bool>> _invokeAsync;
-    private readonly Action<Func<CancellationToken, Task>, string> _runBackground;
+    private readonly Func<Func<CancellationToken, Task>, string, bool> _runBackground;
     private readonly Action _focusSearchFromInstalled;
     private readonly Action _refreshActiveTab;
 
@@ -39,7 +39,7 @@ internal sealed class SkillViewWorkflowCoordinator
         Action<string, TuiHelpers.NotificationLevel> setStatusWithLevel,
         Action<Action> invoke,
         Func<Action, CancellationToken, Task<bool>> invokeAsync,
-        Action<Func<CancellationToken, Task>, string> runBackground,
+        Func<Func<CancellationToken, Task>, string, bool> runBackground,
         Action focusSearchFromInstalled,
         Action refreshActiveTab)
     {
@@ -372,7 +372,7 @@ internal sealed class SkillViewWorkflowCoordinator
         // on-activate snapshot loads. Probes the environment lazily so the
         // first tab activation doesn't hard-fail when gh hasn't been probed
         // yet (mirrors the lazy-probe in ShowDoctor).
-        return CaptureForTabAsync(null, cancellationToken);
+        return _displayInventory.GetAsync(cancellationToken);
     }
 
     internal void ShowEffectiveLoading(InstalledSkill selected)
@@ -487,13 +487,6 @@ internal sealed class SkillViewWorkflowCoordinator
             throw new IOException("This saved local reimport belongs to another purpose or physical installation address.");
     }
 
-    /// Scope-filtered display over the shared full-context snapshot. Filter
-    /// reconciled physical rows while retaining every recorded consumer.
-    public Task<InventorySnapshot> CaptureInventorySnapshotAsync(string? scopeFilter, CancellationToken cancellationToken = default)
-    {
-        return CaptureForTabAsync(scopeFilter, cancellationToken);
-    }
-
     public async Task OpenRemoveDialogAsync(
         InstalledSkill target,
         InventorySnapshot snapshot,
@@ -518,7 +511,7 @@ internal sealed class SkillViewWorkflowCoordinator
                     var app = _getApp();
                     if (app is not null)
                     {
-                        OpenRemoveDialogInternal(app, target, snapshot, plan);
+                        OpenRemoveDialogInternal(app, plan.Target, snapshot, plan);
                     }
                 },
                 cancellationToken)
@@ -533,8 +526,10 @@ internal sealed class SkillViewWorkflowCoordinator
         Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var freshTarget = SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, OperationSubject.From(target))
+                ?? throw new IOException("The selected installation is missing or ambiguous in the fresh inventory; refresh Installed and select it again.");
             var targets = RemoveTargetResolver.BuildTargetsWithCancellation(
-                target,
+                freshTarget,
                 snapshot,
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
@@ -542,22 +537,8 @@ internal sealed class SkillViewWorkflowCoordinator
                 ? null
                 : (evaluator ?? RemoveTargetResolver.EvaluateWithCancellation)(targets[0], snapshot, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            return new RemoveDialogPlan(targets, primaryEvaluation);
+            return new RemoveDialogPlan(freshTarget, targets, primaryEvaluation);
         }, cancellationToken);
-
-    private async Task<InventorySnapshot> CaptureForTabAsync(string? scopeFilter, CancellationToken cancellationToken)
-    {
-        var snapshot = await _displayInventory.GetAsync(cancellationToken).ConfigureAwait(false);
-        var scope = LocalInventoryService.ParseScope(scopeFilter);
-        return scope is null ? snapshot : snapshot with
-        {
-            Skills = snapshot.Skills.Where(skill =>
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                return LocalInventoryService.MatchesFilters(skill, scope, null);
-            }).ToImmutableArray()
-        };
-    }
 
     private void OpenRemoveDialogInternal(
         IApplication app,
@@ -820,5 +801,6 @@ internal sealed class SkillViewWorkflowCoordinator
 }
 
 internal sealed record RemoveDialogPlan(
+    InstalledSkill Target,
     ImmutableArray<RemoveTarget> Targets,
     RemoveTargetEvaluation? PrimaryEvaluation);

@@ -1,13 +1,21 @@
+using SkillView.Subprocess;
+
 namespace SkillView.Ui;
 
 /// Lexical presentation only: never resolve links, probe disk, or create selectors.
 internal static class DisplayPath
 {
-    private static readonly string CurrentHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.DoNotVerify);
+    internal static string CaptureHome(ProcessRunner runner)
+    {
+        var value = runner.GetEffectiveEnvironmentVariable(OperatingSystem.IsWindows() ? "USERPROFILE" : "HOME");
+        return string.IsNullOrEmpty(value)
+            ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.DoNotVerify)
+            : Path.GetFullPath(value, runner.EffectiveWorkingDirectory);
+    }
 
     internal static string Abbreviate(string path, string? homeDirectory = null, bool? windows = null)
     {
-        var home = homeDirectory ?? CurrentHome;
+        var home = homeDirectory ?? string.Empty;
         var isWindows = windows ?? OperatingSystem.IsWindows();
         bool Separator(char c) => c == '/' || (isWindows && c == '\\');
         var length = home.Length;

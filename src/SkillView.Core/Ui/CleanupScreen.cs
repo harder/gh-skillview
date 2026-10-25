@@ -700,7 +700,7 @@ public sealed class CleanupScreen
             sb.AppendLine();
             sb.AppendLine("## Skill");
             sb.AppendLine();
-            sb.AppendLine(InstalledScreen.RenderDetail(s));
+            sb.AppendLine(InstalledScreen.RenderDetail(s, showDetails: true, showShortcuts: false));
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }

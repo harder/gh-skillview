@@ -14,6 +14,22 @@ namespace SkillView.Tests.Ui;
 public sealed class ChangesTabViewTests
 {
     [Fact]
+    public async Task SummaryUsesCapturedChildHomeAndTechnicalViewKeepsExactPath()
+    {
+        var home = Path.GetFullPath("changes-child-home");
+        var skill = MaintenanceQueueTests.Skill(Path.Combine(home, "skills", "demo"), "https://github.com/owner/repo");
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }),
+            static () => { }, static () => { }, static () => { }, static () => { }, homeDirectory: home);
+        await view.LoadAsync();
+        var detail = Assert.IsType<Markdown>(view.SubViews.Single(child => child is Markdown));
+        Assert.DoesNotContain(home, detail.Text.ToString());
+        Assert.Contains("~", detail.Text.ToString());
+        view.NewKeyDownEvent(new Key(KeyCode.F2));
+        Assert.Contains(skill.ResolvedPath, detail.Text.ToString());
+    }
+
+    [Fact]
     public async Task SameFrozenSnapshotReusesQueueAndNewSnapshotReclassifies()
     {
         var root = Directory.CreateTempSubdirectory("skillview-queue-cache-");

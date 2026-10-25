@@ -79,20 +79,14 @@ public static class InstalledScreen
         return default;
     }
 
-    internal static string RenderDetail(InstalledSkill s, bool showDetails = false, string? homeDirectory = null)
+    internal static string RenderDetail(InstalledSkill s, bool showDetails = false, string? homeDirectory = null, bool showShortcuts = true)
     {
+        if (!showDetails && homeDirectory is null && s.OwnershipRunner is { } runner)
+            homeDirectory = DisplayPath.CaptureHome(runner);
         string PathLabel(string path) => showDetails ? path : DisplayPath.Abbreviate(path, homeDirectory);
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"## {s.Name}");
         sb.AppendLine();
-
-        if (s.FrontMatter.Description is { Length: > 0 } desc)
-        {
-            sb.AppendLine();
-            sb.AppendLine("## Description");
-            sb.AppendLine();
-            sb.AppendLine(desc);
-        }
 
         sb.AppendLine("## Summary");
         sb.AppendLine();
@@ -110,8 +104,11 @@ public static class InstalledScreen
         if (s.FrontMatter.LocalPath is { } localPath)
         {
             AppendDetailItem(sb, "Local source", MarkdownTableFormatter.FormatCodeSpan(PathLabel(localPath)));
-            AppendDetailItem(sb, "Local source switch", "**T** Review a different local source.");
-            AppendDetailItem(sb, "Local reimport", "**R** Review changes from this source. The installed original is retained for recovery.");
+            if (showShortcuts)
+            {
+                AppendDetailItem(sb, "Local source switch", "**T** Review a different local source.");
+                AppendDetailItem(sb, "Local reimport", "**R** Review changes from this source. The installed original is retained for recovery.");
+            }
         }
         AppendDetailItem(sb, "Ignored", MarkdownTableFormatter.FormatTableCell(FormatBool(s.Ignored)));
         if (s.CleanupSuppression is { } suppression && showDetails)
@@ -127,7 +124,7 @@ public static class InstalledScreen
         }
         if (s.FrontMatter.Upstream is { Length: > 0 } upstream)
         {
-            AppendDetailItem(sb, "Upstream", FormatTableLink(upstream, "Open upstream"));
+            AppendDetailItem(sb, "Upstream", FormatTableLink(upstream, "Open upstream", showDetails));
         }
         if (s.InstalledAt is { } when_)
         {
@@ -151,7 +148,7 @@ public static class InstalledScreen
             }
             if (pkg.SourceUrl is { Length: > 0 } url)
             {
-                AppendDetailItem(sb, "Package URL", FormatTableLink(url, "Open package source"));
+                AppendDetailItem(sb, "Package URL", FormatTableLink(url, "Open package source", showDetails));
             }
             if (pkg.UpdatedAt is { } u)
             {
@@ -185,13 +182,23 @@ public static class InstalledScreen
             }
         }
         sb.AppendLine();
-        sb.AppendLine("Active-session loading is unknown. **E** Analyze loading · **K** Check package · **F2** Technical details.");
+        sb.AppendLine(showShortcuts
+            ? "Active-session loading is unknown. **E** Analyze loading · **K** Check package · **F2** Technical details."
+            : "Active-session loading is unknown.");
         if (showDetails && s.ObservedSubject is { } subject)
         {
             sb.AppendLine();
             sb.AppendLine("## Technical details");
             sb.AppendLine();
             OperationImpactFormatter.Append(sb, OperationImpact.Payload(subject, "inspect"));
+        }
+        if (s.FrontMatter.Description is { Length: > 0 } desc)
+        {
+            sb.AppendLine();
+            sb.AppendLine("## Description · from skill metadata");
+            sb.AppendLine();
+            foreach (var line in desc.Replace("\r", "", StringComparison.Ordinal).Split('\n'))
+                sb.AppendLine("> " + line);
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
@@ -206,10 +213,14 @@ public static class InstalledScreen
         sb.AppendLine(value);
     }
 
-    private static string FormatTableLink(string value, string label)
+    private static string FormatTableLink(string value, string label, bool showDestination)
     {
         var normalized = MarkdownTableFormatter.NormalizeTableValue(value);
-        return $"[{label}]({EscapeMarkdownLinkDestination(normalized)})";
+        if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            return MarkdownTableFormatter.FormatCodeSpan(normalized);
+        var link = $"[{label}]({EscapeMarkdownLinkDestination(normalized)})";
+        return showDestination ? link + " · " + MarkdownTableFormatter.FormatCodeSpan(normalized) : link;
     }
 
     private static string EscapeMarkdownLinkDestination(string value) =>

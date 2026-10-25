@@ -159,13 +159,17 @@ nested comparisons. Their filesystem work has been removed from the inner loop.
 - A display snapshot expires one minute after successful completion. `r` from a list explicitly invalidates it; existing mutation invalidations also advance
   the display generation. Failed captures are not cached. Partial captures keep
   their coverage warnings rather than becoming complete through caching.
-- Only one shared display capture is in flight. A tab can cancel its wait and
+- One shared display capture is admitted per catalog generation. Invalidation
+  detaches an obsolete flight so new callers can start a fresh capture immediately;
+  obsolete workers remain app-owned and drain normally. Their completions cannot
+  clear or overwrite a newer flight. A tab can cancel its wait and
   its queued UI publication; the app-owned worker remains available to another
-  tab. App shutdown cancels/drains that worker. Invalidation during capture
-  prevents the old generation from being published and triggers a fresh capture
-  for still-interested waiters without overlapping obsolete scans.
-- Storage is bounded to one completed snapshot, one in-flight capture, and one
-  Changes projection. Path lookup caches belong to a single discovery/matching
+  tab. App shutdown cancels/drains all admitted workers. Old-generation waiters
+  retry against the current generation once their obsolete worker settles;
+  refused background admission completes waiters with cancellation.
+- Storage retains one completed snapshot, the current in-flight capture, and one
+  Changes projection, plus obsolete app-owned workers until they settle.
+  Path lookup caches belong to a single discovery/matching
   pass and are not persisted or shared with destructive admission.
 - Raw case/alias predicates still verify index hits. The index's case-insensitive
   buckets are candidate routing, not ownership authority. Original names, paths,

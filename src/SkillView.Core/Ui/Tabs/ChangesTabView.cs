@@ -17,6 +17,7 @@ namespace SkillView.Ui.Tabs;
 internal sealed class ChangesTabView : FrameView
 {
     private const int KindColumnWidth = 11;
+    private readonly string? _homeDirectory;
     private readonly Action? _onRefresh;
     private readonly Func<Action, Task> _runOnUi;
     private readonly Func<CancellationToken, Task<InventorySnapshot>> _snapshotLoader;
@@ -59,8 +60,9 @@ internal sealed class ChangesTabView : FrameView
         Action<MaintenanceQueueEntry>? onActivateEntry = null,
         Action<Func<Task>, string>? runTask = null,
         Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? activateEntryAsync = null,
-        Action? onRefresh = null)
+        Action? onRefresh = null, string? homeDirectory = null)
     {
+        _homeDirectory = homeDirectory;
         _onRefresh = onRefresh;
         _runOnUi = runOnUi;
         _snapshotLoader = snapshotLoader;
@@ -304,7 +306,7 @@ internal sealed class ChangesTabView : FrameView
         {
             var row = _table.GetSelectedRow();
             var detail = row >= 0 && row < _rows.Count
-                ? (_rows[row].Entry is { } entry ? MaintenanceQueueFormatter.Render(entry, token, _showDetails)
+                ? (_rows[row].Entry is { } entry ? MaintenanceQueueFormatter.Render(entry, token, _showDetails, _homeDirectory)
                     : _rows[row].Detail ?? RenderDetail(_rows[row]))
                     + (_showDetails ? _coverageDetail + (_omittedRows > 0
                         ? $"\n{_omittedRows} additional observations are omitted from the list. Use queue --json for all observations.\n" : string.Empty)

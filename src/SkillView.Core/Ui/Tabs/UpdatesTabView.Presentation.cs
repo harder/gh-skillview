@@ -58,7 +58,7 @@ internal sealed partial class UpdatesTabView
         var row = _table.GetSelectedRow();
         if (row < 0 || row >= _skills.Count) return;
         var target = _skills[row];
-        ShowPreview(UpdateReviewPresentation.Selection(target), "## Selected installation\n\n" + InstalledScreen.RenderDetail(target));
+        ShowPreview(UpdateReviewPresentation.Selection(target), "## Selected installation\n\n" + InstalledScreen.RenderDetail(target, showDetails: true, showShortcuts: false));
     }
 
     // Only layout and visibility change here. Review/apply admission stays in

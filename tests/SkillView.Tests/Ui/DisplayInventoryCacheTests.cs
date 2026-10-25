@@ -17,7 +17,7 @@ public sealed class DisplayInventoryCacheTests
             Assert.False(token.IsCancellationRequested);
             calls++;
             return completion.Task;
-        }, (work, _) => worker = work(CancellationToken.None));
+        }, (work, _) => { worker = work(CancellationToken.None); return true; });
         using var firstTab = new CancellationTokenSource();
         var first = cache.GetAsync(firstTab.Token);
         firstTab.Cancel();
@@ -31,23 +31,39 @@ public sealed class DisplayInventoryCacheTests
         Assert.Equal(1, calls);
     }
 
-    [Fact]
-    public async Task InvalidationDuringCaptureDiscardsStaleResultWithoutOverlappingCaptures()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InvalidationStartsFreshCaptureBeforeObsoleteWorkerFinishes(bool obsoleteFails)
     {
         long generation = 0;
-        var firstResult = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var obsolete = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var current = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var oldWorker = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var calls = 0;
         var fresh = InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow };
         var cache = new DisplayInventoryCache(() => Interlocked.Read(ref generation), _ =>
-            ++calls == 1 ? firstResult.Task : Task.FromResult(fresh),
-            (work, operation) => { _ = work(CancellationToken.None); });
+            ++calls == 1 ? obsolete.Task : current.Task,
+            (work, operation) =>
+            {
+                var task = work(CancellationToken.None);
+                if (calls == 1) _ = task.ContinueWith(_ => oldWorker.SetResult(), TaskScheduler.Default);
+                return true;
+            });
         var first = cache.GetAsync(TestContext.Current.CancellationToken);
         Interlocked.Increment(ref generation);
         var second = cache.GetAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, calls);
-        firstResult.SetResult(InventorySnapshot.Empty);
+        Assert.Equal(2, calls);
+        Assert.False(second.IsCompleted);
+        if (obsoleteFails) obsolete.SetException(new IOException("obsolete scan failed"));
+        else obsolete.SetResult(InventorySnapshot.Empty);
+        await oldWorker.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var third = cache.GetAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(2, calls); // Old completion cannot clear the current flight.
+        current.SetResult(fresh);
         Assert.Same(fresh, await first);
         Assert.Same(fresh, await second);
+        Assert.Same(fresh, await third);
         Assert.Equal(2, calls);
     }
 
@@ -61,7 +77,7 @@ public sealed class DisplayInventoryCacheTests
         {
             calls++;
             return Task.FromResult(InventorySnapshot.Empty);
-        }, (work, operation) => { _ = work(CancellationToken.None); }, () => now);
+        }, Start, () => now);
         await cache.GetAsync(TestContext.Current.CancellationToken);
         now += TimeSpan.FromSeconds(59);
         await cache.GetAsync(TestContext.Current.CancellationToken);
@@ -80,7 +96,7 @@ public sealed class DisplayInventoryCacheTests
         var calls = 0;
         var cache = new DisplayInventoryCache(() => 0, _ =>
             ++calls == 1 ? Task.FromException<InventorySnapshot>(new IOException("scan failed"))
-                : Task.FromResult(InventorySnapshot.Empty), (work, operation) => { _ = work(CancellationToken.None); });
+                : Task.FromResult(InventorySnapshot.Empty), Start);
         await Assert.ThrowsAsync<IOException>(() => cache.GetAsync(TestContext.Current.CancellationToken));
         Assert.Empty((await cache.GetAsync(TestContext.Current.CancellationToken)).Skills);
         Assert.Equal(2, calls);
@@ -93,7 +109,7 @@ public sealed class DisplayInventoryCacheTests
             (work, operation) =>
             {
                 if (++schedules == 1) throw new InvalidOperationException("scheduler refused");
-                _ = work(CancellationToken.None);
+                return Start(work, operation);
             });
         await Assert.ThrowsAsync<InvalidOperationException>(() => cache.GetAsync(TestContext.Current.CancellationToken));
         Assert.Empty((await cache.GetAsync(TestContext.Current.CancellationToken)).Skills);
@@ -111,7 +127,7 @@ public sealed class DisplayInventoryCacheTests
             started.SetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, token);
             return InventorySnapshot.Empty;
-        }, (work, operation) => worker = work(app.Token));
+        }, (work, operation) => { worker = work(app.Token); return true; });
         var first = cache.GetAsync(TestContext.Current.CancellationToken);
         var second = cache.GetAsync(TestContext.Current.CancellationToken);
         await started.Task;
@@ -127,7 +143,7 @@ public sealed class DisplayInventoryCacheTests
         long generation = 1;
         var cache = new DisplayInventoryCache(() => generation,
             _ => throw new InvalidOperationException("Display must reuse the completed fresh capture"),
-            (work, operation) => { _ = work(CancellationToken.None); });
+            Start);
         var fresh = InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow };
         cache.PublishFresh(fresh, generation);
         Assert.Same(fresh, await cache.GetAsync(TestContext.Current.CancellationToken));
@@ -143,13 +159,36 @@ public sealed class DisplayInventoryCacheTests
     {
         var pending = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
         var cache = new DisplayInventoryCache(() => 0, _ => pending.Task,
-            (work, operation) => { _ = work(CancellationToken.None); });
+            Start);
         var loading = cache.GetAsync(TestContext.Current.CancellationToken);
         var fresh = InventorySnapshot.Empty with { CapturedAt = DateTimeOffset.UtcNow };
         cache.PublishFresh(fresh, 0);
         pending.SetResult(InventorySnapshot.Empty);
         Assert.Same(fresh, await loading);
         Assert.Same(fresh, await cache.GetAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task RefusedBackgroundWorkSettlesUncancelableWaitersAndAllowsRetry()
+    {
+        var tracker = new BackgroundTaskTracker(exception => Assert.Fail(exception.ToString()));
+        tracker.StopAccepting();
+        var refused = true;
+        var cache = new DisplayInventoryCache(() => 0, _ => Task.FromResult(InventorySnapshot.Empty),
+            (work, operation) => refused
+                ? tracker.TryRun(() => work(CancellationToken.None)) : Start(work, operation));
+        // CancellationToken.None reproduces the shutdown waiter that cannot self-cancel.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cache.GetAsync(CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        await tracker.DrainAsync();
+        refused = false;
+        Assert.Same(InventorySnapshot.Empty, await cache.GetAsync(TestContext.Current.CancellationToken));
+    }
+
+    private static bool Start(Func<CancellationToken, Task> work, string operation)
+    {
+        _ = work(CancellationToken.None);
+        return true;
     }
 
 }

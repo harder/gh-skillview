@@ -14,6 +14,28 @@ namespace SkillView.Tests.Ui;
 public sealed class UpdatesTabViewTests
 {
     [Fact]
+    public async Task SelectedPreviewRetainsExactEvidenceWithoutInstalledShortcuts()
+    {
+        var home = Path.GetFullPath("updates-child-home");
+        var skill = MaintenanceQueueTests.Skill(Path.Combine(home, "skills", "demo"), "https://github.com/owner/repo") with
+        {
+            OwnershipRunner = new SkillView.Subprocess.ProcessRunner(new Logger(),
+                environment: new Dictionary<string, string> { ["HOME"] = home, ["USERPROFILE"] = home }),
+        };
+        skill = skill with { ObservedSubject = OperationSubject.From(skill) };
+        using var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }));
+        await view.LoadForSubjectAsync(OperationSubject.From(skill));
+        view.ToggleDetailsForTests();
+        var detail = view.PreviewTextForTests;
+        Assert.Contains("**Path:** `" + skill.ResolvedPath + "`", detail);
+        Assert.Contains("Installation address ID", detail);
+
+        Assert.DoesNotContain("**E** Analyze", detail);
+        Assert.DoesNotContain("**K** Check", detail);
+        Assert.DoesNotContain("**F2** Technical", detail);
+    }
+
+    [Fact]
     public async Task QueueDrillIn_SelectsOnlyExactPhysicalInstallAndDoesNotStartAnUpdate()
     {
         var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");

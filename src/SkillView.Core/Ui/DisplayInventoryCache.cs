@@ -7,7 +7,7 @@ namespace SkillView.Ui;
 internal sealed class DisplayInventoryCache(
     Func<long> generation,
     Func<CancellationToken, Task<InventorySnapshot>> capture,
-    Action<Func<CancellationToken, Task>, string> runBackground,
+    Func<Func<CancellationToken, Task>, string, bool> runBackground,
     Func<DateTimeOffset>? clock = null)
 {
     private readonly object _gate = new();
@@ -29,16 +29,23 @@ internal sealed class DisplayInventoryCache(
                 var current = generation();
                 if (_snapshot is not null && _snapshotGeneration == current
                     && _now() - _completedAt < TimeSpan.FromMinutes(1)) return _snapshot;
+                // Detach obsolete work so a refresh starts immediately. The app
+                // still owns and drains the old worker and its existing waiters.
+                if (_flight is not null && _flight.Generation != current) _flight = null;
                 start = _flight is null;
                 flight = _flight ??= new Flight(current);
             }
             // Publish ownership before an inline scheduler can start the worker.
             if (start)
             {
-                try { runBackground(ct => LoadAsync(flight, ct, captureOverride ?? capture), "inventory.display-capture"); }
+                try
+                {
+                    if (!runBackground(ct => LoadAsync(flight, ct, captureOverride ?? capture), "inventory.display-capture"))
+                        throw new OperationCanceledException("Inventory capture was refused during shutdown.");
+                }
                 catch (Exception ex)
                 {
-                    lock (_gate) _flight = null;
+                    lock (_gate) ClearFlightUnderLock(flight);
                     flight.Completion.TrySetException(ex);
                 }
             }
@@ -75,17 +82,22 @@ internal sealed class DisplayInventoryCache(
             lock (_gate)
             {
                 result = StoreUnderLock(result, flight.Generation);
-                _flight = null;
+                ClearFlightUnderLock(flight);
             }
             flight.Completion.TrySetResult(result);
         }
         catch (Exception ex)
         {
-            lock (_gate) _flight = null;
+            lock (_gate) ClearFlightUnderLock(flight);
             flight.Completion.TrySetException(ex);
             // All display waiters may have left; the app still owns this worker.
             _ = flight.Completion.Task.Exception;
         }
+    }
+
+    private void ClearFlightUnderLock(Flight flight)
+    {
+        if (ReferenceEquals(_flight, flight)) _flight = null;
     }
 
     private sealed class Flight(long generation)

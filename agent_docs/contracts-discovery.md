@@ -112,6 +112,8 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   reuse case/containment observations within one capture. Conservative candidate
   buckets must still use the original contextual matching predicate; retain all
   aliases, conflicts and consumers. Never reuse those path observations for
-  destructive admission. Root catalog probes are bounded to four concurrent
+  destructive admission. Cleanup classification uses uncached coverage/owner
+  comparisons; managed discovery for install/removal admission explicitly disables
+  capture-local path reuse. Root catalog probes are bounded to four concurrent
   children and reconciled in configured-root order. See
   [inventory performance](inventory-performance.md).

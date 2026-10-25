@@ -150,7 +150,7 @@ public sealed partial class SkillViewApp
             SetStatus,
             Invoke,
             InvokeOwnedAsync,
-            RunBackground,
+            TryRunBackground,
             FocusSearchFromInstalled,
             RefreshActiveTab);
     }

@@ -240,10 +240,13 @@ public sealed partial class SkillViewApp
     /// Fire-and-forget background work with exception guard. Catches any
     /// unhandled exception, logs it, and shows a status bar message so
     /// failures are never silently swallowed.
-    private void RunBackground(Func<CancellationToken, Task> work, string operation)
+    private void RunBackground(Func<CancellationToken, Task> work, string operation) =>
+        TryRunBackground(work, operation);
+
+    private bool TryRunBackground(Func<CancellationToken, Task> work, string operation)
     {
         var cancellationToken = GetRunLifetimeToken();
-        RunOwnedTask(async () =>
+        return RunOwnedTask(async () =>
         {
             try
             {
@@ -272,12 +275,14 @@ public sealed partial class SkillViewApp
     private void RunOwnedTask(Func<Task> work, string operation) =>
         RunOwnedTask(work, operation, runOnThreadPool: false);
 
-    private void RunOwnedTask(Func<Task> work, string operation, bool runOnThreadPool)
+    private bool RunOwnedTask(Func<Task> work, string operation, bool runOnThreadPool)
     {
         if (!_backgroundTasks.TryRun(work, runOnThreadPool))
         {
             _services.Logger.Debug(operation, $"{operation} skipped during shutdown");
+            return false;
         }
+        return true;
     }
 
     private CancellationToken GetRunLifetimeToken() => _runLifetime?.Token ?? CancellationToken.None;

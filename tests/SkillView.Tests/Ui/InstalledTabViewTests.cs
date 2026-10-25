@@ -42,7 +42,7 @@ public sealed class InstalledTabViewTests
     }
 
     [Fact]
-    public void ScopeCycle_ReloadsFullInventoryAfterServerSideFiltering()
+    public void ScopeCycleFiltersSharedSnapshotWithoutReloadOrLoadingState()
     {
         var snapshot = SnapshotWithSkill("user-skill", null) with
         {
@@ -53,23 +53,13 @@ public sealed class InstalledTabViewTests
                 SnapshotWithSkill("custom-skill", null).Skills[0] with { Scope = Scope.Custom },
             ],
         };
-        var requestedScopes = new List<string?>();
+        var loads = 0;
         using var view = new InstalledTabView(
             action => { action(); return Task.CompletedTask; },
             (operation, _) => operation().GetAwaiter().GetResult(),
-            _ => Task.FromResult(snapshot),
+            _ => { loads++; return Task.FromResult(snapshot); },
             (_, _, _) => Task.CompletedTask,
-            () => { }, () => { },
-            scopedSnapshotLoader: (scope, _) =>
-            {
-                requestedScopes.Add(scope);
-                return Task.FromResult(snapshot with
-                {
-                    Skills = snapshot.Skills.Where(s => scope is null
-                        || (scope == "user" ? s.Scope == Scope.User : s.Scope == Scope.Project))
-                        .ToImmutableArray(),
-                });
-            });
+            () => { }, () => { });
         view.LoadSeeded(snapshot);
         view.FocusList();
 
@@ -81,7 +71,11 @@ public sealed class InstalledTabViewTests
         Assert.Equal(["custom-skill"], view.VisibleSkillNamesForTests);
         view.NewKeyDownEvent(new Key('G'));
         Assert.Equal(["custom-skill", "project-skill", "user-skill"], view.VisibleSkillNamesForTests);
-        Assert.Equal(new string?[] { "user", "project", null, null }, requestedScopes);
+        Assert.Equal(0, loads);
+        Assert.Same(snapshot, view.CurrentSnapshot);
+        Assert.False(view.LoadActiveForTests);
+        Assert.False(view.SpinnerVisibleForTests);
+        Assert.DoesNotContain("scope:", view.FooterTextForTests);
     }
 
     [Fact]

@@ -11,7 +11,7 @@ internal sealed partial class ManagedSkillDiscovery
     internal const int MaxManifestBytes = 1024 * 1024, MaxTotalMetadataBytes = 16 * 1024 * 1024;
     private readonly CancellationToken token;
     private readonly string cwd;
-    private readonly InventoryPathComparison _discoveryPaths = new();
+    private readonly InventoryPathComparison? _discoveryPaths;
     private readonly HashSet<ManagedSkillRegion> regionKeys = [];
     private readonly HashSet<ScanRoot> rootKeys = [];
     private readonly List<ManagedSkillRegion> regions = [];
@@ -25,7 +25,12 @@ internal sealed partial class ManagedSkillDiscovery
     private bool topologyIncomplete;
     private ScanRoot[] contextRoots = [];
 
-    private ManagedSkillDiscovery(string cwd, CancellationToken token) { this.cwd = cwd; this.token = token; }
+    private ManagedSkillDiscovery(string cwd, CancellationToken token, bool cachePathObservations)
+    {
+        this.cwd = cwd;
+        this.token = token;
+        _discoveryPaths = cachePathObservations ? new() : null;
+    }
 
     internal static ProcessRunner CaptureContext(ProcessRunner? source)
     {
@@ -66,10 +71,10 @@ internal sealed partial class ManagedSkillDiscovery
 
     internal static Observation Capture(ProcessRunner runner, IEnumerable<ScanRoot> ordinaryRoots,
         CancellationToken token, IReadOnlyDictionary<string, string>? environment = null, string? workingDirectory = null,
-        bool allowHidden = false, bool discoverPayloads = true)
+        bool allowHidden = false, bool discoverPayloads = true, bool cachePathObservations = true)
     {
         var cwd = Path.GetFullPath(workingDirectory ?? runner.EffectiveWorkingDirectory);
-        var probe = new ManagedSkillDiscovery(cwd, token);
+        var probe = new ManagedSkillDiscovery(cwd, token, cachePathObservations);
         var capturedRoots = ordinaryRoots.Take(513).ToArray();
         probe.contextRoots = capturedRoots.Take(512).ToArray();
         string? Value(string key) => runner.GetEffectiveEnvironmentVariable(key, environment) is { Length: > 0 } value ? value : null;
@@ -118,22 +123,21 @@ internal sealed partial class ManagedSkillDiscovery
         // Inventory identity is physical, but every custom/profile exposure is
         // retained through its reviewed spelling. Do not rescan plugin resources
         // merely because the enclosing ordinary root has a different alias.
-        var paths = new InventoryPathComparison();
-        var payloads = roots.Select(root => (Root: root, Canonical: paths.Canonical(root.Path))).ToArray();
+        var payloads = roots.Select(root => (Root: root, Canonical: _discoveryPaths?.Canonical(root.Path))).ToArray();
         foreach (var ordinary in ordinaryRoots)
         {
             token.ThrowIfCancellationRequested();
-            var parent = paths.Canonical(ordinary.Path);
+            var parent = CanonicalForObservation(ordinary.Path);
             if (parent is null) continue;
             foreach (var captured in payloads)
             {
                 token.ThrowIfCancellationRequested();
                 var payload = captured.Root;
-                var candidate = captured.Canonical;
+                var candidate = _discoveryPaths is null ? OwnershipPath.CanonicalCandidate(payload.Path) : captured.Canonical;
                 if (candidate is null) continue;
-                var contained = paths.IsInside(candidate, parent);
+                var contained = InsideForObservation(candidate, parent);
                 var narrower = !payload.DirectSkill && (ordinary.Scope == Scope.Custom || ordinary.Profile is not null)
-                    && paths.IsInside(parent, candidate);
+                    && InsideForObservation(parent, candidate);
                 if (!contained && !narrower) continue;
                 var alias = narrower ? ordinary.Path : Path.GetFullPath(Path.GetRelativePath(parent, candidate), ordinary.Path);
                 var region = regions.Where(region => region.Provider == payload.ManagedProvider && CoversForObservation(region, candidate))
@@ -179,7 +183,7 @@ internal sealed partial class ManagedSkillDiscovery
         var roots = paths.SelectMany(path => new[] { path, OwnershipPath.CanonicalCandidate(path) ?? OwnershipPath.EntryAddress(path)
             ?? throw new IOException("Managed ownership address could not be inspected.") })
             .Distinct(StringComparer.Ordinal).Select(path => new ScanRoot(path, Scope.Custom, null));
-        var observed = Capture(runner ?? new ProcessRunner(new SkillView.Logging.Logger()), roots, token, discoverPayloads: false);
+        var observed = Capture(runner ?? new ProcessRunner(new SkillView.Logging.Logger()), roots, token, discoverPayloads: false, cachePathObservations: false);
         Refuse(observed, paths, includeContainedRegions: true);
     }
 
@@ -305,13 +309,13 @@ internal sealed partial class ManagedSkillDiscovery
     private bool NeedsExplicitTraversal(ScanRoot? context)
     {
         if (context is null || context.Scope != Scope.Custom && context.Profile is null) return false;
-        var boundary = _discoveryPaths.Canonical(context.Path);
+        var boundary = CanonicalForObservation(context.Path);
         if (boundary is null)
         { topologyIncomplete = true; Incomplete(context.Path, "Explicit managed payload boundary could not be inspected."); return false; }
         // Already discovered payloads get alias/profile exposures below. Only a
         // still-unobserved explicit physical scope needs a separate narrow scan.
-        return !roots.Any(root => _discoveryPaths.Canonical(root.Path) is { } payload
-            && _discoveryPaths.IsInside(boundary, payload));
+        return !roots.Any(root => CanonicalForObservation(root.Path) is { } payload
+            && InsideForObservation(boundary, payload));
     }
     private bool HasManifest(string path) => Exists(Path.Combine(path, ".codex-plugin", "plugin.json"))
         || Exists(Path.Combine(path, ".claude-plugin", "plugin.json")) || Exists(Path.Combine(path, "plugin.json"));
@@ -321,9 +325,9 @@ internal sealed partial class ManagedSkillDiscovery
         var codex = Exists(Path.Combine(path, "plugin.json")) || Exists(Path.Combine(path, ".codex-plugin", "plugin.json"));
         var claude = Exists(Path.Combine(path, ".claude-plugin", "plugin.json"));
         var codexOwner = codex ? regions.FirstOrDefault(region => region.PluginId is not null
-            && region.Provider.Contains("codex", StringComparison.Ordinal) && _discoveryPaths.Same(region.Path, path)) : null;
+            && region.Provider.Contains("codex", StringComparison.Ordinal) && SameForObservation(region.Path, path)) : null;
         var claudeOwner = claude ? regions.FirstOrDefault(region => region.PluginId is not null
-            && region.Provider.Contains("claude", StringComparison.Ordinal) && _discoveryPaths.Same(region.Path, path)) : null;
+            && region.Provider.Contains("claude", StringComparison.Ordinal) && SameForObservation(region.Path, path)) : null;
         if (codex) Plugin(path, codexOwner?.Provider ?? "local-codex-plugin", "codex", codexOwner?.PluginId ?? Path.GetFileName(path), codexOwner?.PackageVersion, discover, context,
             payloadBoundaries: context is null ? null : [context]);
         if (claude) Plugin(path, claudeOwner?.Provider ?? "local-claude-plugin", "claude", claudeOwner?.PluginId ?? Path.GetFileName(path), claudeOwner?.PackageVersion, discover, context,
@@ -379,6 +383,12 @@ internal sealed partial class ManagedSkillDiscovery
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { return false; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { topologyIncomplete = true; Incomplete(path, ex.Message); return false; }
     }
+    private string? CanonicalForObservation(string path) => _discoveryPaths is null
+        ? OwnershipPath.CanonicalCandidate(path) : _discoveryPaths.Canonical(path);
+    private bool InsideForObservation(string candidate, string root) => _discoveryPaths is null
+        ? PathIdentity.IsInside(candidate, root) : _discoveryPaths.IsInside(candidate, root);
+    private bool SameForObservation(string left, string right) => _discoveryPaths is null
+        ? OwnershipPath.Same(left, right) : _discoveryPaths.Same(left, right);
     private bool CoversForObservation(ManagedSkillRegion region, string path)
     {
         var covered = region.ObserveCoverage(path, _discoveryPaths);

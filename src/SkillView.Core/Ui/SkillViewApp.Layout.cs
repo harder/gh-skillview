@@ -173,8 +173,6 @@ public sealed partial class SkillViewApp
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onGoToSearch: () => { ActivateTab(SkillViewTab.Discover); FocusSearchFromInstalled(); },
             onStateChange: RefreshShellChrome,
-            // Scope cycle (`G`) selects from the shared reconciled inventory.
-            scopedSnapshotLoader: (scope, token) => _workflows.CaptureInventorySnapshotAsync(scope, token),
             lifetimeToken: GetRunLifetimeToken(),
             onCancellationCallbackException:
                 CancellationCallbackReporter.For(_services.Logger, "installed tab"),
@@ -227,6 +225,7 @@ public sealed partial class SkillViewApp
             runOnUi: runOnUi,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
             onRefresh: () => _services.ListAdapter.Invalidate(),
+            homeDirectory: DisplayPath.CaptureHome(_services.Runner),
             onActivateUpdates: OpenUpdatesWorkspace,
             onActivateCleanup: () => _workflows.ShowCleanupScreen(),
             onActivateDoctor: () => _doctorTab?.ActivateFromChanges(
