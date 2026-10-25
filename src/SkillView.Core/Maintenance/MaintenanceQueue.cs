@@ -17,6 +17,7 @@ public sealed record MaintenanceQueueEntry(string Id, string Issue, string Title
     public string DisablementState => "not-assessed";
     public string MigrationState => "not-assessed";
     internal CleanupClassifier.Candidate? Cleanup { get; init; }
+    internal PinDisplayPolicy? PinDisplay { get; init; }
     internal bool IsCopyReview => Issue is "NameCollision" or "Duplicate";
 }
 
@@ -39,7 +40,7 @@ public static class MaintenanceQueueBuilder
                 Paths(candidate.Path, impact.AffectedExposures),
                 candidate.ReviewOnly ? "review-required" : "observed-candidate", candidate.Reason,
                 "review-cleanup", candidate.Skill?.Ignored ?? false, IsPinned(candidate.Skill))
-            { Cleanup = candidate });
+            { Cleanup = candidate, PinDisplay = candidate.Skill is { } skill ? PinDisplayPolicy.From(skill) : null });
         }
 
         // Unknown availability is a review opportunity, never an available update.
@@ -53,7 +54,8 @@ public static class MaintenanceQueueBuilder
                 subject, Paths(subject.Path, subject.Exposures),
                 subject.ExposureCoverageComplete && !subject.Source.Conflicted ? "recorded-observation" : "limited-observation",
                 "Inspect source, revision, owners and consumers before requesting a check or saved plan.",
-                "review-installation", skill.Ignored, IsPinned(skill)));
+                "review-installation", skill.Ignored, IsPinned(skill))
+            { PinDisplay = PinDisplayPolicy.From(skill) });
         }
 
         var diagnostics = snapshot.Diagnostics.InaccessiblePaths.Select(path => "Incomplete discovery: " + path)

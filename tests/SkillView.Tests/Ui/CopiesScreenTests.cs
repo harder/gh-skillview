@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Maintenance;
 using SkillView.Ui;
@@ -14,6 +15,40 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class CopiesScreenTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UnknownPinFlagAndDetailRemainExplicitForUnreadableOrMalformedMetadata(bool malformed)
+    {
+        var skill = CopiesPresentationTests.Copy("/unknown") with
+        {
+            Validity = malformed ? ValidityState.Valid : ValidityState.UnparsableFrontMatter,
+            Package = malformed ? new("test/repo", "github", null, null, null) { PinnedRef = " " } : null
+        };
+        var checkedRow = false;
+        var timedOut = false;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(80, 24);
+            Dialog? dialog = null;
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (dialog is null) return true;
+                Assert.Equal("?", dialog.SubViews.OfType<TableView>().Single().Table![0, 3]);
+                Assert.Contains("pin state unknown", dialog.SubViews.OfType<Editor>().Single().Text.ToString());
+                checkedRow = true;
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                return false;
+            });
+            Assert.Null(CopiesScreen.Show(app, new Logger(), new([skill], 0, 0, false),
+                (_, _, _) => throw new InvalidOperationException("No implicit comparison"),
+                TestContext.Current.CancellationToken, value => dialog = value));
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.True(checkedRow);
+        Assert.False(timedOut);
+    }
+
     [Theory]
     [InlineData(80, 24, "Update / version...", "Update")]
     [InlineData(120, 36, "Cleanup review...", "Cleanup")]

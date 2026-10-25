@@ -21,8 +21,7 @@ internal sealed partial class UpdatesTabView
         if (_review is not null || _queue.Count > 0 || _inventoryNeedsRefresh || _unpinRunner is null) return false;
         var row = _table.GetSelectedRow();
         var selected = row >= 0 && row < _skills.Count ? _skills[row] : null;
-        return selected is not null && (selected.Pinned || selected.Revision.PinnedRef is not null
-            || selected.AllOwnershipClaims.Any(owner => owner.PinnedRef is not null));
+        return selected is not null && Inventory.Models.PinDisplayPolicy.From(selected).HasPin;
     }
 
     private void ShowPreview(string summary, string technical)
