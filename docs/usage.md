@@ -503,7 +503,6 @@ match returns 20. Pass global scan roots before `check` and use
 `--allow-hidden-dirs` when the desired inventory includes hidden containers.
 
 Saved updates provide [frozen source review](saved-updates.md#frozen-source-review).
-Separate workflows support [opt-in isolated evaluations](isolated-evaluations.md).
 Source authors can use `gh skill publish --dry-run` directly in their source
 repository. `publish --fix` is never a repair action for installed payloads;
 no installed authored bytes are rewritten.
@@ -773,10 +772,3 @@ Saved source-changing updates also provide a [frozen source review](saved-update
 with captured diffs and a separate explicit acknowledgement. This user declaration
 supplies no authenticity, compatibility or safety assurance; local `check` remains
 unreviewed without a matching explicit review workflow.
-
-## Opt-in offline evaluations
-
-Use `evaluate-review` to inspect a frozen package, your representative prompts and
-an explicit already-local offline Docker evaluator. `evaluate-run` requires the
-exact review fingerprint and `--consent-run`. No routine inspection or update
-starts evaluations. See [environment, protocol and limitations](isolated-evaluations.md).
