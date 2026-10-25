@@ -408,20 +408,62 @@ public sealed class CompactInstallDialogTests
     public async Task DisplayBoundsLongHomeWithoutChangingRawContext()
     {
         using var fixture = new Fixture(false);
+        var workingDirectory = fixture.Runner.EffectiveWorkingDirectory;
         var rawHome = Path.Combine(fixture.Custom, new string('x', InstallConfirmModal.MaxBasePathDisplayCharacters + 128));
-        fixture.Runner = fixture.Runner.WithContext(fixture.Runner.EffectiveWorkingDirectory,
-            new Dictionary<string, string> { ["HOME"] = rawHome, ["USERPROFILE"] = rawHome });
-        var result = await RunModal(fixture, 80, 24, false, (app, dialog) =>
+        // This display-bound check needs no Git process. Hold the existing owned
+        // completion so readiness, focus and Cancel are checked in one callback.
+        fixture.Runner = fixture.Runner.WithContext(workingDirectory,
+            new Dictionary<string, string> { ["HOME"] = rawHome, ["USERPROFILE"] = rawHome, ["PATH"] = string.Empty });
+        var result = await RunQueuedPreparation(fixture, 80, 24, (app, dialog, operation, completion) =>
         {
             var displayed = dialog.SubViews.OfType<TextField>().Single(field => field.ReadOnly).Text;
-            Assert.InRange(displayed.Length, 1, InstallConfirmModal.MaxBasePathDisplayCharacters);
+            Assert.Equal(4096, InstallConfirmModal.MaxBasePathDisplayCharacters);
+            Assert.Equal(4096, displayed.Length);
+            Assert.Equal(rawHome[..4095] + "…", displayed);
             Assert.EndsWith("…", displayed);
             Assert.Equal(rawHome, fixture.Runner.GetEffectiveEnvironmentVariable("HOME"));
-            dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel").SetFocus();
-            app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+            Assert.Equal(rawHome, fixture.Runner.GetEffectiveEnvironmentVariable("USERPROFILE"));
+            Assert.Equal(workingDirectory, fixture.Runner.EffectiveWorkingDirectory);
+            completion();
+            Assert.Equal(ModalOperationTracker.Ownership.None, operation.CurrentOwnership);
+            var selector = dialog.SubViews.OfType<OptionSelector>().Single();
+            Assert.True(selector.Enabled);
+            Assert.Equal(1, selector.Value);
+            Assert.Equal(1, selector.FocusedItem);
+            Assert.Equal(displayed, dialog.SubViews.OfType<TextField>().Single(field => field.ReadOnly).Text);
+            Assert.True(dialog.SubViews.OfType<Button>().Single(button => button.Text == "Install").HasFocus);
+            var cancel = dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel");
+            cancel.SetFocus();
+            Assert.True(cancel.HasFocus);
+            Assert.True(app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)));
+            Assert.True(dialog.StopRequested);
         });
         Assert.Equal(InstallConfirmModal.Outcome.Cancelled, result.Outcome);
         Assert.Null(result.Install);
+        Assert.Equal(rawHome, fixture.Runner.GetEffectiveEnvironmentVariable("HOME"));
+        Assert.Equal(workingDirectory, fixture.Runner.EffectiveWorkingDirectory);
+        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.StartsWith("exec:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InteractionAssertionPropagatesWithOriginalStackAfterTeardown(bool queued)
+    {
+        using var fixture = new Fixture(false);
+        IApplication? observedApp = null;
+        void FailInteraction(IApplication app, Dialog dialog)
+        {
+            observedApp = app;
+            Assert.Fail("interaction assertion sentinel");
+        }
+        var error = await Assert.ThrowsAnyAsync<Xunit.Sdk.XunitException>(() => queued
+            ? RunQueuedPreparation(fixture, 80, 24, (app, dialog, _, _) => FailInteraction(app, dialog))
+            : RunModal(fixture, 80, 24, false, FailInteraction));
+        Assert.Equal("interaction assertion sentinel", error.Message);
+        Assert.Contains(nameof(FailInteraction), error.StackTrace);
+        Assert.False(observedApp!.Initialized);
+        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal));
     }
 
     [Theory]
