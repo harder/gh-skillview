@@ -31,6 +31,8 @@ internal static class HelpOverlay
 
 ## Installed
 
+- **C** — Check updates / cancel checks (browsing stays available)
+- **u / Enter** — review an update for the selected exact copy
 - **x** — remove the selected installed skill
 - **o** — open the selected skill path
 - **G** — cycle scope filter (all / user / project / custom)
@@ -39,8 +41,9 @@ internal static class HelpOverlay
 
 - **Enter** — review the selected issue without changing files
 - **F2** — switch between the issue summary and technical details
-- Problems are local findings; same-name copies are review suggestions. Updates not checked.
-- **u** — open Updates; choose **Check updates** explicitly
+- Problems are local findings; same-name copies are review suggestions.
+- **C** — Check updates / cancel; results are shared with Installed
+- **u** — review selected finding (alias for Enter)
 - **r** — refresh local inventory (no update check)
 - **c** — open cleanup
 - **d** — open Doctor

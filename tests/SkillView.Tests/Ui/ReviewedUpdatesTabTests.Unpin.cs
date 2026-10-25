@@ -1,3 +1,4 @@
+using SkillView.Inventory.Models;
 using SkillView.Gh.Models;
 using SkillView.Maintenance;
 using SkillView.Ui;
@@ -34,8 +35,7 @@ public sealed partial class ReviewedUpdatesTabTests
             }, local: (_, _, _) => throw new InvalidOperationException("Unpin has no local merge review"),
             unpin: (target, _, _) =>
             { Assert.Same(second, target); prepared++; return Task.FromResult(Result(plan)); });
-        await view.LoadAsync(); view.SelectRowForTests(1); view.MarkRowForTests(0);
-        view.AllBoxForTests.Value = CheckState.Checked; view.UnpinBoxForTests.Value = CheckState.Checked;
+        await view.LoadForSubjectAsync(OperationSubject.From(second)); view.UnpinBoxForTests.Value = CheckState.Checked;
         view.RetainBoxForTests.Value = CheckState.Checked;
         await view.PlanUnpinForTestsAsync();
         Assert.Equal(1, prepared); Assert.Equal(0, applied);
@@ -66,7 +66,7 @@ public sealed partial class ReviewedUpdatesTabTests
                 return Task.FromResult(Result() with
                 { Outcomes = [new("demo-id", "/skills/demo", "unchanged", null, null, [], 0, [], "Verified unpinned; no retained-plan quota consumed.")] });
             });
-        await view.LoadAsync(); await view.PlanUnpinForTestsAsync();
+        await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); await view.PlanUnpinForTestsAsync();
         Assert.False(view.ApplyButtonForTests.Enabled); Assert.False(view.RetainBoxForTests.Enabled);
         Assert.Contains("unchanged", view.StatusTextForTests);
         Assert.Contains("no retained-plan quota", view.PreviewTextForTests);
@@ -86,12 +86,12 @@ public sealed partial class ReviewedUpdatesTabTests
                 queued = action; ready.TrySetResult(); return delivered.Task;
             }, unpin: (target, _, token) =>
             { calls++; captured = token; return Task.FromResult(Result(UnpinReview(target))); });
-        await view.LoadAsync(); intercept = true;
+        await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); intercept = true;
         var pending = view.PlanUnpinForTestsAsync();
         await ready.Task.WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
         await view.PlanUnpinForTestsAsync(); Assert.Equal(1, calls); Assert.True(view.BusyForTests);
         view.CancelPendingWork(); Assert.True(captured.IsCancellationRequested);
-        intercept = false; await view.LoadAsync(); var status = view.StatusTextForTests;
+        intercept = false; await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); var status = view.StatusTextForTests;
         queued!(); delivered.SetResult(); await pending;
         Assert.Equal(status, view.StatusTextForTests); Assert.False(view.ApplyButtonForTests.Enabled);
         Assert.Equal(CheckState.UnChecked, view.RetainBoxForTests.Value);

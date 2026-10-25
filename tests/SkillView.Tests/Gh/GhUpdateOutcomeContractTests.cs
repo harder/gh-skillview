@@ -48,7 +48,7 @@ public sealed class GhUpdateOutcomeContractTests
     }
 
     [Fact]
-    public async Task SavedUpdateQueueShowsEarlierVerifiedChangeAfterActualRemoteFailure()
+    public async Task SavedExactUpdateReviewsReconcileBeforeAnotherCopyAndReportActualRemoteFailure()
     {
         if (!Enabled) return;
         using var fixture = await Fixture.CreateAsync(Token);
@@ -60,7 +60,7 @@ public sealed class GhUpdateOutcomeContractTests
         var secondBefore = PayloadSnapshot.Capture(targets[1].ResolvedPath, Token);
         UpdateResult? applied = null, refused = null;
         using var view = new UpdatesTabView(action => { action(); return Task.CompletedTask; },
-            (operation, _) => operation().GetAwaiter().GetResult(), _ => Task.FromResult(initial),
+            (operation, _) => operation().GetAwaiter().GetResult(), _ => fixture.InventoryAsync(Token),
             async (_, options, token) =>
             {
                 var result = await fixture.Services.SavedUpdates.PrepareAsync(fixture.Gh, options,
@@ -70,10 +70,9 @@ public sealed class GhUpdateOutcomeContractTests
             }, () => fixture.Gh, fixture.Services.Logger, () => { }, () => { },
             applyRunner: async (review, _, token) => applied = await fixture.Services.SavedUpdates.ApplyAsync(review,
                 "retain-original", await fixture.InventoryAsync(token), fixture.InventoryAsync, token));
-        await view.LoadAsync();
-        view.AllBoxForTests.Value = CheckState.Checked;
+        await view.LoadForSubjectAsync(OperationSubject.From(initial.Skills.Single(skill => skill.InstallationId == targets[0].InstallationId)));
         view.UnpinBoxForTests.Value = CheckState.Checked;
-        await view.RunForTestsAsync(false, false);
+        await view.ReviewUpdateAsync();
         Assert.Contains("review required", view.StatusTextForTests);
         Assert.True(view.SourceReviewBoxForTests.Enabled);
         Assert.Equal(CheckState.UnChecked, view.SourceReviewBoxForTests.Value);
@@ -88,16 +87,18 @@ public sealed class GhUpdateOutcomeContractTests
         Assert.Equal("changed", Assert.Single(applied.Outcomes).Status);
         var afterFirst = PayloadSnapshot.Capture(targets[0].ResolvedPath, Token);
         Assert.NotEqual(firstBefore.Fingerprint, afterFirst.Fingerprint);
-        await view.NextReviewForTestsAsync();
+        await view.LoadForSubjectAsync(OperationSubject.From(initial.Skills.Single(skill => skill.InstallationId == targets[1].InstallationId)));
+        view.UnpinBoxForTests.Value = CheckState.Checked;
+        await view.ReviewUpdateAsync();
         Assert.NotNull(refused);
         Assert.False(refused.Succeeded);
         Assert.Equal("refused", Assert.Single(refused.Outcomes).Status);
         Assert.Contains("404", refused.StdOut);
         Assert.Contains("404", refused.StdErr);
         view.ToggleDetailsForTests();
-        Assert.Contains("changed", view.PreviewTextForTests);
-        Assert.Contains(applied.SavedPlan!.Id, view.PreviewTextForTests);
-        Assert.Contains(applied.SavedPlan.PlanPath, view.PreviewTextForTests);
+        Assert.Equal("changed", Assert.Single(applied.Outcomes).Status);
+        Assert.True(File.Exists(applied.SavedPlan!.PlanPath));
+        Assert.Contains(targets[1].ResolvedPath, view.PreviewTextForTests);
         Assert.Contains(refused.StdErr.Trim(), view.PreviewTextForTests);
         Assert.Contains("Not Found", view.PreviewTextForTests);
         Assert.Equal(afterFirst.Objects, PayloadSnapshot.Capture(targets[0].ResolvedPath, Token).Objects);

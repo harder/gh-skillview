@@ -7,6 +7,7 @@ namespace SkillView.Ui;
 internal sealed record ChangesQueueRow(string Kind, string Title, IReadOnlyList<MaintenanceQueueEntry> Entries)
 {
     internal MaintenanceQueueEntry Entry => Entries[0];
+    internal UpdateAvailability? Availability { get; init; }
     internal bool IsFamily => Entry.IsCopyReview;
     internal IReadOnlyList<string> LocationLabels { get; init; } = [];
 }
@@ -149,6 +150,11 @@ internal static class ChangesQueueBuilder
 
     internal static string Render(ChangesQueueRow row, CancellationToken token, bool showDetails, string? homeDirectory)
     {
+        if (row.Availability is { } observation)
+            return "## Review update\n\n" + observation.Detail + "\nCopy: "
+                + MarkdownTableFormatter.FormatCodeSpan(row.Entry.Subject.Path)
+                + "\n\n**Enter / u:** prepare the saved update review for this exact copy.\n"
+                + (showDetails ? "\n````\n" + (TerminalEscapeSanitizer.Sanitize(observation.Diagnostic) ?? "").Replace("`", "'") + "\n````\n" : "");
         if (!row.IsFamily) return MaintenanceQueueFormatter.Render(row.Entry, token, showDetails, homeDirectory);
         var rendered = MaintenanceQueueFormatter.RenderFields(FamilyFields(row, token, showDetails), token,
             (showDetails ? MaintenanceQueueFormatter.MaxDetailCharacters : MaintenanceQueueFormatter.MaxSummaryCharacters) - 768);

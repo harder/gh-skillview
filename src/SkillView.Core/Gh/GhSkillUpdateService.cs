@@ -85,6 +85,7 @@ public sealed class GhSkillUpdateService
             StdOut = result.StdOut,
             StdErr = result.StdErr,
             Cancelled = result.Cancelled,
+            OutputTruncated = result.StdOutTruncated || result.StdErrTruncated,
             MutationAttempted = !options.DryRun,
             ErrorMessage = result.Succeeded ? null : result.Cancelled ? "Update canceled; partial changes may exist." : result.StdErr.Trim(),
             CommandLine = args,
@@ -219,7 +220,7 @@ public sealed class GhSkillUpdateService
         {
             var name = line[..colon].Trim();
             var rest = line[(colon + 1)..].Trim().ToLowerInvariant();
-            if (rest.Contains("up-to-date") || rest.Contains("up to date"))
+            if (rest is "up-to-date" or "up to date")
                 return new UpdateEntry { Name = name, Status = "up-to-date" };
             if (rest.Contains("pinned"))
                 return new UpdateEntry { Name = name, Status = "pinned" };

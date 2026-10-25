@@ -12,15 +12,13 @@ internal sealed partial class UpdatesTabView
     private string _summaryPreview = "";
     private string _technicalPreview = "";
     private bool _showTechnical;
-    private bool _singleInstallationView;
     private bool _inventoryNeedsRefresh;
     private bool _reviewPresentationReady;
 
     private bool ShowUnpinOnlyAction()
     {
-        if (_review is not null || _queue.Count > 0 || _inventoryNeedsRefresh || _unpinRunner is null) return false;
-        var row = _table.GetSelectedRow();
-        var selected = row >= 0 && row < _skills.Count ? _skills[row] : null;
+        if (_review is not null || _inventoryNeedsRefresh || _unpinRunner is null) return false;
+        var selected = _target;
         return selected is not null && Inventory.Models.PinDisplayPolicy.From(selected).HasPin;
     }
 
@@ -35,9 +33,9 @@ internal sealed partial class UpdatesTabView
         _detailsButton.Enabled = technical.Length > 0;
     }
 
-    private void ShowResultPreview(UpdateResult result, bool dryRun, bool unpinOnly) =>
-        ShowPreview(UpdateReviewPresentation.Result(result, dryRun, _review is not null),
-            UpdateScreen.RenderResult(result, dryRun, false, [], unpinOnly));
+    private void ShowResultPreview(UpdateResult result, bool unpinOnly) =>
+        ShowPreview(UpdateReviewPresentation.Result(result, _review is not null),
+            UpdateScreen.RenderResult(result, unpinOnly: unpinOnly));
 
     private void ShowPlanPreview(ReplacementResult plan, bool awaitingReview) =>
         ShowPreview(UpdateReviewPresentation.Plan(plan, awaitingReview), UpdateScreen.RenderPlan(plan));
@@ -53,10 +51,8 @@ internal sealed partial class UpdatesTabView
 
     private void ShowSelectedPreview()
     {
-        if (_undoReview is not null || _review is not null || _queue.Count > 0 || _choosingVersion || _inventoryNeedsRefresh) return;
-        var row = _table.GetSelectedRow();
-        if (row < 0 || row >= _skills.Count) return;
-        var target = _skills[row];
+        if (_undoReview is not null || _review is not null || _choosingVersion || _inventoryNeedsRefresh) return;
+        if (_target is not { } target) return;
         ShowPreview(UpdateReviewPresentation.Selection(target), "## Selected installation\n\n" + InstalledScreen.RenderDetail(target, showDetails: true, showShortcuts: false));
     }
 
@@ -66,54 +62,42 @@ internal sealed partial class UpdatesTabView
     {
         if (!_reviewPresentationReady) return;
         var undoing = _undoReview is not null;
-        var reviewing = undoing || _review is not null || _queue.Count > 0 || _inventoryNeedsRefresh;
+        var reviewing = undoing || _review is not null || _inventoryNeedsRefresh;
         var applicable = _review is not null && (!_localReviewStarted || _review.LocalDisposition is not null);
         var localActions = _review is { PinPolicy: null } && _localReviewRunner is not null;
         var editing = _localPanel.Visible;
         _reviewHint.Text = editing ? "Tab Move focus · Esc Back · Build merge for a new review"
             : _showTechnical ? "F2 Summary · Tab Move focus · Esc Back" : "F2 Details · Tab Move focus · Esc Back";
-        _statusBar.Visible = !reviewing && !_singleInstallationView;
-        _reviewHint.Visible = !_statusBar.Visible;
-        if (_queueOptions?.Tag is null)
+        if (_options?.Tag is null)
             _tableLabel.Text = undoing ? "Review undo · F2 Details"
-                : _inventoryNeedsRefresh && _review is null && _queue.Count == 0
-                ? "Refresh inventory before another review · F2 Details"
-                : reviewing ? "Review saved change · F2 Details"
-                : _singleInstallationView ? "Selected physical copy · F2 Details"
-                : "Space marks · c compare/plan row · u review · U marked · p unpin";
-        var tableHadFocus = _table.HasFocus;
-        _table.Visible = !editing && !reviewing && !_singleInstallationView;
+                : _inventoryNeedsRefresh && _review is null ? "Refresh inventory before another review · F2 Details"
+                : reviewing ? "Review saved change · F2 Details" : "Selected physical copy · F2 Details";
         _preview.Visible = !editing;
-        _preview.X = _table.Visible ? Pos.Right(_table) + 1 : 0;
-        _preview.Width = Dim.Fill();
-
-        _allBox.Visible = !reviewing && !_singleInstallationView;
         _hiddenBox.Visible = _unpinBox.Visible = !reviewing;
-        _unpinBox.X = _allBox.Visible ? 10 : 0;
+        _unpinBox.X = 0;
         _hiddenBox.X = Pos.Right(_unpinBox) + 2;
-        _dryRunButton.Visible = _updateButton.Visible = _chooseVersionButton.Visible = !reviewing;
+        _updateButton.Visible = _chooseVersionButton.Visible = !reviewing;
         _unpinOnlyButton.Visible = ShowUnpinOnlyAction();
         _sourceReviewBox.Visible = applicable && _review?.SourceReview is not null;
         _retainBox.Visible = _applyButton.Visible = applicable;
-        _nextButton.Visible = reviewing && !undoing;
-        _undoButton.Visible = !undoing && _undoResult is not null && _review is null && _queue.Count == 0
+        _finishButton.Visible = reviewing && !undoing;
+        _undoButton.Visible = !undoing && _undoResult is not null && _review is null
             && _inspectUndoRunner is not null && _undoRunner is not null;
         _confirmUndoButton.Visible = _cancelUndoButton.Visible = _undoApproval.Visible = undoing;
         _preserveButton.Visible = _localReviewButton.Visible = localActions;
         _buildMergeButton.Visible = localActions && _localReview is not null;
         _detailsButton.Visible = !editing;
 
-        _dryRunButton.X = 0;
-        _updateButton.X = Pos.Right(_dryRunButton) + 2;
+        _updateButton.X = 0;
         _chooseVersionButton.X = Pos.Right(_updateButton) + 2;
-        _dryRunButton.Y = _updateButton.Y = _chooseVersionButton.Y = Pos.AnchorEnd(2);
+        _updateButton.Y = _chooseVersionButton.Y = Pos.AnchorEnd(2);
         _unpinOnlyButton.X = 0;
         _unpinOnlyButton.Y = Pos.AnchorEnd(3);
         _applyButton.X = 0;
-        _applyButton.Y = _nextButton.Y = Pos.AnchorEnd(2);
-        _nextButton.X = applicable ? Pos.Right(_applyButton) + 2 : 0;
+        _applyButton.Y = _finishButton.Y = Pos.AnchorEnd(2);
+        _finishButton.X = applicable ? Pos.Right(_applyButton) + 2 : 0;
         _detailsButton.Y = Pos.AnchorEnd(reviewing ? 2 : 3);
-        _detailsButton.X = reviewing ? Pos.Right(_nextButton) + 2
+        _detailsButton.X = reviewing ? Pos.Right(_finishButton) + 2
             : _unpinOnlyButton.Visible ? Pos.Right(_unpinOnlyButton) + 2 : 0;
         _undoButton.X = Pos.Right(_detailsButton) + 2;
         _undoButton.Y = _confirmUndoButton.Y = _cancelUndoButton.Y = Pos.AnchorEnd(2);
@@ -137,8 +121,7 @@ internal sealed partial class UpdatesTabView
             }
             footer = row - 1;
         }
-        _table.Height = _preview.Height = _localPanel.Height = Dim.Fill(footer);
-        if (tableHadFocus && !_table.Visible && _preview.Visible) _preview.SetFocus();
+        _preview.Height = _localPanel.Height = Dim.Fill(footer);
         SetNeedsLayout();
     }
 

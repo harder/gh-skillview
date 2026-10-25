@@ -90,7 +90,7 @@ internal sealed partial class UpdatesTabView
         _resolutionFile.Text = "";
         _localPaths.Table = null;
         _localPanel.Visible = false;
-        _table.Visible = _preview.Visible = true;
+        _preview.Visible = true;
     }
 
     private void QueueLocalChoice(string? side) =>
@@ -127,7 +127,7 @@ internal sealed partial class UpdatesTabView
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var request = new LocalUpdateRequest(action, plan, _localReview,
             choices.IsDefault ? [] : choices, resolutions.IsDefault ? [] : resolutions);
-        var hidden = _queueOptions?.AllowHiddenDirectories ?? false;
+        var hidden = _options?.AllowHiddenDirectories ?? false;
         var selected = _localPaths.GetSelectedRow();
         // Starting capture closes the old replacement approval, including when
         // capture or UI delivery fails after creating private evidence.
@@ -156,7 +156,7 @@ internal sealed partial class UpdatesTabView
                     ShowPlanPreview(preserved, awaitingReview: false);
                     _review = null;
                     ResetLocalReview();
-                    _status.Text = " installed payload preserved; no maintenance preference recorded · Next / skip continues";
+                    _status.Text = " installed payload preserved; no maintenance preference recorded · Review update prepares this copy again";
                 }
                 else if (response.Review is { } local)
                 {
@@ -178,8 +178,7 @@ internal sealed partial class UpdatesTabView
                 SetBusy(false);
                 ownership.Dispose();
                 SetOperationControlsEnabled(true);
-                if (_table.Visible) _table.SetFocus();
-                else if (_preview.Visible) _preview.SetFocus();
+                if (_preview.Visible) _preview.SetFocus();
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -193,7 +192,7 @@ internal sealed partial class UpdatesTabView
                 {
                     if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
                     _localReviewUncertain |= action != LocalUpdateAction.Preserve;
-                    _status.Text = $" local review refused: {TuiHelpers.ErrorSnippet(ex.Message)}; Review local to refresh, or Next / skip";
+                    _status.Text = $" local review refused: {TuiHelpers.ErrorSnippet(ex.Message)}; Review local to refresh, or Skip review";
                     SetBusy(false);
                     ownership.Dispose();
                     SetOperationControlsEnabled(true);
@@ -216,7 +215,7 @@ internal sealed partial class UpdatesTabView
             });
         _localPaths.Style.GetOrCreateColumnStyle(0).MaxWidth = 24;
         _localPaths.SetSelection(0, Math.Clamp(selected, 0, rows.Length - 1), false);
-        _table.Visible = _preview.Visible = false;
+        _preview.Visible = false;
         _localPanel.Visible = true;
         _resolutionFile.Text = "";
         RenderLocalPath();

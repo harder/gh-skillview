@@ -42,16 +42,16 @@ internal sealed partial class UpdatesTabView
         if (!applying || !result.Succeeded || result.Cancelled || result.ReconciliationPartial
             || !result.MutationAttempted || result.SavedPlan is not { Succeeded: true, Canceled: false, Status: "installed", MutationObserved: true } plan
             || !SavedUpdateCoordinator.IsRevisionUpdate(plan)) return;
-        // Eligibility belongs to this apply. Keep earlier queue diagnostics in
+        // Eligibility belongs to this apply. Keep preparation/apply diagnostics in
         // the result restored when the user cancels undo review.
         _undoResult = displayResult with { SavedPlan = plan };
-        _undoHidden = _queueOptions?.AllowHiddenDirectories ?? false;
+        _undoHidden = _options?.AllowHiddenDirectories ?? false;
     }
 
     private void RefreshUndoControls(bool idle)
     {
         if (_undoButton is null) return;
-        _undoButton.Enabled = idle && _undoResult is not null && _undoReview is null && _review is null && _queue.Count == 0
+        _undoButton.Enabled = idle && _undoResult is not null && _undoReview is null && _review is null
             && _inspectUndoRunner is not null && _undoRunner is not null;
         _undoApproval.Enabled = idle && _undoReview is not null;
         _confirmUndoButton.Enabled = _undoApproval.Enabled && _undoApproval.Value == CheckState.Checked && _undoRunner is not null;
@@ -63,7 +63,7 @@ internal sealed partial class UpdatesTabView
         if (_undoReview is null || _operationCancellations.HasActive || _loadCancellations.HasActive) return;
         _undoReview = null;
         _undoApproval.Value = CheckState.UnChecked;
-        if (_undoResult is { } result) ShowResultPreview(result, false, false);
+        if (_undoResult is { } result) ShowResultPreview(result, false);
         _status.Text = " undo canceled; installed files unchanged; review undo again or Refresh inventory";
         SetOperationControlsEnabled(true);
         _preview.SetFocus();
@@ -73,7 +73,7 @@ internal sealed partial class UpdatesTabView
     private async Task RunUndoOperationAsync(bool execute)
     {
         if (_undoResult?.SavedPlan is not { } applied || _inspectUndoRunner is null || _undoRunner is null
-            || _review is not null || _queue.Count > 0 || _loadCancellations.HasActive
+            || _review is not null || _loadCancellations.HasActive
             || execute && (_undoReview is null || _undoApproval.Value != CheckState.Checked)
             || !execute && _undoReview is not null) return;
         using var ownership = _operationCancellations.TryBegin(_lifetimeToken);
@@ -113,7 +113,7 @@ internal sealed partial class UpdatesTabView
                     if (token.IsCancellationRequested || generation != Interlocked.Read(ref _reviewGeneration)) return;
                     _inventoryNeedsRefresh |= result.MutationAttempted;
                     ClearUndo(); // Every attempt closes this approval, including a refusal.
-                    ShowPreview(UpdateUndoPresentation.Result(result), "## Undo result\n\n" + UpdateScreen.RenderResult(result, false, false, []));
+                    ShowPreview(UpdateUndoPresentation.Result(result), "## Undo result\n\n" + UpdateScreen.RenderResult(result));
                     _status.Text = result.Cancelled ? " undo canceled; inspect saved evidence before recovery"
                         : UpdateUndoPresentation.RestoredWithIncompleteInventory(result) ? " original restored; verification incomplete — Refresh inventory"
                         : result.ReconciliationPartial ? " undo needs review; verification incomplete — Refresh inventory and inspect Details"

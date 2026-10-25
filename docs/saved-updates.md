@@ -35,10 +35,16 @@ with `--unpin`. Branches and raw commits are not selected by this action; a tag
 named like a commit is still resolved only as a tag. New pin policy, automatic tag
 browsing and persistent version approvals are outside this flow.
 
-From a list, `u` opens the Updates workspace. There, `u` reviews the current physical installation, `U` queues
-marked installations, and Update uses marks or the explicit all selection.
-Each candidate has its own review, retention checkbox and **Replace reviewed**
-action. **Next / skip** retains an unapplied plan and advances to the next target.
+Installed's **Review update (u / Enter)** and an Issues **Updates** finding open
+one exact physical copy and prepare its saved candidate immediately. Copies'
+**Update / version...** opens options for its already selected copy, so choosing
+a tag does not first stage latest. The operation surface has no inventory table,
+marks, All selection or availability check. Main-view **Check updates (C)** is
+read-only and consumes no saved-plan quota.
+
+Each candidate has its own source acknowledgement, retention checkbox and
+**Replace reviewed** action. **Skip review** retains an unapplied plan without
+starting another copy. Choose another copy in Installed or Issues.
 **Preserve installed** verifies the current payload and owner without applying or
 recording a maintenance preference. **Review local** freezes recorded, installed
 and source evidence and closes the earlier replacement approval. Select a path,
@@ -49,12 +55,12 @@ for path** for custom content. Each successful choice clears that file input.
 **Build merge** creates a separate verified candidate. Review its result and
 source baseline, check retention again, then select **Apply reviewed merge**.
 A failed private write requires **Review local** to refresh before another build.
-**Next / skip** keeps private evidence and continues the queue.
-The next candidate is prepared only after the previous operation completes.
-Earlier outcomes, output and notices remain visible when a later target fails.
+**Skip review** keeps private evidence without applying. Preparation, apply and
+undo diagnostics for this copy remain available in Details. Backend/CLI batch
+callers still prepare each sibling only after the prior operation reconciles.
 Select **Include hidden directories** (CLI `--allow-hidden-dirs`) when hidden
-containers would otherwise make inventory incomplete. Availability checks through
-Dry-run do not create plans or consume the retained-plan quota.
+containers would otherwise make inventory incomplete. Main-view availability
+checks do not create plans or consume the retained-plan quota.
 
 `update-plan` resolves the latest release (or the default branch when there is
 no release) to an exact commit and skill tree. It saves the candidate alongside

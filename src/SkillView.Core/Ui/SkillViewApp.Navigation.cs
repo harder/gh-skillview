@@ -150,7 +150,14 @@ public sealed partial class SkillViewApp
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
         // Open the update workspace directly. Changes rows describe observed
         // work and do not fabricate an update-available row for navigation.
-        if (rune.Value == 'u' || rune.Value == 'U') { OpenUpdatesWorkspace(); return true; }
+        if (rune.Value == 'C') { CheckUpdates(); return true; }
+        if (rune.Value == 'u' || rune.Value == 'U')
+        {
+            if (_activeTab == SkillViewTab.Installed && _installedTab?.GetSelectedSkill() is { } selected)
+                OpenUpdatesWorkspace(OperationSubject.From(selected));
+            else { ActivateTab(SkillViewTab.Changes); SetStatus("Use Check updates (C), then select an Updates finding and press Enter."); }
+            return true;
+        }
         if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
         if (key.KeyCode == KeyCode.F1 || rune.Value == '?') { ShowHelp(); return true; }
 
@@ -356,36 +363,40 @@ public sealed partial class SkillViewApp
         ActivateTab(restore);
     }
 
-    /// Open update review without requiring an update-available queue row.
-    private void OpenUpdatesWorkspace() => OpenUpdatesWorkspace(null);
+    // No inventory discovery route: callers supply exactly one observed copy.
+    private void OpenUpdatesWorkspace(OperationSubject? selected) => OpenUpdatesWorkspace(selected, prepareImmediately: true);
 
-    private void OpenUpdatesWorkspace(OperationSubject? selected)
+    private void OpenUpdatesWorkspace(OperationSubject? selected, bool prepareImmediately)
     {
-        if (_updatesTab is null || _changesTab is null || _updatesTab.Visible) return;
-        ActivateTab(SkillViewTab.Changes);
-        _openedUpdatesFromChanges = true;
-        _changesTab.CancelPendingLoad();
-        _workflows.OpenUpdatesFromChanges(
-            hideChanges: () => _changesTab.Visible = false,
-            activateUpdates: hideChanges => _updatesTab.ActivateFromChanges(hideChanges, selected));
+        if (selected is null || _updatesTab is null || _updatesTab.Visible) return;
+        _tabBeforeUpdateReview = _activeTab;
+        CancelPendingTabWork();
+        ShowSearchPanes(false);
+        if (_installedTab is not null) _installedTab.Visible = false;
+        if (_changesTab is not null) _changesTab.Visible = false;
+        _updatesTab.ActivateExactReview(selected, prepareImmediately);
+        RefreshShellChrome();
     }
 
-    /// Esc returns from the update workspace to Changes.
     private void LeaveUpdates()
     {
+        _updatesTab?.CancelPendingWork();
         if (_updatesTab is not null) _updatesTab.Visible = false;
-        if (_openedUpdatesFromChanges)
-        {
-            _openedUpdatesFromChanges = false;
-            // _activeTab is still Changes since drill-in bypasses ActivateTab.
-            // Force the no-op guard by temporarily setting to a different tab.
-            _activeTab = SkillViewTab.Discover;
-            ActivateTab(SkillViewTab.Changes);
-        }
-        else
-        {
-            ActivateTab(SkillViewTab.Discover);
-        }
+        _activeTab = _tabBeforeUpdateReview == SkillViewTab.Discover ? SkillViewTab.Installed : SkillViewTab.Discover;
+        ActivateTab(_tabBeforeUpdateReview);
+    }
+
+    private void CheckUpdates()
+    {
+        if (_updatesTab?.Visible == true || _inDoctor) return;
+        if (_workflows.Availability.Running) { _workflows.CancelAvailability(RefreshUpdateAvailability); return; }
+        RunOwnedTask(() => _workflows.CheckUpdatesAsync(RefreshUpdateAvailability, GetRunLifetimeToken()), "updates.check");
+    }
+
+    private void RefreshUpdateAvailability()
+    {
+        _installedTab?.RefreshAvailability();
+        _changesTab?.RefreshAvailability();
     }
 
     private void CycleTab(int delta)
@@ -415,7 +426,7 @@ public sealed partial class SkillViewApp
                 RunOwnedTask(_installedTab.LoadAsync, "installed.refresh");
                 break;
             case SkillViewTab.Changes when _changesTab is not null:
-                SetStatus("refreshing disk inventory; update availability remains unknown…");
+                SetStatus("refreshing disk inventory; previous update checks are stale…");
                 RunOwnedTask(_changesTab.LoadAsync, "changes.refresh");
                 break;
             case SkillViewTab.Discover:

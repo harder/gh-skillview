@@ -19,6 +19,7 @@ public sealed record UpdateResult
     public required IReadOnlyList<string> CommandLine { get; init; }
     public required ImmutableArray<UpdateEntry> Entries { get; init; }
     public bool Cancelled { get; init; }
+    public bool OutputTruncated { get; init; }
     public bool ReconciliationPartial { get; init; }
     public bool MutationAttempted { get; init; }
     public ImmutableArray<UpdateNotice> Notices { get; init; } = [];

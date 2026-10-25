@@ -48,7 +48,7 @@ internal static class LocalReimportScreen
         };
         var message = prepared.SavedPlan is { } saved
             ? "\n\nSaved operation message: " + MarkdownTableFormatter.FormatCodeSpan(DisplayDiagnostic(saved.Message)) : "";
-        return TerminalEscapeSanitizer.Sanitize(UpdateScreen.RenderResult(bounded, false, false, [selectedName], localReimport: !sourceSwitch, localSourceSwitch: sourceSwitch) + message) ?? "";
+        return TerminalEscapeSanitizer.Sanitize(UpdateScreen.RenderResult(bounded, selectedName, localReimport: !sourceSwitch, localSourceSwitch: sourceSwitch) + message) ?? "";
     }
 
     internal static bool IsLocalReimport(ReplacementResult plan) => plan.LocalSourceSwitch is null && plan.LocalImport is not null && plan.LocalImport.Disposition == ReplacementPlanStore.LocalReimportDisposition

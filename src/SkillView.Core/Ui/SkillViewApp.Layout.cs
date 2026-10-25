@@ -1,3 +1,4 @@
+using SkillView.Inventory.Models;
 using SkillView.Bootstrapping;
 using SkillView.Threading;
 using Terminal.Gui.ViewBase;
@@ -181,6 +182,9 @@ public sealed partial class SkillViewApp
             onPackageCheck: skill => _workflows.ShowPackageCheck(skill, GetRunLifetimeToken()),
             onLocalReimport: skill => _workflows.ShowLocalReimport(skill, GetRunLifetimeToken()),
             onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()),
+            availability: _workflows.Availability,
+            onCheckUpdates: CheckUpdates,
+            onReviewUpdate: skill => OpenUpdatesWorkspace(OperationSubject.From(skill)),
             onRemovalError: error =>
             {
                 _services.Logger.Error("installed.remove", error.ToString());
@@ -231,6 +235,8 @@ public sealed partial class SkillViewApp
             runOnUi: runOnUi,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
             onRefresh: () => _services.ListAdapter.Invalidate(),
+            availability: _workflows.Availability,
+            onCheckUpdates: CheckUpdates,
             homeDirectory: DisplayPath.CaptureHome(_services.Runner),
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onStateChange: UpdateContextBar,
@@ -240,7 +246,8 @@ public sealed partial class SkillViewApp
             activateEntryAsync: (entry, request) =>
             {
                 if (entry.IsCopyReview)
-                    return _workflows.ShowCopiesAsync(entry, request, OpenUpdatesWorkspace, GetRunLifetimeToken());
+                    return _workflows.ShowCopiesAsync(entry, request,
+                        subject => OpenUpdatesWorkspace(subject, prepareImmediately: false), GetRunLifetimeToken());
                 if (entry.Cleanup is not null) return _workflows.ShowSelectedCleanupAsync(entry, request);
                 if (request.IsCurrent) OpenUpdatesWorkspace(entry.Subject);
                 return Task.CompletedTask;
@@ -253,6 +260,9 @@ public sealed partial class SkillViewApp
             Height = Dim.Fill(2),
         };
 
+        void InvalidateUpdateObservations() => _workflows.InvalidateAvailability(RefreshUpdateAvailability);
+        _services.ListAdapter.Invalidated += InvalidateUpdateObservations;
+        window.Disposing += (_, _) => _services.ListAdapter.Invalidated -= InvalidateUpdateObservations;
         window.Add(_tabBar, _contextBar, _discoverTab, _installedTab, _updatesTab, _doctorTab,
                    _changesTab,
                    _statusStrip, _sizeGuard);

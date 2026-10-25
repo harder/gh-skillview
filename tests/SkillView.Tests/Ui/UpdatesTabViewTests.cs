@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Threading.Tasks;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Inventory.Models;
@@ -14,14 +13,39 @@ namespace SkillView.Tests.Ui;
 public sealed class UpdatesTabViewTests
 {
     [Fact]
+    public async Task ExactOptionsResolveOneCopyAndPreparationCannotWidenToItsSameNamedPeer()
+    {
+        var first = SnapshotWithSkill("demo").Skills[0];
+        var second = first with { ResolvedPath = "/another/demo", Scope = Scope.Project };
+        GhSkillUpdateService.Options? captured = null;
+        using var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
+            (_, options, _) => { captured = options; return Task.FromResult(SuccessfulResult()); });
+        await view.LoadForSubjectAsync(OperationSubject.From(second));
+        Assert.Null(captured);
+        Assert.Equal(second.InstallationId, view.SelectedInstallationForTests);
+        Assert.Empty(view.SubViews.OfType<TableView>());
+        await view.ReviewUpdateAsync();
+        Assert.NotNull(captured);
+        Assert.False(captured.All); Assert.False(captured.DryRun);
+        Assert.Equal(second.InstallationId, Assert.Single(captured.Targets!).InstallationId);
+    }
+
+    [Fact]
+    public async Task UnseededRefreshDoesNotOpenAnInventoryBrowserOrCaptureInventory()
+    {
+        using var view = CreateUpdatesTab(() => throw new InvalidOperationException("An exact subject is required"));
+        await view.LoadAsync();
+        await view.ReviewUpdateAsync();
+        Assert.Null(view.SelectedInstallationForTests);
+        Assert.Empty(view.SubViews.OfType<TableView>());
+    }
+
+    [Fact]
     public async Task SelectedPreviewRetainsExactEvidenceWithoutInstalledShortcuts()
     {
         var home = Path.GetFullPath("updates-child-home");
         var skill = MaintenanceQueueTests.Skill(Path.Combine(home, "skills", "demo"), "https://github.com/owner/repo") with
-        {
-            OwnershipRunner = new SkillView.Subprocess.ProcessRunner(new Logger(),
-                environment: new Dictionary<string, string> { ["HOME"] = home, ["USERPROFILE"] = home }),
-        };
+        { OwnershipRunner = new SkillView.Subprocess.ProcessRunner(new Logger(), environment: new Dictionary<string, string> { ["HOME"] = home, ["USERPROFILE"] = home }) };
         skill = skill with { ObservedSubject = OperationSubject.From(skill) };
         using var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }));
         await view.LoadForSubjectAsync(OperationSubject.From(skill));
@@ -29,191 +53,78 @@ public sealed class UpdatesTabViewTests
         var detail = view.PreviewTextForTests;
         Assert.Contains("**Path:** `" + skill.ResolvedPath + "`", detail);
         Assert.Contains("Installation address ID", detail);
-
-        Assert.DoesNotContain("**E** Analyze", detail);
-        Assert.DoesNotContain("**K** Check", detail);
+        Assert.DoesNotContain("**E** Analyze", detail); Assert.DoesNotContain("**K** Check", detail);
         Assert.DoesNotContain("**F2** Technical", detail);
     }
 
     [Fact]
-    public async Task QueueDrillIn_SelectsOnlyExactPhysicalInstallAndDoesNotStartAnUpdate()
+    public async Task MissingOrFailedExactCaptureCannotPrepareUpdateOrUnpinAPreviousCopy()
     {
-        var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
-        var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
-        var calls = 0;
-        GhSkillUpdateService.Options? checkedOptions = null;
-        var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
-            (_, options, _) => { calls++; checkedOptions = options; return Task.FromResult(SuccessfulDryRun()); });
-        view.AllBoxForTests.Value = CheckState.Checked;
-
-        await view.LoadForSubjectAsync(OperationSubject.From(second));
-
-        Assert.Equal(0, calls);
-        Assert.Equal(CheckState.UnChecked, view.AllBoxForTests.Value);
-        Assert.Single(view.LoadedSkillNamesForTests);
-        Assert.Contains("availability unknown", view.StatusTextForTests);
-        await view.RunForTestsAsync(dryRun: true, batchOnly: false);
-        Assert.Equal(second.InstallationId, Assert.Single(checkedOptions!.Targets!).InstallationId);
-    }
-
-    [Fact]
-    public async Task QueueDrillIn_MissingTargetCannotUpdateSameNamedSibling()
-    {
-        var missing = MaintenanceQueueTests.Skill("/skills/missing", "https://github.com/one/repo");
-        var sibling = MaintenanceQueueTests.Skill("/skills/sibling", "https://github.com/two/repo");
-        var calls = 0;
-        var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [sibling] }),
-            (_, _, _) => { calls++; return Task.FromResult(SuccessfulDryRun()); });
-        await view.LoadForSubjectAsync(OperationSubject.From(missing));
-        Assert.Empty(view.LoadedSkillNamesForTests);
-        Assert.Contains("missing or ambiguous", view.StatusTextForTests);
-        await view.RunForTestsAsync(dryRun: true, batchOnly: false);
-        Assert.Equal(0, calls);
-    }
-
-    [Fact]
-    public async Task QueueDrillIn_FailedCaptureClearsPreviousTargetsAndCannotRunUpdateOrUnpin()
-    {
-        var unrelated = MaintenanceQueueTests.Skill("/skills/unrelated", "https://github.com/other/repo");
-        var selected = MaintenanceQueueTests.Skill("/skills/selected", "https://github.com/selected/repo");
+        var first = SnapshotWithSkill("first").Skills[0];
+        var missing = first with { ResolvedPath = "/missing/first" };
         var capture = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var loads = 0;
-        var updates = 0;
-        var unpins = 0;
-        using var view = CreateUpdatesTab(
-            () => ++loads == 1 ? Task.FromResult(InventorySnapshot.Empty with { Skills = [unrelated] }) : capture.Task,
-            (_, _, _) => { updates++; return Task.FromResult(SuccessfulDryRun()); },
-            (_, _, _) => { unpins++; return Task.FromResult(SuccessfulDryRun()); });
-        await view.LoadAsync();
-        view.MarkRowForTests(0);
-        view.SelectRowForTests(0);
-        view.AllBoxForTests.Value = CheckState.Checked;
-        view.UnpinBoxForTests.Value = CheckState.Checked;
-
-        var load = view.LoadForSubjectAsync(OperationSubject.From(selected));
-        Assert.Empty(view.LoadedSkillNamesForTests);
-        Assert.Equal(CheckState.UnChecked, view.AllBoxForTests.Value);
-        Assert.Equal(CheckState.UnChecked, view.UnpinBoxForTests.Value);
-        capture.SetException(new IOException("Selected inventory unavailable"));
-        await load;
+        var loads = 0; var prepares = 0; var unpins = 0;
+        using var view = CreateUpdatesTab(() => ++loads == 1 ? Task.FromResult(InventorySnapshot.Empty with { Skills = [first] }) : capture.Task,
+            (_, _, _) => { prepares++; return Task.FromResult(SuccessfulResult()); },
+            (_, _, _) => { unpins++; return Task.FromResult(SuccessfulResult()); });
+        await view.LoadForSubjectAsync(OperationSubject.From(first));
+        var pending = view.LoadForSubjectAsync(OperationSubject.From(missing));
+        Assert.Null(view.SelectedInstallationForTests);
+        await view.ReviewUpdateAsync(); await view.PlanUnpinForTestsAsync();
+        capture.SetException(new IOException("Selected inventory unavailable")); await pending;
+        await view.ReviewUpdateAsync(); await view.PlanUnpinForTestsAsync();
         Assert.Contains("inventory load failed", view.StatusTextForTests);
-        Assert.Empty(view.LoadedSkillNamesForTests);
-        await view.RunForTestsAsync(dryRun: true, batchOnly: false);
-        await view.RunForTestsAsync(dryRun: false, batchOnly: false);
-        await view.RunForTestsAsync(dryRun: false, batchOnly: true);
-        view.UpdateCurrentRowForTests();
-        await view.PlanUnpinForTestsAsync();
-        Assert.Equal(0, updates);
-        Assert.Equal(0, unpins);
+        Assert.Equal(0, prepares); Assert.Equal(0, unpins);
     }
 
     [Fact]
-    public async Task QueueDrillIn_RefreshRetainsExactSelectionAndRefusesItsDisappearance()
+    public async Task RefreshRetainsExactSubjectAndRefusesItsDisappearanceWithoutSelectingAPeer()
     {
-        var selected = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
-        var sibling = selected with { ResolvedPath = "/skills/two" };
-        var snapshot = InventorySnapshot.Empty with { Skills = [selected, sibling] };
-        var view = CreateUpdatesTab(() => Task.FromResult(snapshot));
-        view.ActivateFromChanges(static () => { }, OperationSubject.From(selected));
-        Assert.Single(view.LoadedSkillNamesForTests);
-        snapshot = snapshot with { Skills = [sibling] };
+        var selected = SnapshotWithSkill("demo").Skills[0];
+        var peer = selected with { ResolvedPath = "/peer/demo" };
+        var snapshot = InventorySnapshot.Empty with { Skills = [selected, peer] };
+        using var view = CreateUpdatesTab(() => Task.FromResult(snapshot));
+        await view.LoadForSubjectAsync(OperationSubject.From(selected));
+        Assert.Equal(selected.InstallationId, view.SelectedInstallationForTests);
+        snapshot = snapshot with { Skills = [peer] };
         await view.LoadAsync();
-        Assert.Empty(view.LoadedSkillNamesForTests);
+        Assert.Null(view.SelectedInstallationForTests);
         Assert.Contains("missing or ambiguous", view.StatusTextForTests);
-    }
-
-    // gh ≥ 2.94 is required, so every update flag is always available; the
-    // Updates tab no longer has per-capability UI state to test.
-
-    [Fact]
-    public void UpdateControls_AreEnabledByDefault()
-    {
-        var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty));
-        Assert.True(view.AllBoxForTests.Enabled);
-        Assert.Equal("_all", view.AllBoxForTests.Text.ToString());
-        Assert.True(view.DryRunButtonForTests.Enabled);
+        Assert.False(view.ReviewButtonForTests.Enabled);
     }
 
     [Fact]
-    public async Task LoadAsync_IgnoresStaleEarlierSnapshot()
+    public async Task SupersededExactLoadCannotOverwriteANewerSnapshot()
     {
-        var first = new TaskCompletionSource<InventorySnapshot>();
-        var second = new TaskCompletionSource<InventorySnapshot>();
-        var loadCount = 0;
-        var view = CreateUpdatesTab(
-            () => ++loadCount == 1 ? first.Task : second.Task);
-
-        var initialLoad = view.LoadAsync();
-        var replacementLoad = view.LoadAsync();
-
-        second.SetResult(SnapshotWithSkill("newer"));
-        await replacementLoad;
-
-        first.SetResult(SnapshotWithSkill("older"));
-        await initialLoad;
-
+        var selected = SnapshotWithSkill("demo").Skills[0];
+        var first = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = new TaskCompletionSource<InventorySnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loads = 0;
+        using var view = CreateUpdatesTab(() => ++loads == 1 ? first.Task : second.Task);
+        var oldLoad = view.LoadForSubjectAsync(OperationSubject.From(selected));
+        var newLoad = view.LoadForSubjectAsync(OperationSubject.From(selected));
+        second.SetResult(InventorySnapshot.Empty with { Skills = [selected with { Name = "newer" }] }); await newLoad;
+        first.SetResult(InventorySnapshot.Empty with { Skills = [selected with { Name = "older" }] }); await oldLoad;
         Assert.Equal(["newer"], view.LoadedSkillNamesForTests);
     }
 
     [Fact]
-    public async Task CancelPendingWork_CancelsActiveUpdateAndRestoresControls()
+    public async Task CancelPendingWorkCancelsExactPreparationAndStaleCompletionCannotRestoreApproval()
     {
-        var updateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        CancellationToken updateToken = default;
-        var view = CreateUpdatesTab(
-            () => Task.FromResult(SnapshotWithSkill("installed")),
-            async (_, _, token) =>
-            {
-                updateToken = token;
-                updateStarted.SetResult();
-                await Task.Delay(Timeout.InfiniteTimeSpan, token);
-                throw new InvalidOperationException("The canceled delay should not complete normally.");
-            });
-        await view.LoadAsync();
-        view.AllBoxForTests.Value = CheckState.Checked;
-
-        var update = view.RunForTestsAsync(dryRun: true, batchOnly: false);
-        await updateStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
-        Assert.True(view.BusyForTests);
-        Assert.False(view.DryRunButtonForTests.Enabled);
-
-        view.CancelPendingWork();
-        await update.WaitAsync(TestContext.Current.CancellationToken);
-
-        Assert.True(updateToken.IsCancellationRequested);
-        Assert.False(view.BusyForTests);
-        Assert.True(view.DryRunButtonForTests.Enabled);
-    }
-
-    [Fact]
-    public async Task CanceledUpdateCompletion_DoesNotOverwriteReloadedState()
-    {
-        var updateStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var updateCompleted = new TaskCompletionSource<UpdateResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var snapshotName = "initial";
-        var view = CreateUpdatesTab(
-            () => Task.FromResult(SnapshotWithSkill(snapshotName)),
-            (_, _, _) =>
-            {
-                updateStarted.SetResult();
-                return updateCompleted.Task;
-            });
-        await view.LoadAsync();
-        view.AllBoxForTests.Value = CheckState.Checked;
-
-        var update = view.RunForTestsAsync(dryRun: true, batchOnly: false);
-        await updateStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
-        view.CancelPendingWork();
-
-        snapshotName = "reloaded";
-        await view.LoadAsync();
-        var reloadedStatus = view.StatusTextForTests;
-        updateCompleted.SetResult(SuccessfulDryRun());
-        await update.WaitAsync(TestContext.Current.CancellationToken);
-
-        Assert.Equal(["reloaded"], view.LoadedSkillNamesForTests);
-        Assert.Equal(reloadedStatus, view.StatusTextForTests);
-        Assert.DoesNotContain("dry-run complete", view.StatusTextForTests, StringComparison.Ordinal);
+        var selected = SnapshotWithSkill("demo").Skills[0];
+        var completion = new TaskCompletionSource<UpdateResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken operationToken = default;
+        using var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [selected] }),
+            (_, _, token) => { operationToken = token; return completion.Task; });
+        await view.LoadForSubjectAsync(OperationSubject.From(selected));
+        var work = view.ReviewUpdateAsync();
+        Assert.True(view.BusyForTests); Assert.False(view.ReviewButtonForTests.Enabled);
+        view.CancelPendingWork(); await view.LoadAsync(); var status = view.StatusTextForTests;
+        completion.SetResult(SuccessfulResult()); await work;
+        Assert.True(operationToken.IsCancellationRequested);
+        Assert.Equal(status, view.StatusTextForTests);
+        Assert.False(view.ApplyButtonForTests.Enabled); Assert.False(view.BusyForTests);
+        Assert.True(view.ReviewButtonForTests.Enabled);
     }
 
     [Fact]
@@ -321,40 +232,6 @@ public sealed class UpdatesTabViewTests
         Assert.Equal("loaded", selectedSkillAtCallback!.Name);
     }
 
-    [Fact]
-    public async Task MarkedSelectionPreservesPhysicalIdentityEvenWhenAllBoxIsChecked()
-    {
-        var first = SnapshotWithSkill("demo").Skills[0];
-        var second = first with { ResolvedPath = "/another/demo", Scope = Scope.Project };
-        GhSkillUpdateService.Options? captured = null;
-        using var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
-            (_, options, _) => { captured = options; return Task.FromResult(SuccessfulDryRun()); });
-        await view.LoadAsync();
-        view.AllBoxForTests.Value = CheckState.Checked;
-        view.MarkRowForTests(1);
-        await view.RunForTestsAsync(dryRun: true, batchOnly: true);
-        Assert.NotNull(captured);
-        Assert.False(captured.All);
-        Assert.Equal(second.InstallationId, Assert.Single(captured.Targets!).InstallationId);
-    }
-
-    [Fact]
-    public async Task CurrentRowShortcutPreservesItsPhysicalTarget()
-    {
-        var first = SnapshotWithSkill("demo").Skills[0];
-        var second = first with { ResolvedPath = "/another/demo", Scope = Scope.Project };
-        GhSkillUpdateService.Options? captured = null;
-        using var view = CreateUpdatesTab(() => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
-            (_, options, _) => { captured = options; return Task.FromResult(SuccessfulDryRun()); });
-        await view.LoadAsync();
-        view.AllBoxForTests.Value = CheckState.Checked;
-        view.SelectRowForTests(1);
-        view.UpdateCurrentRowForTests();
-        Assert.NotNull(captured);
-        Assert.False(captured.All);
-        Assert.Equal(second.InstallationId, Assert.Single(captured.Targets!).InstallationId);
-    }
-
     private static UpdatesTabView CreateUpdatesTab(
         Func<Task<InventorySnapshot>> snapshotLoader,
         Func<string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>>? updateRunner = null,
@@ -377,9 +254,9 @@ public sealed class UpdatesTabViewTests
             unpinRunner: unpinRunner);
     }
 
-    private static UpdateResult SuccessfulDryRun() => new()
+    private static UpdateResult SuccessfulResult() => new()
     {
-        DryRun = true,
+        DryRun = false,
         Succeeded = true,
         ExitCode = 0,
         StdOut = "would update initial",

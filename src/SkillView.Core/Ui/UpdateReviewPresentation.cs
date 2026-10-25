@@ -73,12 +73,11 @@ internal static class UpdateReviewPresentation
         return guidance;
     }
 
-    internal static string Result(UpdateResult result, bool dryRun, bool awaitingReview)
+    internal static string Result(UpdateResult result, bool awaitingReview)
     {
         var heading = awaitingReview ? "Review this change" : result.Cancelled ? "Update canceled"
-            : !result.Succeeded ? "Update failed or refused" : dryRun ? "Update availability" : "Update result";
+            : !result.Succeeded ? "Update failed or refused" : "Update result";
         return Render(heading, ResultFields(result, awaitingReview), result.SavedPlan is { } plan ? ReviewGuidance(plan, awaitingReview)
-            : dryRun ? "An availability check does not prepare or apply a saved update. Inspect notices in F2 Details."
             : "Inspect the recorded outcome. F2 Details retains complete diagnostics and any recovery evidence.");
     }
 

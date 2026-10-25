@@ -14,14 +14,8 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui.Tabs;
 
-/// Embedded tab 3 — replaces the modal UpdateScreen.Show() subloop with a
-/// persistent view that follows the winget-tui Updates pattern:
-///   Space — toggle mark on current row
-///   a     — mark / unmark all visible
-///   u     — prepare a review for the current physical installation
-///   U     — queue a separate review for every marked row
-/// Check updates reports availability; Review update prepares a saved review.
-/// F2 switches between a summary and existing technical/recovery evidence.
+/// Saved-operation review for one exact subject selected in Installed, Issues,
+/// or Copies. Availability discovery belongs to the main views.
 internal sealed partial class UpdatesTabView : FrameView
 {
     private readonly Func<Action, Task> _runOnUi;
@@ -36,24 +30,18 @@ internal sealed partial class UpdatesTabView : FrameView
     private readonly CancellationToken _lifetimeToken;
 
     private readonly Label _tableLabel;
-    private readonly TableView _table;
     private readonly Markdown _preview;
-    private readonly CheckBox _allBox;
     private readonly CheckBox _hiddenBox;
     private readonly CheckBox _unpinBox;
     private readonly Label _status;
     private readonly SpinnerView _spinner;
-    private readonly Button _dryRunButton;
     private readonly Button _updateButton;
     private readonly Button _unpinOnlyButton;
     private readonly Button _chooseVersionButton;
     private readonly Func<InstalledSkill, string?> _chooseTag;
     private bool _choosingVersion;
-    private readonly StatusBar _statusBar;
 
-    private CheckBoxTableSourceWrapperByIndex? _wrapper;
-    private IReadOnlyList<InstalledSkill> _skills = Array.Empty<InstalledSkill>();
-    private int _nameW = 12;
+    private InstalledSkill? _target;
     private long _loadGeneration;
     private OperationSubject? _drillInSubject;
     private readonly CancellationOperationSlot _loadCancellations;
@@ -101,38 +89,20 @@ internal sealed partial class UpdatesTabView : FrameView
 
         _tableLabel = new Label
         {
-            Text = "Space marks · c compare/plan row · u review · U marked · p unpin",
+            Text = "Selected physical copy · F2 Details",
             X = 0,
             Y = 0,
         };
-        _table = new TableView
-        {
-            X = 0,
-            Y = 1,
-            Width = Dim.Percent(45),
-            Height = Dim.Fill(9),
-            FullRowSelect = true,
-        };
-        TuiHelpers.DisableTypeToSearch(_table);
-        TuiHelpers.ConfigureTableNavigation(_table);
-        TuiHelpers.ConfigureTableChrome(_table);
-
         _preview = new Markdown
         {
-            X = Pos.Right(_table) + 1,
+            X = 0,
             Y = 1,
             Width = Dim.Fill(),
             Height = Dim.Fill(9),
-            Text = "## Updates\n\n_Loading inventory… press **Check updates** once loaded to check availability._",
+            Text = "## Update review\n\nSelect an exact copy in Installed or Issues to begin.",
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
 
-        _allBox = new CheckBox
-        {
-            X = 0,
-            Y = Pos.AnchorEnd(5),
-            Text = "_all",
-        };
         _hiddenBox = new CheckBox
         {
             X = 22,
@@ -164,16 +134,10 @@ internal sealed partial class UpdatesTabView : FrameView
             Style = new SpinnerStyle.Dots(),
         };
 
-        _dryRunButton = new SingleRowButton
-        {
-            Text = "_Check updates",
-            X = 0,
-            Y = Pos.AnchorEnd(3),
-        };
         _updateButton = new SingleRowButton
         {
             Text = "_Review update",
-            X = Pos.Right(_dryRunButton) + 2,
+            X = 0,
             Y = Pos.AnchorEnd(3),
             IsDefault = true,
         };
@@ -201,15 +165,10 @@ internal sealed partial class UpdatesTabView : FrameView
         InitializeLocalReviewControls();
         InitializeUndoControls();
 
-        _dryRunButton.Accepting += (_, ev) =>
-        {
-            ev.Handled = true;
-            _runTask(() => RunAsync(dryRun: true, batchOnly: false), "updates.dry-run");
-        };
         _updateButton.Accepting += (_, ev) =>
         {
             ev.Handled = true;
-            _runTask(() => RunAsync(dryRun: false, batchOnly: false), "updates.run");
+            _runTask(ReviewUpdateAsync, "updates.prepare");
         };
         _unpinOnlyButton.Accepting += (_, ev) =>
         {
@@ -217,47 +176,26 @@ internal sealed partial class UpdatesTabView : FrameView
             _runTask(RunUnpinAsync, "updates.unpin-plan");
         };
 
-        _statusBar = new StatusBar(TuiHelpers.WithMarkdownShortcuts(
-        [
-            new Shortcut { Title = "Space", HelpText = "Toggle" },
-            new Shortcut { Title = "a",     HelpText = "Mark all" },
-            new Shortcut { Title = "u",     HelpText = "Review row" },
-            new Shortcut { Title = "U",     HelpText = "Review marked" },
-            new Shortcut { Title = "d",     HelpText = "Check updates" },
-            new Shortcut { Title = "p",     HelpText = "Unpin row" },
-            new Shortcut { Key = Key.F2, Title = "F2", HelpText = "Details" },
-            new Shortcut { Key = Key.Esc,   Title = "Esc", HelpText = "Back" },
-        ], includeOpenLink: false));
-
         TuiHelpers.ApplyScheme(SchemeNames.Base,
-            this, _tableLabel, _table, _preview,
-            _allBox, _hiddenBox, _unpinBox,
-            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _detailsButton, _reviewHint, _statusBar);
+            this, _tableLabel, _preview,
+            _hiddenBox, _unpinBox,
+            _status, _spinner, _updateButton, _unpinOnlyButton, _chooseVersionButton, _detailsButton, _reviewHint);
 
         KeyDown += OnKeyDown;
 
-        Add(_tableLabel, _table, _preview,
-            _allBox, _hiddenBox, _unpinBox,
-            _status, _spinner, _dryRunButton, _updateButton, _unpinOnlyButton, _chooseVersionButton, _detailsButton, _reviewHint, _statusBar, _sourceReviewBox, _retainBox, _applyButton, _nextButton);
+        Add(_tableLabel, _preview,
+            _hiddenBox, _unpinBox,
+            _status, _spinner, _updateButton, _unpinOnlyButton, _chooseVersionButton, _detailsButton, _reviewHint, _sourceReviewBox, _retainBox, _applyButton, _finishButton);
         Add(_preserveButton, _localReviewButton, _buildMergeButton, _localPanel);
         Add(_undoButton, _undoApproval, _confirmUndoButton, _cancelUndoButton);
-        _table.ValueChanged += (_, _) =>
-        {
-            if (!_loadCancellations.HasActive && !_operationCancellations.HasActive) ShowSelectedPreview();
-            // Row movement only changes the summary and pin-only action.
-            // Reflow the footer only when that action's visibility changes.
-            if (!_reviewPresentationReady || _unpinOnlyButton.Visible != ShowUnpinOnlyAction()) RefreshPresentation();
-        };
         _reviewPresentationReady = true;
-        RefreshPresentation();
+        SetOperationControlsEnabled(false);
         Disposing += (_, _) => CancelPendingWork();
     }
 
-    internal Task LoadAsync() => LoadForSubjectAsync(_drillInSubject);
+    internal Task LoadAsync() => _drillInSubject is { } subject ? LoadForSubjectAsync(subject) : Task.CompletedTask;
 
-    internal Task LoadForSubjectAsync(OperationSubject? selected) => LoadForSubjectCoreAsync(selected);
-
-    private async Task<(InventorySnapshot Snapshot, long Generation)?> LoadForSubjectCoreAsync(OperationSubject? selected)
+    internal async Task<(InventorySnapshot Snapshot, long Generation)?> LoadForSubjectAsync(OperationSubject selected)
     {
         // App entry points use RunOwnedTask's default runOnThreadPool:false.
         // This pre-await chooser handshake therefore runs on the UI thread;
@@ -268,23 +206,16 @@ internal sealed partial class UpdatesTabView : FrameView
             _versionReloadSubject = selected;
             return null;
         }
-        if (_review is not null || _undoReview is not null || _queue.Count > 0 || _operationCancellations.HasActive) return null;
+        if (_review is not null || _undoReview is not null || _operationCancellations.HasActive) return null;
+        _drillInSubject = selected;
         ClearUndo();
-        _singleInstallationView = selected is not null;
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
-        if (selected is not null)
-        {
-            // A failed or canceled capture must not leave a previous workspace's
-            // targets actionable after this load lease ends.
-            _skills = [];
-            _wrapper = null;
-            _table.Table = null;
-            _allBox.Value = CheckState.UnChecked;
-            _unpinBox.Value = CheckState.UnChecked;
-            ShowPreview("## Selected installation\n\nCapturing fresh inventory for this exact installation.", "");
-        }
+        // Never leave a previous copy actionable after failed/canceled loading.
+        _target = null;
+        _unpinBox.Value = CheckState.UnChecked;
+        ShowPreview("## Selected installation\n\nCapturing fresh inventory for this exact installation.", "");
         SetBusy(true);
         SetOperationControlsEnabled(false);
         _status.Text = " loading inventory…";
@@ -300,8 +231,7 @@ internal sealed partial class UpdatesTabView : FrameView
                 }
 
                 _inventoryNeedsRefresh = false;
-                if (selected is null) Populate(snapshot);
-                else PopulateSelected(snapshot, selected);
+                PopulateSelected(snapshot, selected);
                 published = true;
             }).ConfigureAwait(false);
             return published ? (snapshot, loadGeneration) : null;
@@ -328,95 +258,52 @@ internal sealed partial class UpdatesTabView : FrameView
         return null;
     }
 
-    private void Populate(InventorySnapshot snapshot)
-    {
-        _skills = snapshot.Skills;
-        var rowsList = _skills.Select((s, i) => (Idx: i, S: s)).ToList();
-        var inner = new EnumerableTableSource<(int Idx, InstalledSkill S)>(
-            rowsList,
-            new Dictionary<string, Func<(int Idx, InstalledSkill S), object>>
-            {
-                ["Name"] = row => TuiHelpers.Truncate(row.S.Name, _nameW),
-                ["Scope"] = row => row.S.Scope.ToString(),
-                ["Flags"] = row => PinDisplayPolicy.From(row.S).Flag + (row.S.IsSymlinked ? "s" : "-"),
-            });
-        _wrapper = new CheckBoxTableSourceWrapperByIndex(_table, inner);
-        _table.Table = _wrapper;
-        var style = _table.Style;
-        style.ExpandLastColumn = true;
-        var nameStyle = style.GetOrCreateColumnStyle(2);
-        nameStyle.MinWidth = 8;
-        RecomputeColumnWidths();
-        _status.Text = $" {_skills.Count} installed skill(s) — Space to toggle, U to review marked";
-        ShowPreview("## Updates\n\nCheck updates for availability, or mark rows and review each installation.", "");
-        ShowSelectedPreview();
-        SetBusy(false);
-        SetOperationControlsEnabled(true);
-        (_table.Visible ? (View)_table : _preview).SetFocus();
-    }
-
     private void PopulateSelected(InventorySnapshot snapshot, OperationSubject selected)
     {
-        var target = SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, selected);
-        // A missing or ambiguous ID must not silently select the first same-name
-        // row. Restrict this drill-in to one fresh physical target, and clear
-        // broad/batch choices left over from earlier visits.
-        _allBox.Value = CheckState.UnChecked;
-        _unpinBox.Value = CheckState.UnChecked;
-        Populate(snapshot with { Skills = target is null ? [] : [target] });
-        if (target is null)
+        _target = MaintenanceQueueBuilder.ResolveInstallation(snapshot, selected);
+        SetBusy(false);
+        if (_target is null)
         {
-            _status.Text = " selected installation is missing or ambiguous — refresh Issues";
-            ShowPreview("## Selection refused\n\nThe queue address no longer identifies exactly one installation. Return to Issues and refresh disk inventory.", "");
-            return;
+            _status.Text = " selected installation is missing or ambiguous — refresh Installed or Issues";
+            ShowPreview("## Selection refused\n\nThe selected address no longer identifies exactly one installation. Return to Installed or Issues and refresh disk inventory.", "");
         }
-        _table.SetSelectedRow(0);
-        _wrapper?.CheckedRows.Add(0);
-        _status.Text = " exact installation selected · availability unknown · Check updates or Review update";
-        ShowSelectedPreview();
+        else
+        {
+            _status.Text = " exact installation selected · Review update or Choose version";
+            ShowSelectedPreview();
+        }
+        SetOperationControlsEnabled(true);
+        _preview.SetFocus();
     }
-
 
     private bool IsCurrentLoad(long loadGeneration) =>
         Interlocked.Read(ref _loadGeneration) == loadGeneration && !_lifetimeToken.IsCancellationRequested;
 
     internal CheckBox UnpinBoxForTests => _unpinBox;
-    internal void MarkRowForTests(int row) => _wrapper?.CheckedRows.Add(row);
-    internal void SelectRowForTests(int row) => _table.SetSelection(0, row, false);
-    internal void UpdateCurrentRowForTests() => UpdateCurrentRow();
-    internal CheckBox AllBoxForTests => _allBox;
-    internal Button DryRunButtonForTests => _dryRunButton;
+    internal Button ReviewButtonForTests => _updateButton;
     internal Button UnpinOnlyButtonForTests => _unpinOnlyButton;
     internal Task PlanUnpinForTestsAsync() => RunUnpinAsync();
     internal void ChooseVersionForTests() => ChooseVersion();
     internal Button ChooseVersionButtonForTests => _chooseVersionButton;
     internal string StatusTextForTests => _status.Text.ToString();
     internal string TableLabelForTests => _tableLabel.Text.ToString();
-    internal string? SelectedInstallationForTests => _table.GetSelectedRow() is var row && row >= 0 && row < _skills.Count ? _skills[row].InstallationId : null;
-    internal IReadOnlyList<string> LoadedSkillNamesForTests => _skills.Select(s => s.Name).ToArray();
+    internal string? SelectedInstallationForTests => _target?.InstallationId;
+    internal IReadOnlyList<string> LoadedSkillNamesForTests => _target is { } target ? [target.Name] : [];
     internal bool BusyForTests => _spinner.Visible || _spinner.AutoSpin;
-    internal Task RunForTestsAsync(bool dryRun, bool batchOnly) => RunAsync(dryRun, batchOnly);
 
-    /// Activate this view as a drill-in from the Changes workspace.
-    /// Hides the Changes tab via <paramref name="hideChanges"/>, then shows and loads this view.
-    internal void ActivateFromChanges(Action hideChanges, OperationSubject? selected = null)
+    internal void ActivateExactReview(OperationSubject selected, bool prepareImmediately = true)
     {
-        _drillInSubject = selected;
-        hideChanges();
         Visible = true;
-        _runTask(() => LoadForSubjectAsync(selected), "updates.load");
-    }
-
-    private void RecomputeColumnWidths()
-    {
-        var viewportWidth = _table.Viewport.Width;
-        var available = viewportWidth > 0 ? Math.Max(30, viewportWidth - 4) : 50;
-        _nameW = Math.Max(12, available - 1 - 6 - 5);
-        if (_table.Table is null) return;
-        var style = _table.Style;
-        var nameStyle = style.GetOrCreateColumnStyle(2);
-        nameStyle.MaxWidth = _nameW;
-        _table.Update();
+        _runTask(async () =>
+        {
+            var loaded = await LoadForSubjectAsync(selected).ConfigureAwait(false);
+            if (loaded is not { } current) return;
+            await _runOnUi(() =>
+            {
+                if (!Visible || !IsCurrentLoad(current.Generation) || _target is null) return;
+                if (prepareImmediately) _runTask(ReviewUpdateAsync, "updates.prepare");
+            }).ConfigureAwait(false);
+        }, "updates.exact-review");
     }
 
     private void OnKeyDown(object? sender, Key key)
@@ -444,30 +331,10 @@ internal sealed partial class UpdatesTabView : FrameView
         if (key.IsAlt || key.IsCtrl) return;
 
         var rune = key.AsRune.Value;
-        if (rune == 'a')
+        if (rune is 'u' or 'U' or 'c')
         {
             key.Handled = true;
-            ToggleAllMarks();
-        }
-        else if (rune == 'A')
-        {
-            key.Handled = true;
-            ClearAllMarks();
-        }
-        else if (rune is 'u' or 'c')
-        {
-            key.Handled = true;
-            UpdateCurrentRow();
-        }
-        else if (rune == 'U')
-        {
-            key.Handled = true;
-            _runTask(() => RunAsync(dryRun: false, batchOnly: true), "updates.batch");
-        }
-        else if (rune == 'd' || rune == 'D')
-        {
-            key.Handled = true;
-            _runTask(() => RunAsync(dryRun: true, batchOnly: false), "updates.dry-run");
+            _runTask(ReviewUpdateAsync, "updates.prepare");
         }
         else if (rune == 'p')
         {
@@ -476,109 +343,29 @@ internal sealed partial class UpdatesTabView : FrameView
         }
     }
 
-    private void ToggleAllMarks()
+    internal async Task ReviewUpdateAsync()
     {
-        if (_wrapper is null) return;
-        var allMarked = _wrapper.CheckedRows.Count >= _skills.Count;
-        if (allMarked)
-        {
-            ClearAllMarks();
-            _status.Text = " marks cleared";
-            return;
-        }
-        for (var i = 0; i < _skills.Count; i++)
-        {
-            if (!_wrapper.CheckedRows.Contains(i))
-            {
-                _wrapper.CheckedRows.Add(i);
-            }
-        }
-        _table.SetNeedsDraw();
-        _status.Text = $" marked all {_skills.Count}";
-    }
-
-    private void ClearAllMarks()
-    {
-        if (_wrapper is null) return;
-        _wrapper.CheckedRows.Clear();
-        _table.SetNeedsDraw();
-    }
-
-    private void UpdateCurrentRow()
-    {
-        if (_choosingVersion || _undoReview is not null || _inventoryNeedsRefresh || _wrapper is null || _review is not null || _queue.Count > 0 || _operationCancellations.HasActive) return;
-        var row = _table.GetSelectedRow();
-        if (row < 0 || row >= _skills.Count)
-        {
-            _status.Text = " no row selected";
-            return;
-        }
-        // Mark just the current row and run a one-skill update.
-        _wrapper.CheckedRows.Clear();
-        _wrapper.CheckedRows.Add(row);
-        _runTask(() => RunAsync(dryRun: false, batchOnly: true), "updates.current");
-    }
-
-    private async Task RunAsync(bool dryRun, bool batchOnly)
-    {
-        if (_choosingVersion || _undoReview is not null || _inventoryNeedsRefresh || _operationCancellations.HasActive || _loadCancellations.HasActive || _review is not null || _queue.Count > 0) return;
+        if (_choosingVersion || _undoReview is not null || _inventoryNeedsRefresh || _operationCancellations.HasActive
+            || _loadCancellations.HasActive || _review is not null || _target is not { } target) return;
         var ghPath = _ghPathProvider();
-        if (ghPath is null)
-        {
-            _status.Text = " gh not found — press 'd' for Doctor";
-            return;
-        }
-        var allChecked = !batchOnly && _allBox.Value == CheckState.Checked;
-        var selected = _wrapper is null
-            ? new List<InstalledSkill>()
-            : Enumerable.Range(0, _skills.Count)
-                .Where(i => _wrapper.CheckedRows.Contains(i))
-                .Select(i => _skills[i])
-                .ToList();
-
-        var marked = selected.Select(s => s.Name).ToList();
-        var targets = allChecked ? _skills : selected;
-        if (targets.Count == 0)
-        {
-            _status.Text = dryRun
-                ? " mark at least one skill or enable All to Check updates"
-                : " pick at least one skill (Space to mark) or enable --all";
-            return;
-        }
-
-        var options = new GhSkillUpdateService.Options(
-            Skills: marked.ToArray(), All: allChecked, DryRun: dryRun,
-            Unpin: _unpinBox.Value == CheckState.Checked, Targets: targets.ToArray(),
+        if (ghPath is null) { _status.Text = " gh unavailable; open Doctor for setup"; return; }
+        _options = new(Skills: [target.Name], Targets: [target], Unpin: _unpinBox.Value == CheckState.Checked,
             AllowHiddenDirectories: _hiddenBox.Value == CheckState.Checked);
-        if (!dryRun)
-        {
-            if (targets.Count > SkillUpdateCoordinator.MaxTargets)
-            {
-                _status.Text = $" select at most {SkillUpdateCoordinator.MaxTargets} installations";
-                return;
-            }
-            _queue = new Queue<InstalledSkill>(targets.DistinctBy(target => target.InstallationId));
-            _queueOptions = options;
-            _queueOutcomes.Clear();
-            _queueResults = new();
-            await PrepareNextAsync().ConfigureAwait(false);
-        }
-        else await ExecuteReviewOperationAsync(
-            token => _updateRunner(ghPath, options, token), dryRun: true).ConfigureAwait(false);
+        _outcomes.Clear();
+        _results = new();
+        await ExecuteReviewOperationAsync(token => _updateRunner(ghPath, _options, token)).ConfigureAwait(false);
     }
 
     private async Task RunUnpinAsync()
     {
         if (_choosingVersion || _undoReview is not null || _inventoryNeedsRefresh || _unpinRunner is null || _operationCancellations.HasActive || _loadCancellations.HasActive
-            || _review is not null || _queue.Count > 0) return;
-        var row = _table.GetSelectedRow();
-        if (row < 0 || row >= _skills.Count) { _status.Text = " select one physical installation to unpin"; return; }
-        var selected = _skills[row];
+            || _review is not null) return;
+        if (_target is not { } selected) return;
         var hidden = _hiddenBox.Value == CheckState.Checked;
-        _queueOptions = new([selected.Name], false, false, false, Targets: [selected], AllowHiddenDirectories: hidden);
-        _queueOutcomes.Clear();
-        _queueResults = new();
-        await ExecuteReviewOperationAsync(token => _unpinRunner(selected, hidden, token), dryRun: false, unpinOnly: true).ConfigureAwait(false);
+        _options = new([selected.Name], false, false, false, Targets: [selected], AllowHiddenDirectories: hidden);
+        _outcomes.Clear();
+        _results = new();
+        await ExecuteReviewOperationAsync(token => _unpinRunner(selected, hidden, token), unpinOnly: true).ConfigureAwait(false);
     }
 
     internal void CancelPendingLoad()
@@ -600,8 +387,7 @@ internal sealed partial class UpdatesTabView : FrameView
         _review = null;
         ClearUndo();
         ResetLocalReview();
-        _queue.Clear();
-        _queueOptions = null;
+        _options = null;
         _retainBox.Value = CheckState.UnChecked;
         _sourceReviewBox.Value = CheckState.UnChecked;
         SetBusy(false);
@@ -617,18 +403,15 @@ internal sealed partial class UpdatesTabView : FrameView
 
     private void SetOperationControlsEnabled(bool enabled)
     {
-        enabled = enabled && _undoReview is null && !_inventoryNeedsRefresh && _review is null && _queue.Count == 0;
-        _dryRunButton.Enabled = enabled;
+        enabled = enabled && _target is not null && _undoReview is null && !_inventoryNeedsRefresh && _review is null;
         _updateButton.Enabled = enabled;
         _unpinOnlyButton.Enabled = enabled && _unpinRunner is not null;
         _chooseVersionButton.Enabled = enabled && !_lifetimeToken.IsCancellationRequested;
-        _tableLabel.Text = _queueOptions?.Tag is not null
+        _tableLabel.Text = _options?.Tag is not null
             ? VersionUpdateGuidance.ShortTagChoice
-            : "Space marks · c compare/plan row · u review · U marked · p unpin";
-        _allBox.Enabled = enabled;
+            : "Selected physical copy · F2 Details";
         _hiddenBox.Enabled = enabled;
         _unpinBox.Enabled = enabled;
-        _table.Enabled = enabled;
         RefreshReviewControls();
     }
 }

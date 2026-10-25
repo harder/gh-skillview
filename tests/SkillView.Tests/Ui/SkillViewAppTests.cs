@@ -601,9 +601,9 @@ public sealed class SkillViewAppTests
 
         Assert.Equal(7, hints.Count);
         Assert.Contains(hints, hint => hint.Key == "f" && hint.Label == "Filter");
-        Assert.Contains(hints, hint => hint.Key == "s" && hint.Label == "Sort");
-        Assert.Contains(hints, hint => hint.Key == "P" && hint.Label == "Pins");
-        Assert.Contains(hints, hint => hint.Key == "G" && hint.Label == "Scope");
+        Assert.Contains(hints, hint => hint.Key == "C" && hint.Label == "Check updates");
+        Assert.Contains(hints, hint => hint.Key == "u" && hint.Label == "Review");
+        Assert.Contains(hints, hint => hint.Key == "r" && hint.Label == "Refresh");
         Assert.Contains(hints, hint => hint.Key == "x" && hint.Label == "Remove");
         Assert.Contains(hints, hint => hint.Key == "?" && hint.Label == "Help");
         Assert.Contains(hints, hint => hint.Key == "Ctrl+Q" && hint.Label == "Quit");
@@ -1002,16 +1002,16 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
-    public void BuildUi_UpdateShortcutOpensReviewEvenWithoutPendingUpdateRows()
+    public void BuildUi_UpdateShortcutWithNoSelectedCopyKeepsVisibleMainCheckAction()
     {
         var app = CreateApp();
         app.StopBackgroundAdmissionForTests(); // navigation must not probe this machine
         using var window = app.BuildUiForTests();
         app.ForceActiveTabForTests(SkillViewTab.Installed);
         _ = window.NewKeyDownEvent(new Key('u'));
-        Assert.True(app.UpdatesWorkspaceVisibleForTests);
+        Assert.False(app.UpdatesWorkspaceVisibleForTests);
         Assert.Equal(SkillViewTab.Changes, app.ActiveTabForTests);
-        Assert.False(app.ChangesTabForTests!.Visible);
+        Assert.True(app.ChangesTabForTests!.Visible);
     }
 
     [Fact]
@@ -1021,6 +1021,7 @@ public sealed class SkillViewAppTests
         app.StopBackgroundAdmissionForTests();
         using var window = app.BuildUiForTests();
         app.ForceActiveTabForTests(SkillViewTab.Installed);
+        app.InstalledTabForTests!.LoadSeeded(InventorySnapshot.Empty with { Skills = [MaintenanceQueueTests.Skill("/skills/demo", "https://github.com/owner/repo")] });
         window.NewKeyDownEvent(new Key('u'));
         Assert.True(app.UpdatesWorkspaceVisibleForTests);
         var updates = app.UpdatesTabForTests!;
@@ -1418,7 +1419,7 @@ public sealed class SkillViewAppTests
         app.ForceActiveTabForTests(SkillViewTab.Changes);
         Assert.Equal(0, app.ChangesTabForTests!.RowCountForTests);
         var changesHints = app.StatusStripForTests.HintsForTests;
-        Assert.Contains(changesHints, hint => hint is { Key: "u", Label: "Updates" });
+        Assert.Contains(changesHints, hint => hint is { Key: "C", Label: "Check updates" });
         Assert.Contains(changesHints, hint => hint is { Key: "Enter", Label: "Review" });
         Assert.Contains(changesHints, hint => hint is { Key: "F2", Label: "Details" });
         Assert.Contains(changesHints, hint => hint is { Key: "c", Label: "Cleanup" });

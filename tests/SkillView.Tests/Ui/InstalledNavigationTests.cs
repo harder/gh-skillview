@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Terminal.Gui.Views;
 using SkillView.Bootstrapping;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
@@ -93,14 +94,14 @@ public sealed class InstalledNavigationTests
             view.FocusList();
             Press(KeyCode.CursorDown, count + 10);
             Assert.Equal(count == 0 ? null : $"skill-{count - 1:D3}", view.GetSelectedSkill()?.Name);
-            Assert.True(view.TableHasFocusForTests);
+            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.N | KeyCode.CtrlMask, 10);
-            Assert.True(view.TableHasFocusForTests);
+            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.CursorUp, count + 10);
             Assert.Equal(count == 0 ? null : "skill-000", view.GetSelectedSkill()?.Name);
-            Assert.True(view.TableHasFocusForTests);
+            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.P | KeyCode.CtrlMask, 10);
-            Assert.True(view.TableHasFocusForTests);
+            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.PageDown, 10);
             Assert.Equal(count == 0 ? null : $"skill-{count - 1:D3}", view.GetSelectedSkill()?.Name);
             Press(KeyCode.PageUp, 10);
@@ -113,7 +114,7 @@ public sealed class InstalledNavigationTests
             Press(KeyCode.CursorDown, 10);
             Press(KeyCode.CursorUp, 10);
             Assert.Null(view.GetSelectedSkill());
-            Assert.True(view.TableHasFocusForTests);
+            Assert.True(view.GetSelectedSkill() is null ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             view.SetFilterTextForTests("skill-000");
             Press(KeyCode.CursorDown, 10);
             Assert.Equal(count == 0 ? null : "skill-000", view.GetSelectedSkill()?.Name);

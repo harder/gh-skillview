@@ -1,3 +1,4 @@
+using SkillView.Inventory.Models;
 using System.Collections.Immutable;
 using SkillView.Maintenance;
 using SkillView.Ui;
@@ -46,7 +47,7 @@ public sealed partial class ReviewedUpdatesTabTests
                 Assert.Equal("local-1", request.Review!.ReviewFingerprint);
                 return Task.FromResult(new LocalUpdateResponse(Plan: merged));
             });
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); await view.ReviewUpdateAsync();
         view.RetainBoxForTests.Value = CheckState.Checked;
         await view.LocalActionForTestsAsync(LocalUpdateAction.Review);
         Assert.Equal(CheckState.UnChecked, view.RetainBoxForTests.Value);
@@ -67,7 +68,7 @@ public sealed partial class ReviewedUpdatesTabTests
     }
 
     [Fact]
-    public async Task PreserveDoesNotApplyOrAutomaticallyAdvanceTheQueue()
+    public async Task PreserveDoesNotApplyOrPrepareAnotherCopy()
     {
         var first = Target("first"); var second = Target("second"); var prepared = new List<string>();
         using var view = View([first, second], (_, options, _) =>
@@ -79,12 +80,11 @@ public sealed partial class ReviewedUpdatesTabTests
             Assert.Equal(LocalUpdateAction.Preserve, request.Action);
             return Task.FromResult(new LocalUpdateResponse(Plan: request.Plan with { Status = "preserved", Message = "exact original preserved" }));
         });
-        await view.LoadAsync(); view.AllBoxForTests.Value = CheckState.Checked;
-        await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(first)); await view.ReviewUpdateAsync();
         await view.LocalActionForTestsAsync(LocalUpdateAction.Preserve);
         Assert.Equal(new[] { "first" }, prepared); Assert.False(view.ApplyButtonForTests.Enabled);
         Assert.Contains("preserved", view.StatusTextForTests);
-        await view.NextReviewForTestsAsync(); Assert.Equal(new[] { "first", "second" }, prepared);
+        Assert.Equal(new[] { "first" }, prepared);
     }
 
     [Theory]
@@ -102,7 +102,7 @@ public sealed partial class ReviewedUpdatesTabTests
                 if (request.Action == failing && fail) throw new IOException("disk full after private write");
                 return Task.FromResult(new LocalUpdateResponse(Review: Local(plan, selection: "installed")));
             });
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); await view.ReviewUpdateAsync();
         await view.LocalActionForTestsAsync(LocalUpdateAction.Review);
         if (failing == LocalUpdateAction.Choose) { view.SelectLocalPathForTests(1); await view.LocalChoiceForTestsAsync("source"); }
         if (failing == LocalUpdateAction.Build) await view.LocalActionForTestsAsync(LocalUpdateAction.Build);
@@ -131,7 +131,7 @@ public sealed partial class ReviewedUpdatesTabTests
         using var view = View([Target("demo")], (_, _, _) => Task.FromResult(Result(plan)), (_, _, _) => Task.FromResult(Result()),
             local: (request, _, _) =>
             { if (request.Action == LocalUpdateAction.Choose) chosen = request; return Task.FromResult(new LocalUpdateResponse(Review: local)); });
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false); await view.LocalActionForTestsAsync(LocalUpdateAction.Review);
+        await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); await view.ReviewUpdateAsync(); await view.LocalActionForTestsAsync(LocalUpdateAction.Review);
         view.SelectLocalPathForTests(1);
         Assert.True(view.ResolutionFileForTests.SetFocus());
         Assert.True(view.LocalFileInputHasFocus);
@@ -157,12 +157,12 @@ public sealed partial class ReviewedUpdatesTabTests
             dispatch: action =>
             { if (!intercept) { action(); return Task.CompletedTask; } queued = action; ready.TrySetResult(); return delivered.Task; },
             local: (_, _, token) => { calls++; operationToken = token; return Task.FromResult(new LocalUpdateResponse(Review: Local(plan))); });
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); await view.ReviewUpdateAsync();
         intercept = true; var pending = view.LocalActionForTestsAsync(LocalUpdateAction.Review); await ready.Task.WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
         Assert.True(view.BusyForTests);
-        await view.LocalActionForTestsAsync(LocalUpdateAction.Preserve); await view.NextReviewForTestsAsync(); Assert.Equal(1, calls);
+        await view.LocalActionForTestsAsync(LocalUpdateAction.Preserve); await view.FinishReviewForTestsAsync(); Assert.Equal(1, calls);
         view.CancelPendingWork(); Assert.True(operationToken.IsCancellationRequested);
-        intercept = false; await view.LoadAsync(); var status = view.StatusTextForTests;
+        intercept = false; await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); var status = view.StatusTextForTests;
         queued!(); delivered.SetResult(); await pending;
         Assert.Equal(status, view.StatusTextForTests); Assert.False(view.LocalPanelVisibleForTests);
         Assert.False(view.ApplyButtonForTests.Enabled);
@@ -176,7 +176,7 @@ public sealed partial class ReviewedUpdatesTabTests
         var plan = Review(Target("demo")); var local = Local(plan) with { Message = "untrusted\u001b[31m text" };
         using var view = View([Target("demo")], (_, _, _) => Task.FromResult(Result(plan)), (_, _, _) => Task.FromResult(Result()),
             local: (_, _, _) => Task.FromResult(new LocalUpdateResponse(Review: local)));
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false); await view.LocalActionForTestsAsync(LocalUpdateAction.Review);
+        await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); await view.ReviewUpdateAsync(); await view.LocalActionForTestsAsync(LocalUpdateAction.Review);
         view.Frame = new System.Drawing.Rectangle(0, 0, width, height); view.Layout(new(width, height));
         static void Check(View parent)
         {
@@ -204,7 +204,7 @@ public sealed partial class ReviewedUpdatesTabTests
         var local = Local(plan) with { MetadataRefusals = Enumerable.Range(0, 70).Select(i => $"issue-{i:D2}-" + new string('x', 4000)).ToImmutableArray() };
         using var view = View([Target("demo")], (_, _, _) => Task.FromResult(Result(plan)), (_, _, _) => Task.FromResult(Result()),
             local: (_, _, _) => Task.FromResult(new LocalUpdateResponse(Review: local)));
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, false);
+        await view.LoadForSubjectAsync(OperationSubject.From(Target("demo"))); await view.ReviewUpdateAsync();
         await view.LocalActionForTestsAsync(LocalUpdateAction.Review);
         Assert.Contains("issue-31-", view.LocalDetailForTests); Assert.DoesNotContain("issue-32-", view.LocalDetailForTests);
         Assert.Contains("38; inspect the saved evidence", view.LocalDetailForTests);

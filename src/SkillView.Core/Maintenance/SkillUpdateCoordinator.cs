@@ -11,7 +11,7 @@ namespace SkillView.Maintenance;
 
 /// Low-level gh contract coordinator. Product callers use its dry-run path for
 /// availability only; saved candidate preparation/apply uses SavedUpdateCoordinator.
-public sealed class SkillUpdateCoordinator(
+public sealed partial class SkillUpdateCoordinator(
     GhSkillInstallService installer, GhSkillUpdateService updater,
     GhSkillListAdapter catalog, Logger logger, SkillView.Subprocess.ProcessRunner? sourceRunner = null)
 {

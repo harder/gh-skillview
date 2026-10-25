@@ -35,8 +35,7 @@ public sealed partial class ReviewedUpdatesTabTests
         var controls = view.SubViews.Where(child => child.Visible && child is Button or CheckBox).ToArray();
         foreach (var control in controls)
             Assert.DoesNotContain(controls, other => !ReferenceEquals(control, other) && control.Frame.IntersectsWith(other.Frame));
-        Assert.False(view.DryRunButtonForTests.Visible && view.ApplyButtonForTests.Visible);
-    }
+        }
 
     private static InstalledSkill Target(string name, string root = "/skills") => new()
     {
@@ -91,10 +90,8 @@ public sealed partial class ReviewedUpdatesTabTests
             prepare, () => "/gh", new Logger(), () => { }, changed ?? (() => { }), applyRunner: apply, localReviewRunner: local, unpinRunner: unpin, chooseTag: chooseTag,
             inspectUndoRunner: inspectUndo, undoRunner: undo);
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PreparingSelectionDoesNotApplyAndRequiresFreshRetentionApproval(bool markedShortcut)
+    [Fact]
+    public async Task PreparingSelectionDoesNotApplyAndRequiresFreshRetentionApproval()
     {
         var selected = Target("demo"); var unrelated = Target("demo", "/other");
         var calls = new List<string>(); var review = Review(selected);
@@ -106,11 +103,8 @@ public sealed partial class ReviewedUpdatesTabTests
         {
             Assert.Same(review, saved); calls.Add("apply"); return Task.FromResult(Result(saved with { Status = "installed" }, true));
         });
-        await view.LoadAsync();
-        view.AllBoxForTests.Value = CheckState.Checked;
-        view.MarkRowForTests(0);
-        if (markedShortcut) await view.RunForTestsAsync(false, true);
-        else view.UpdateCurrentRowForTests();
+        await view.LoadForSubjectAsync(OperationSubject.From(selected));
+        await view.ReviewUpdateAsync();
         Assert.Equal(new[] { "prepare" }, calls);
         Assert.False(view.ApplyButtonForTests.Enabled);
         await view.ApplyReviewForTestsAsync();
@@ -122,39 +116,12 @@ public sealed partial class ReviewedUpdatesTabTests
         Assert.Contains(new string('d', 40), preview); Assert.Contains(selected.ResolvedPath, preview);
         Assert.Contains("448 -> 493", preview);
         // Reload and current-row shortcuts cannot retarget an awaiting review.
-        view.SelectRowForTests(1); await view.LoadAsync(); view.UpdateCurrentRowForTests();
+        await view.LoadForSubjectAsync(OperationSubject.From(unrelated)); await view.ReviewUpdateAsync();
         Assert.Equal(preview, view.PreviewTextForTests);
         view.RetainBoxForTests.Value = CheckState.Checked;
         Assert.True(view.ApplyButtonForTests.Enabled);
         await view.ApplyReviewForTestsAsync();
         Assert.Equal(new[] { "prepare", "apply" }, calls);
-        Assert.False(view.ApplyButtonForTests.Enabled);
-    }
-
-    [Fact]
-    public async Task SiblingsPrepareOnlyAfterPriorApplyCompletesAndEachNeedsApproval()
-    {
-        var first = Target("first"); var second = Target("second");
-        var calls = new List<string>();
-        var applying = new TaskCompletionSource<UpdateResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var view = View([first, second], (_, options, _) =>
-        {
-            var target = Assert.Single(options.Targets!); calls.Add("prepare:" + target.Name);
-            return Task.FromResult(Result(Review(target)));
-        }, (saved, _, _) => { calls.Add("apply:" + saved.Subject.Name); return applying.Task; });
-        await view.LoadAsync(); view.AllBoxForTests.Value = CheckState.Checked;
-        await view.RunForTestsAsync(false, false);
-        Assert.Equal(new[] { "prepare:first" }, calls);
-        view.RetainBoxForTests.Value = CheckState.Checked;
-        var task = view.ApplyReviewForTestsAsync();
-        await view.NextReviewForTestsAsync();
-        Assert.Equal(new[] { "prepare:first", "apply:first" }, calls);
-        applying.SetResult(Result(Review(first) with { Status = "installed" }, true));
-        await task;
-        Assert.Equal(2, calls.Count);
-        await view.NextReviewForTestsAsync();
-        Assert.Equal(new[] { "prepare:first", "apply:first", "prepare:second" }, calls);
-        Assert.Equal(CheckState.UnChecked, view.RetainBoxForTests.Value);
         Assert.False(view.ApplyButtonForTests.Enabled);
     }
 
@@ -165,55 +132,14 @@ public sealed partial class ReviewedUpdatesTabTests
         var applying = new TaskCompletionSource<UpdateResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var view = View([target], (_, _, _) => Task.FromResult(Result(Review(target))),
             (_, _, _) => applying.Task, () => changed++);
-        await view.LoadAsync(); view.MarkRowForTests(0); await view.RunForTestsAsync(false, true);
+        await view.LoadForSubjectAsync(OperationSubject.From(target)); await view.ReviewUpdateAsync();
         view.RetainBoxForTests.Value = CheckState.Checked;
         var task = view.ApplyReviewForTestsAsync();
-        view.CancelPendingWork(); await view.LoadAsync(); var status = view.StatusTextForTests;
+        view.CancelPendingWork(); await view.LoadForSubjectAsync(OperationSubject.From(target)); var status = view.StatusTextForTests;
         applying.SetResult(Result(Review(target) with { Status = "needs-recovery", Canceled = true }, true));
         await task;
         Assert.Equal(1, changed); Assert.Equal(status, view.StatusTextForTests);
         Assert.False(view.ApplyButtonForTests.Enabled);
-    }
-
-    [Fact]
-    public async Task SkippingReviewPreservesPlanAndContinuesCapturedTargets()
-    {
-        var first = Target("first"); var second = Target("second"); var calls = new List<string>();
-        using var view = View([first, second], (_, options, _) =>
-        {
-            var target = Assert.Single(options.Targets!); calls.Add(target.Name);
-            return Task.FromResult(Result(Review(target)));
-        }, (_, _, _) => throw new InvalidOperationException("Skip must not apply"));
-        await view.LoadAsync(); view.MarkRowForTests(0); view.MarkRowForTests(1);
-        await view.RunForTestsAsync(false, true);
-        await view.NextReviewForTestsAsync();
-        Assert.Equal(new[] { "first", "second" }, calls);
-        Assert.Contains("Saved plan", view.PreviewTextForTests);
-        Assert.Contains("retained without applying", view.PreviewTextForTests);
-    }
-
-    [Fact]
-    public async Task AdvancingAfterInterruptedApplyRetainsEarlierRecoveryIdAndManifest()
-    {
-        var first = Target("first"); var second = Target("second"); var firstReview = Review(first);
-        using var view = View([first, second], (_, options, _) => Task.FromResult(Result(Review(Assert.Single(options.Targets!)))),
-            (saved, _, _) => Task.FromResult(Result(saved with { Status = "needs-recovery" }, true) with
-            {
-                Succeeded = false,
-                ExitCode = 2,
-                ErrorMessage = "Inspect saved recovery evidence",
-                Outcomes = [new(first.InstallationId, first.ResolvedPath, "recovery-required", null, null, [], 0, [],
-                    $"Saved plan {firstReview.Id}; manifest: {firstReview.PlanPath}")]
-            }));
-        await view.LoadAsync(); view.AllBoxForTests.Value = CheckState.Checked;
-        await view.RunForTestsAsync(false, false);
-        view.RetainBoxForTests.Value = CheckState.Checked; await view.ApplyReviewForTestsAsync();
-        await view.NextReviewForTestsAsync();
-        Assert.Contains("recovery-required", view.PreviewTextForTests);
-        Assert.Contains(firstReview.Id, view.PreviewTextForTests);
-        Assert.Contains(firstReview.PlanPath, view.PreviewTextForTests);
-        view.ToggleDetailsForTests();
-        Assert.Contains(Review(second).PlanPath, view.PreviewTextForTests);
     }
 
     [Fact]
@@ -230,41 +156,7 @@ public sealed partial class ReviewedUpdatesTabTests
         Assert.Contains("--allow-hidden-dirs", root.GetProperty("applyArguments").EnumerateArray().Select(value => value.GetString()));
     }
     [Fact]
-    public async Task PriorSuccessfulOutputAndNoticesSurviveNextPreparationFailure()
-    {
-        var first = Target("first"); var second = Target("second");
-        using var view = View([first, second], (_, options, _) =>
-        {
-            var target = Assert.Single(options.Targets!);
-            return Task.FromResult(target.Name == "first" ? Result(Review(target)) : Result() with
-            {
-                Succeeded = false,
-                ExitCode = 2,
-                ErrorMessage = "Second remote failed",
-                StdOut = "Second preparation output",
-                StdErr = "Second remote diagnostic",
-                Outcomes = [new(second.InstallationId, second.ResolvedPath, "refused", null, null, [], 0, [], "Second remote failed")]
-            });
-        }, (saved, _, _) => Task.FromResult(Result(saved with { Status = "installed" }, true) with
-        {
-            StdOut = "First update completed",
-            StdErr = "First update warning",
-            Notices = [new("warning", "First notice remains visible")],
-            Outcomes = [new(first.InstallationId, first.ResolvedPath, "changed", null, null, ["SKILL.md"], 1, [], "First payload verified")]
-        }));
-        await view.LoadAsync(); view.AllBoxForTests.Value = CheckState.Checked;
-        await view.RunForTestsAsync(false, false);
-        view.RetainBoxForTests.Value = CheckState.Checked;
-        await view.ApplyReviewForTestsAsync();
-        await view.NextReviewForTestsAsync();
-        view.ToggleDetailsForTests();
-        foreach (var text in new[] { "First update completed", "First update warning", "First notice remains visible",
-            "Second preparation output", "Second remote diagnostic", "First payload verified", "Second remote failed" })
-            Assert.Contains(text, view.PreviewTextForTests);
-    }
-
-    [Fact]
-    public async Task FreshReviewQueueDoesNotRetainPriorOutputOrApplyTarget()
+    public async Task FreshExactReviewDoesNotRetainPriorOutputOrApplyTarget()
     {
         var first = Target("first"); var second = Target("second");
         var applied = new List<string>();
@@ -277,13 +169,13 @@ public sealed partial class ReviewedUpdatesTabTests
             applied.Add(saved.Subject.Name);
             return Task.FromResult(Result(saved with { Status = "installed" }, true) with { StdOut = "applied " + saved.Subject.Name });
         });
-        await view.LoadAsync(); view.SelectRowForTests(0); view.UpdateCurrentRowForTests();
+        await view.LoadForSubjectAsync(OperationSubject.From(first)); await view.ReviewUpdateAsync();
         view.RetainBoxForTests.Value = CheckState.Checked;
         await view.ApplyReviewForTestsAsync();
         view.ToggleDetailsForTests();
         Assert.Contains("applied first", view.PreviewTextForTests);
-        await view.NextReviewForTestsAsync();
-        view.SelectRowForTests(1); view.UpdateCurrentRowForTests();
+        await view.LoadForSubjectAsync(OperationSubject.From(second));
+        await view.ReviewUpdateAsync();
         view.ToggleDetailsForTests();
         Assert.Contains("prepared second", view.PreviewTextForTests);
         Assert.DoesNotContain("prepared first", view.PreviewTextForTests);

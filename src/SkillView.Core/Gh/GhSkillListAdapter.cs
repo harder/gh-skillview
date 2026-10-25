@@ -102,7 +102,12 @@ public sealed class GhSkillListAdapter
 
     internal long Generation => _cache.Generation;
 
-    public void Invalidate() => _cache.Invalidate();
+    internal event Action? Invalidated;
+    public void Invalidate()
+    {
+        _cache.Invalidate();
+        Invalidated?.Invoke();
+    }
 
     /// Parses a JSON payload into `GhSkillListRecord`s. Accepts either a top-
     /// level array or a top-level object with a records array under one of

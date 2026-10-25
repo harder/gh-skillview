@@ -114,11 +114,11 @@ public sealed partial class SkillViewApp
                 new StatusHint("Ctrl+Q", "Quit"),
             ],
             SkillViewTab.Installed => [
+                new StatusHint("C", "Check updates"),
+                new StatusHint("u", "Review"),
                 new StatusHint("f", "Filter"),
-                new StatusHint("s", "Sort"),
-                new StatusHint("P", "Pins"),
-                new StatusHint("G", "Scope"),
                 new StatusHint("x", "Remove"),
+                new StatusHint("r", "Refresh"),
                 new StatusHint("?", "Help"),
                 new StatusHint("Ctrl+Q", "Quit"),
             ],
@@ -128,7 +128,7 @@ public sealed partial class SkillViewApp
                 new StatusHint("c", "Cleanup"),
                 new StatusHint("d", "Doctor"),
                 new StatusHint("?", "Help"),
-                new StatusHint("u", "Updates"),
+                new StatusHint("C", "Check updates"),
                 new StatusHint("Ctrl+Q", "Quit"),
             ],
             _ => [

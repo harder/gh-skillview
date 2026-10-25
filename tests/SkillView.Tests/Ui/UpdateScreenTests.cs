@@ -48,7 +48,7 @@ public sealed class UpdateScreenTests
     {
         var result = UpdateResult.Failure(false, 2, "", []) with
         { Succeeded = succeeded, ExitCode = succeeded ? 0 : 2, ErrorMessage = succeeded ? null : "Native transition refused" };
-        var body = UpdateScreen.RenderResult(result, false, false, ["demo"], localReimport: true);
+        var body = UpdateScreen.RenderResult(result, "demo", localReimport: true);
         Assert.Equal(succeeded, body.Contains("Completed with no output", StringComparison.Ordinal));
         if (!succeeded)
         {
@@ -62,7 +62,7 @@ public sealed class UpdateScreenTests
     {
         var result = new UpdateResult
         {
-            DryRun = true,
+            DryRun = false,
             Succeeded = true,
             ExitCode = 0,
             StdOut = "updated",
@@ -74,54 +74,9 @@ public sealed class UpdateScreenTests
 
         var body = UpdateScreen.RenderResult(
             result,
-            dryRun: true,
-            allChecked: false,
-            skills: ["skill`name|beta\nstable"]);
+            skillName: "skill`name|beta\nstable");
 
         Assert.Contains("**Scope:** `` skill`name\\|beta stable ``", body);
-    }
-
-    [Fact]
-    public void RenderResult_RendersParsedDryRunEntriesAsMarkdownTable()
-    {
-        var result = new UpdateResult
-        {
-            DryRun = true,
-            Succeeded = true,
-            ExitCode = 0,
-            StdOut = """
-                demo: up-to-date
-                skill`name|beta v1.0.0 -> v1.1.0
-                """,
-            StdErr = string.Empty,
-            ErrorMessage = string.Empty,
-            CommandLine = [],
-            Entries =
-            [
-                new UpdateEntry
-                {
-                    Name = "demo",
-                    Status = "up-to-date",
-                },
-                new UpdateEntry
-                {
-                    Name = "skill`name|beta",
-                    Status = "updated",
-                    FromVersion = "v1.0.0",
-                    ToVersion = "v1.1.0",
-                },
-            ],
-        };
-
-        var body = UpdateScreen.RenderResult(
-            result,
-            dryRun: true,
-            allChecked: false,
-            skills: ["demo", "skill`name|beta"]);
-
-        Assert.Contains("| Skill | Status | Change |", body);
-        Assert.Contains("| `demo` | up-to-date | — |", body);
-        Assert.Contains("| `` skill`name\\|beta `` | updated | `v1.0.0 -> v1.1.0` |", body);
     }
 
     [Fact]
@@ -129,7 +84,7 @@ public sealed class UpdateScreenTests
     {
         var result = new UpdateResult
         {
-            DryRun = true,
+            DryRun = false,
             Succeeded = true,
             ExitCode = 0,
             StdOut = """
@@ -146,9 +101,7 @@ public sealed class UpdateScreenTests
 
         var body = UpdateScreen.RenderResult(
             result,
-            dryRun: true,
-            allChecked: false,
-            skills: ["demo"]);
+            skillName: "demo");
 
         Assert.Contains("````", body);
         Assert.Contains("```", body);
