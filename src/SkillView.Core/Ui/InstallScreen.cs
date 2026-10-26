@@ -16,7 +16,7 @@ namespace SkillView.Ui;
 /// skill name within the repo. `InstallScreen` picks the rest of the flags
 /// interactively, but the parent screen can seed obvious toggles such as
 /// hidden-dir access.
-public sealed record InstallRequest(string Repo, string? SkillName, bool AllowHiddenDirs = false);
+public sealed record InstallRequest(string Repo, string? SkillName, bool AllowHiddenDirs = false, string? SourcePath = null);
 
 /// Phase 4 install dialog. Consumes an `InstallRequest` (repo + skill) and
 /// runs `gh skill install` with the flags the user has chosen. SkillView

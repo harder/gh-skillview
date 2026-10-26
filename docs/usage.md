@@ -46,8 +46,27 @@ Escape cancels, including while an install is running.
 Agent checkboxes select gh's installation folders. With none checked,
 **Universal** installs into the shared `.agents/skills` folder under the
 displayed base. **Custom path** requires an explicit folder and overrides
-the scope and agent folders. After installation, open **Installed** (`2`)
-to find the resulting copy and inspect its locations.
+the scope and agent folders.
+
+After a named Discover install succeeds, the review says **Install completed**.
+Choose **View installed skill** to find it with a fresh scan. A verified single
+copy opens its Installed detail when the selected agents each have one known
+folder. Multiple copies open their source group so you can choose a copy.
+Some agents have more than one possible folder, including Codex at User scope
+and Claude or Pi with a custom configuration folder. These open the source group
+even for one verified copy and say **Showing verified copies of this skill;
+choose a copy to review it.** This does not identify which folder gh just wrote.
+Every selected agent must have a verified copy in one of its folders. **Back to Discover** or Escape keeps your search and
+results. Closing this completed review does not cancel the successful install.
+
+Installed keeps its filters when they show the result. Otherwise it clears those
+filters and says **Adjusted Installed filters to show this result.** When browsing
+possible agent folders, the choose-copy notice follows that adjustment notice.
+Sort and Discover search state stay as they were. If the source, folder or scan coverage
+cannot be verified, the completed review explains why and stays open. Automatic
+navigation covers named remote skills at User or Project scope; custom folders,
+install-all and advanced flows retain their existing paths. A custom folder
+outside the current scan needs an explicit scan root to appear in Installed.
 
 The same operations are available from the CLI; see [CLI usage](#cli-usage).
 

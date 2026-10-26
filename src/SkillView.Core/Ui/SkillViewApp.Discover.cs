@@ -457,12 +457,16 @@ public sealed partial class SkillViewApp
             SetStatus("no repo on selected row");
             return;
         }
+        var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
         _workflows.OpenInstallDialog(
             new InstallRequest(
                 Repo: pick.Repo,
                 SkillName: pick.SkillName,
-                AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)),
-            forceAdvanced: forceAdvanced);
+                AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled),
+                SourcePath: pick.Path),
+            forceAdvanced: forceAdvanced,
+            revealInstalled: RevealInstalledInstall,
+            isOwnerActive: () => _mainWindow is { IsRunning: true, StopRequested: false } && IsDiscoverWorkspaceActive(discoverGeneration) && !GetRunLifetimeToken().IsCancellationRequested);
     }
 
     /// Discover the skills in the selected result's repo and open the picker

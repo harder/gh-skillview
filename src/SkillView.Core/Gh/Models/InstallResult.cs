@@ -6,6 +6,10 @@ namespace SkillView.Gh.Models;
 /// gh 2.94.0).
 public sealed record InstallResult
 {
+    // Transient navigation observation only; excluded from every wire format.
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal InstallNavigationEvidence? Navigation { get; init; }
+
     public required string Repo { get; init; }
     public required string? SkillName { get; init; }
     public required string? Version { get; init; }

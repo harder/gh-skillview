@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using SkillView.Gh;
 using SkillView.Inventory;
+using SkillView.Inventory.Models;
 using SkillView.Logging;
 using SkillView.Subprocess;
 using SkillView.Ui;
@@ -32,6 +33,7 @@ public sealed class CompactInstallDialogTests
         var interacted = false;
         var result = await RunModal(fixture, width, height, all, (app, dialog) =>
         {
+            Assert.Equal(18, dialog.Frame.Height);
             var selector = dialog.SubViews.OfType<OptionSelector>().Single();
             var buttons = dialog.SubViews.OfType<Button>().Where(b => b.Visible).ToArray();
             var install = buttons.Single(b => b.Text == "Install");
@@ -464,6 +466,158 @@ public sealed class CompactInstallDialogTests
         Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(80, 24, false, false)]
+    [InlineData(120, 36, false, true)]
+    [InlineData(80, 24, true, false)]
+    [InlineData(120, 36, true, true)]
+    public async Task CompletedResultHasVisiblePrimaryAndBackOrEscapePreservesSuccess(int width, int height, bool seeded, bool escape)
+    {
+        using var fixture = new Fixture(seeded);
+        var checkedResult = false;
+        var result = await RunModal(fixture, width, height, false,
+            (app, _) => app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)), completed: (app, dialog) =>
+            {
+                checkedResult = true;
+                var buttons = dialog.SubViews.OfType<Button>().Where(button => button.Visible).ToArray();
+                Assert.Equal(["View installed skill", "Back to Discover"], buttons.Select(button => button.Text).ToArray());
+                Assert.True(buttons[0].HasFocus);
+                Assert.InRange(dialog.Frame.Height, 8, 10);
+                Assert.InRange(Math.Abs(dialog.Frame.Top - (height - dialog.Frame.Height) / 2), 0, 1);
+                var labels = dialog.SubViews.OfType<Label>().Where(label => label.Visible).ToArray();
+                Assert.Contains(labels, label => label.Text == "Repo:  fixture/tools · demo");
+                Assert.Contains(labels, label => label.Text == (seeded ? "Selected scope: Project" : "Selected scope: User"));
+                Assert.All(labels, label => AssertFits(label, dialog));
+                Assert.All(buttons, button => AssertFits(button, dialog));
+                Assert.True(buttons[0].Frame.Right < buttons[1].Frame.Left);
+                Assert.Contains(dialog.SubViews.OfType<Label>(), label => label.Visible && label.Text.Contains("Install completed", StringComparison.Ordinal));
+                if (escape) app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                else buttons[1].InvokeCommand(Command.Accept);
+            });
+        Assert.True(checkedResult);
+        Assert.Equal(InstallConfirmModal.Outcome.Installed, result.Outcome);
+        Assert.True(result.Install!.Succeeded);
+        Assert.Null(result.Handoff);
+        Assert.Equal("skills/demo", result.Install.Navigation!.Source.Subpath);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task PendingAndQueuedNavigationCannotPublishAfterBack(bool queueCompletion, bool shutdown)
+    {
+        using var fixture = new Fixture(false);
+        var capture = new TaskCompletionSource<InstalledInstallHandoff>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callbacks = new ConcurrentQueue<Action>();
+        var captures = 0;
+        var publishing = 0;
+        var started = false;
+        var submitted = false;
+        var result = await RunModal(fixture, 80, 24, false,
+            (app, dialog) => app.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
+            {
+                if (started) return false;
+                while (callbacks.TryDequeue(out var callback)) callback();
+                if (!submitted && dialog.SubViews.OfType<OptionSelector>().Single().Enabled)
+                {
+                    submitted = true;
+                    app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+                }
+                return true;
+            }), waitForPreparation: false, invokeForTests: callbacks.Enqueue,
+            completed: (app, dialog) =>
+            {
+                started = true;
+                var primary = dialog.SubViews.OfType<Button>().Single(button => button.Text == "View installed skill");
+                primary.InvokeCommand(Command.Accept);
+                primary.InvokeCommand(Command.Accept);
+                app.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
+                {
+                    if (captures == 0) return true;
+                    if (queueCompletion && callbacks.IsEmpty) return true;
+                    if (shutdown) app.RequestStop();
+                    else dialog.SubViews.OfType<Button>().Single(button => button.Text == "Back to Discover").InvokeCommand(Command.Accept);
+                    // A queued callback may still be delivered after closure admission.
+                    while (callbacks.TryDequeue(out var callback)) callback();
+                    capture.TrySetResult(new(InventorySnapshot.Empty, InstalledOverview.Empty, "none", []));
+                    return false;
+                });
+            },
+            findInstalled: (_, _) =>
+            {
+                Interlocked.Increment(ref captures);
+                if (queueCompletion) capture.TrySetResult(new(InventorySnapshot.Empty, InstalledOverview.Empty, "none", []));
+                return capture.Task;
+            }, canPublish: _ => { publishing++; return true; });
+        Assert.True(started);
+        Assert.Equal(1, captures);
+        Assert.Equal(0, publishing);
+        Assert.Equal(InstallConfirmModal.Outcome.Installed, result.Outcome);
+        Assert.Null(result.Handoff);
+    }
+
+    [Fact]
+    public async Task FailedInstallHasNoCompletedAction()
+    {
+        using var fixture = new Fixture(false);
+        var checkedFailure = false;
+        var result = await RunModal(fixture, 80, 24, false, (app, dialog) =>
+        {
+            app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+            app.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
+            {
+                if (!dialog.SubViews.OfType<Label>().Any(label => label.Text.Contains("install failed", StringComparison.Ordinal))) return true;
+                checkedFailure = true;
+                Assert.DoesNotContain(dialog.SubViews.OfType<Button>(), button => button.Text == "View installed skill");
+                Assert.DoesNotContain("Install completed", dialog.Title);
+                dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel").InvokeCommand(Command.Accept);
+                return false;
+            });
+        }, ghPath: "/bin/false");
+        Assert.True(checkedFailure);
+        Assert.False(result.Install!.Succeeded);
+        Assert.Null(result.Handoff);
+    }
+
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 36)]
+    public async Task StaleQueuedCaptureStaysInCompletedResultWithoutNavigation(int width, int height)
+    {
+        using var fixture = new Fixture(false);
+        var captures = 0;
+        var checkedRefusal = false;
+        var result = await RunModal(fixture, width, height, false,
+            (app, _) => app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter)),
+            completed: (app, dialog) =>
+            {
+                dialog.SubViews.OfType<Button>().Single(button => button.Text == "View installed skill").InvokeCommand(Command.Accept);
+                app.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
+                {
+                    if (!dialog.SubViews.OfType<Label>().Any(label => label.Text.Contains("context changed", StringComparison.Ordinal))) return true;
+                    checkedRefusal = true;
+                    Assert.InRange(dialog.Frame.Height, 8, 10);
+                    var labels = dialog.SubViews.OfType<Label>().Where(label => label.Visible).ToArray();
+                    Assert.Contains(labels, label => label.Text == "Repo:  fixture/tools · demo");
+                    Assert.Contains(labels, label => label.Text == "Selected scope: User");
+                    Assert.All(labels, label => AssertFits(label, dialog));
+                    Assert.All(dialog.SubViews.OfType<Button>().Where(button => button.Visible), button => AssertFits(button, dialog));
+                    Assert.Contains(dialog.SubViews.OfType<Label>(), label => label.Text.Contains("Install completed; the exact installed copy could not be verified.", StringComparison.Ordinal));
+                    app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                    return false;
+                });
+            }, findInstalled: (_, _) =>
+            {
+                captures++;
+                return Task.FromResult(new InstalledInstallHandoff(InventorySnapshot.Empty, InstalledOverview.Empty, "unused", []));
+            }, canPublish: _ => false);
+        Assert.True(checkedRefusal);
+        Assert.Equal(1, captures);
+        Assert.Equal(InstallConfirmModal.Outcome.Installed, result.Outcome);
+        Assert.Null(result.Handoff);
+    }
+
     private static async Task<InstallConfirmModal.Result> RunQueuedPreparation(Fixture fixture, int width, int height,
         Action<IApplication, Dialog, ModalOperationTracker, Action> interact)
     {
@@ -488,7 +642,10 @@ public sealed class CompactInstallDialogTests
 
     private static async Task<InstallConfirmModal.Result> RunModal(Fixture fixture, int width, int height, bool all,
         Action<IApplication, Dialog> interact, string ghPath = "/bin/echo", bool waitForPreparation = true,
-        Action<Action>? invokeForTests = null, Action<Dialog, ModalOperationTracker>? readyForTests = null)
+        Action<Action>? invokeForTests = null, Action<Dialog, ModalOperationTracker>? readyForTests = null,
+        Action<IApplication, Dialog>? completed = null,
+        Func<InstallNavigationEvidence, CancellationToken, Task<InstalledInstallHandoff>>? findInstalled = null,
+        Func<InstalledInstallHandoff, bool>? canPublish = null)
     {
         return await Task.Run(() =>
         {
@@ -511,8 +668,16 @@ public sealed class CompactInstallDialogTests
                 interact(app, dialog);
                 return false;
             });
+            app.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
+            {
+                // Completion changes dimensions; observe the normal app reflow first.
+                if (dialog?.Title != " Install completed " || dialog.NeedsLayout) return true;
+                if (completed is not null) completed(app, dialog);
+                else dialog.SubViews.OfType<Button>().Single(button => button.Text == "Back to Discover").InvokeCommand(Command.Accept);
+                return false;
+            });
             var result = new InstallConfirmModal(app, new GhSkillInstallService(fixture.Runner, fixture.Logger), fixture.Logger,
-                ghPath, new InstallRequest("fixture/tools", "demo"), all).Show((value, operation) =>
+                ghPath, new InstallRequest("fixture/tools", "demo", SourcePath: "skills/demo/SKILL.md"), all, findInstalled, canPublish).Show((value, operation) =>
                 {
                     dialog = value;
                     readyForTests?.Invoke(value, operation);

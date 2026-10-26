@@ -346,6 +346,36 @@ internal sealed class InstalledTabView : FrameView
         Populate(snapshot, overview ?? InstalledOverview.Build(snapshot, _lifetimeToken));
     }
 
+    internal bool RevealInstall(InstalledInstallHandoff handoff)
+    {
+        if (_disposed || _lifetimeToken.IsCancellationRequested) return false;
+        var group = handoff.Overview.Groups.SingleOrDefault(group => group.Key == handoff.GroupKey);
+        var copies = group?.Copies.Where(copy => handoff.CopyKeys.Contains(copy.Key, StringComparer.Ordinal)).ToArray();
+        if (group is null || copies is null || copies.Length != handoff.CopyKeys.Count || copies.Length == 0
+            || copies.Any(copy => copy.Ambiguous)) return false;
+        LoadSeeded(handoff.Snapshot, handoff.Overview);
+        // Evaluate every verified copy against the full fresh projection first.
+        // Clearing is the same single state transition as ordinary Clear filters.
+        var adjusted = copies.Any(copy => !Matches(copy.Target!));
+        if (adjusted) ClearFilters();
+        _coverageOpen = false;
+        _detailOpen = copies.Length == 1 && !handoff.BrowseOnly;
+        _expanded.Add(group.Key);
+        _selectedKey = _detailOpen ? copies[0].Key : group.Key;
+        _topRowKey = _selectedKey;
+        _topRowHidden = false;
+        RefreshAll();
+        // Bounded row projections may omit a late group. Never select a peer.
+        if (FindRow(_selectedKey) < 0) { _detailOpen = false; RefreshSelectedDetail(); return false; }
+        _table.RowOffset = FindRow(_selectedKey);
+        if (handoff.BrowseOnly) _idleStatusMessage = (adjusted ? "Adjusted Installed filters to show this result. " : "")
+                + "Showing verified copies of this skill; choose a copy to review it.";
+        else if (adjusted) _idleStatusMessage = "Adjusted Installed filters to show this result.";
+        RefreshOperationStatus();
+        if (_detailOpen) OpenSelectedDetail(); else FocusList();
+        return true;
+    }
+
     private void Populate(InventorySnapshot snapshot, InstalledOverview overview)
     {
         _snapshot = snapshot;

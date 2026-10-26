@@ -12,6 +12,7 @@ namespace SkillView.Ui;
 internal sealed partial class SkillViewWorkflowCoordinator
 {
     private readonly DisplayInventoryCache _displayInventory;
+    private long _installHandoffGeneration;
     private readonly TuiServices _services;
     private readonly AppOptions _options;
     private readonly Func<IApplication?> _getApp;
@@ -73,7 +74,8 @@ internal sealed partial class SkillViewWorkflowCoordinator
     /// If the user picks "Advanced…" (or `forceAdvanced: true` is requested by
     /// the caller for the `I` shortcut), escalates to the full multi-step
     /// <see cref="InstallScreen"/> wizard.
-    public void OpenInstallDialog(InstallRequest request, bool forceAdvanced = false)
+    public void OpenInstallDialog(InstallRequest request, bool forceAdvanced = false,
+        Action<InstalledInstallHandoff>? revealInstalled = null, Func<bool>? isOwnerActive = null)
     {
         var app = _getApp();
         var ghPath = _getGhPath();
@@ -94,16 +96,20 @@ internal sealed partial class SkillViewWorkflowCoordinator
                 _services.InstallService,
                 _services.Logger,
                 ghPath,
-                request);
+                request,
+                findInstalled: (evidence, token) => CaptureInstallHandoffAsync(evidence, report, token),
+                canPublish: found => IsInstallHandoffCurrent(found) && isOwnerActive?.Invoke() == true);
             var compactResult = compact.Show();
             switch (compactResult.Outcome)
             {
-                case InstallConfirmModal.Outcome.Installed when compactResult.Install is { Succeeded: true } r:
+                case InstallConfirmModal.Outcome.Installed when compactResult.Install is { Succeeded: true }:
+                    if (compactResult.Handoff is { } handoff && IsInstallHandoffCurrent(handoff) && isOwnerActive?.Invoke() == true)
+                    {
+                        revealInstalled?.Invoke(handoff);
+                        return;
+                    }
                     _services.ListAdapter.Invalidate();
-                    _setStatusWithLevel(
-                        $"installed {r.Repo}{(r.SkillName is null ? "" : "/" + r.SkillName)} — rescanning…",
-                        TuiHelpers.NotificationLevel.Success);
-                    QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
+                    _setStatusWithLevel("Install completed", TuiHelpers.NotificationLevel.Success);
                     return;
                 case InstallConfirmModal.Outcome.Failed when compactResult.Install is { } f:
                     _setStatusWithLevel(
@@ -141,6 +147,66 @@ internal sealed partial class SkillViewWorkflowCoordinator
         }
     }
 
+
+    internal async Task<InstalledInstallHandoff> CaptureInstallHandoffAsync(
+        SkillView.Gh.InstallNavigationEvidence evidence, EnvironmentReport report, CancellationToken token)
+    {
+        var request = Interlocked.Increment(ref _installHandoffGeneration);
+        _services.ListAdapter.Invalidate();
+        var generation = _services.ListAdapter.Generation;
+        async Task<IReadOnlyList<IReadOnlyList<string>>> CheckContextAsync()
+        {
+            token.ThrowIfCancellationRequested();
+            var context = _services.Runner.WithContext(_services.Runner.EffectiveWorkingDirectory, new Dictionary<string, string>());
+            if (evidence.ContextKey != SkillView.Gh.InstallNavigationEvidence.Context(context))
+                throw new IOException("The installation context changed; refresh Installed before choosing a copy.");
+            var roots = await SkillView.Gh.GhPlacementCatalog.DestinationsAsync(
+                new(Agents: evidence.Agents, Scope: evidence.Scope, WorkingDirectory: context.EffectiveWorkingDirectory),
+                context, token).ConfigureAwait(false);
+            if (!roots.SequenceEqual(evidence.Roots, StringComparer.Ordinal))
+                throw new IOException("The project or installation folders changed; refresh Installed before choosing a copy.");
+            var folders = await CaptureInstallAgentFoldersAsync(evidence, context, token).ConfigureAwait(false);
+            if (evidence.ContextKey != SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner))
+                throw new IOException("The installation context changed; refresh Installed before choosing a copy.");
+            return folders;
+        }
+        var agentFolders = await CheckContextAsync().ConfigureAwait(false);
+        var snapshot = await CaptureInventoryAsync(report, token, bypassGhCache: true).ConfigureAwait(false);
+        var overview = await Task.Run(() => InstalledOverview.Build(snapshot, token), token).ConfigureAwait(false);
+        var latestFolders = await CheckContextAsync().ConfigureAwait(false);
+        if (agentFolders.Count != latestFolders.Count || agentFolders.Zip(latestFolders).Any(pair =>
+            !pair.First.Select(PathIdentity.NormalizeKey).ToHashSet(StringComparer.Ordinal).SetEquals(pair.Second.Select(PathIdentity.NormalizeKey))))
+            throw new IOException("The requested installation folders changed; refresh Installed before choosing a copy.");
+        var handoff = await Task.Run(() => InstalledInstallHandoffResolver.Resolve(evidence, snapshot, overview, token, agentFolders), token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        return handoff with { CatalogGeneration = generation, RequestGeneration = request };
+    }
+
+    // Post-install navigation only. Keep these catalog lookups out of the
+    // install service's final-admission-to-launch interval.
+    internal static async Task<IReadOnlyList<IReadOnlyList<string>>> CaptureInstallAgentFoldersAsync(
+        SkillView.Gh.InstallNavigationEvidence evidence, SkillView.Subprocess.ProcessRunner context, CancellationToken token)
+    {
+        var folders = new List<IReadOnlyList<string>>();
+        IEnumerable<IReadOnlyList<string>> selections = evidence.Agents.Count == 0 ? [evidence.Agents]
+            : evidence.Agents.Select(agent => (IReadOnlyList<string>)[agent]);
+        foreach (var selection in selections)
+        {
+            token.ThrowIfCancellationRequested();
+            folders.Add(await SkillView.Gh.GhPlacementCatalog.DestinationsAsync(
+                new(Agents: selection, Scope: evidence.Scope, WorkingDirectory: context.EffectiveWorkingDirectory), context, token).ConfigureAwait(false));
+        }
+        var union = folders.SelectMany(set => set).Select(PathIdentity.NormalizeKey).ToHashSet(StringComparer.Ordinal);
+        if (folders.Count == 0 || folders.Any(set => set.Count == 0)
+            || !union.SetEquals(evidence.Roots.Select(PathIdentity.NormalizeKey)))
+            throw new IOException("The requested installation folders do not match the captured placement; refresh Installed.");
+        return folders;
+    }
+
+    internal bool IsInstallHandoffCurrent(InstalledInstallHandoff handoff) =>
+        handoff.CatalogGeneration == _services.ListAdapter.Generation
+        && handoff.RequestGeneration == Interlocked.Read(ref _installHandoffGeneration)
+        && handoff.Evidence?.ContextKey == SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner);
 
     /// Open the "install every skill in a repo" flow (gh 2.94 `--all`,
     /// cli/cli#13471). Reuses the compact modal's scope/agent pickers in

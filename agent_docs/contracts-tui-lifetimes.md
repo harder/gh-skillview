@@ -306,3 +306,37 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   generation once per view refresh and reuses that pair for every row, choice,
   count and status in that refresh. No new event bus/cache/classifier owns this
   handoff. Restore selector focus only while its view lifetime is still active.
+
+- Compact named-install success stays in the same dialog as an operation result:
+  Install completed, View installed skill, Back to Discover. Back/Esc/close,
+  including during pending navigation, preserve success and reject late capture
+  publication. Completed results cannot submit another install. The coordinator
+  captures fresh inventory once, bypassing both display and gh caches, and builds
+  the projection off-thread. Queued publication checks modal request ownership,
+  app/Discover lifetime, catalog generation and captured context. Seed Installed
+  without an activation load; publish the same snapshot through the existing
+  CaptureInventoryAsync/DisplayInventoryCache path so subsequent display/Issues
+  requests share that capture reference at the catalog generation. Preserve
+  newer-snapshot ordering; the reuse TTL is not freshness or mutation permission.
+  Return to Discover without rerunning search.
+  Match the explicit source against the full snapshot and admitted placement,
+  covered targets and stable native observations before applying filters. One
+  verified physical copy opens exact detail when every agent has one folder;
+  multiple copies select their source group without copy action focus. When an
+  agent has alternative folders, each requested agent needs at least one verified
+  copy in its own folder set; a single-folder agent still needs that folder.
+  Missing agent locations refuse with “Not all requested locations were verified.”
+  Require positive scan/gh coverage for displayed copies, without requiring a
+  copy or coverage in empty alternatives. Preserve complete/nonpartial inventory,
+  ownership, source/subpath, unique group and stable native identity checks for
+  all displayed children. Alternatives always select/expand the group, even for
+  one copy, with no copy detail/action focus and the notice “Showing verified
+  copies of this skill; choose a copy to review it.” Never attribute a copy to the
+  just-completed write. Unknown/conflicted/partial/omitted evidence
+  stays in the completed result with a specific explanation, without peer fallback.
+  Preserve all Installed restrictions if every verified copy matches; otherwise
+  clear them together using ordinary ClearFilters and show “Adjusted Installed
+  filters to show this result.” Alternative-folder browsing preserves that notice
+  and appends its choose-copy notice when filters were adjusted. Preserve sort and
+  Discover state. If seeded reveal is rejected, use one ordinary owned Installed
+  load/focus; successful reveal never reloads.
