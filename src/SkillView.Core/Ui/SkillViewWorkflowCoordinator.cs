@@ -454,19 +454,59 @@ internal sealed partial class SkillViewWorkflowCoordinator
         return _displayInventory.GetAsync(cancellationToken);
     }
 
-    internal void ShowPackageCheck(InstalledSkill selected, CancellationToken lifetimeToken)
+    private PackageCheckFact? _lastPackageCheck;
+
+    internal PackageCheckFact? CurrentPackageCheck
     {
-        if (_getApp() is not { } app) return;
-        PackageCheckScreen.Show(app, _services.Logger, selected, async token =>
+        get
         {
-            var inventory = await _services.InventoryService.CaptureAsync(null,
-                new(_options.ScanRoots, true, WorkspaceDirectories: _options.WorkspaceDirectories,
-                    Profiles: _options.Profiles), token).ConfigureAwait(false);
-            var matches = inventory.Skills.Where(skill => skill.InstallationId == selected.InstallationId
-                && PathIdentity.Equals(skill.ResolvedPath, selected.ResolvedPath)).Take(2).ToArray();
-            if (matches.Length != 1) throw new IOException("The selected installation changed; refresh Installed before checking it.");
-            return await new SkillView.PackageChecking.StaticPackageChecker().CheckAsync(matches[0], token).ConfigureAwait(false);
-        }, lifetimeToken);
+            var fact = _lastPackageCheck;
+            return fact is not null && PackageRequestIsCurrent(fact.Request) ? fact : null;
+        }
+    }
+
+    internal bool PackageRequestIsCurrent(PackageCheckRequest request) => request.HasExactSubject
+        && request.Context == SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner)
+        && _displayInventory.CacheIsCurrent(request.Snapshot, request.Generation);
+
+    internal PackageCheckRequest CreatePackageCheckRequest(InventorySnapshot snapshot, string id, InstalledSkill selected) =>
+        new(snapshot, selected, _services.ListAdapter.Generation, SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner), id);
+
+    internal bool PublishPackageCheck(PackageCheckFact fact, InventorySnapshot? displayed)
+    {
+        if (!ReferenceEquals(displayed, fact.Request.Snapshot) || !PackageRequestIsCurrent(fact.Request)) return false;
+        _lastPackageCheck = fact;
+        return true;
+    }
+
+    internal bool CompletePackageCheck(PackageCheckResult result, InventorySnapshot? displayed)
+    {
+        // A final native mismatch or metadata-only fallback supersedes earlier
+        // evidence too. Never keep the old positive after observing that refusal.
+        _lastPackageCheck = null;
+        return result.Fact is { } fact && PublishPackageCheck(fact, displayed);
+    }
+
+    internal void ShowPackageCheck(InventorySnapshot snapshot, string id, InstalledSkill selected,
+        Func<InventorySnapshot?> displayedSnapshot, CancellationToken lifetimeToken)
+    {
+        if (_getApp() is not { } app || lifetimeToken.IsCancellationRequested) return;
+        var request = CreatePackageCheckRequest(snapshot, id, selected);
+        if (!request.HasExactAddress || request.Context != SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner)
+            || !_displayInventory.CacheIsCurrent(snapshot, request.Generation))
+        {
+            _setStatus("Refresh Installed before checking this exact copy; its inventory or native observation is unavailable or changed.");
+            return;
+        }
+        PackageCheckScreen.ShowBound(app, _services.Logger, selected, token => request.CaptureAsync(token), lifetimeToken,
+            publish: result => ReferenceEquals(app, _getApp()) && !lifetimeToken.IsCancellationRequested
+                && CompletePackageCheck(result, displayedSnapshot()));
+    }
+
+    internal void ShowRetainedPackageCheck(PackageCheckFact fact, CancellationToken lifetimeToken)
+    {
+        if (_getApp() is { } app && ReferenceEquals(fact, CurrentPackageCheck))
+            PackageCheckScreen.ShowRetained(app, fact, lifetimeToken);
     }
 
     internal void ShowLocalReimport(InstalledSkill selected, CancellationToken lifetimeToken)

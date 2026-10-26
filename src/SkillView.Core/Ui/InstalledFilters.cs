@@ -108,7 +108,7 @@ internal sealed class InstalledFilters
     }
 
     internal bool Matches(InstalledSkill skill, InstalledFilterSelection selection, Scope? scope,
-        InstalledIssueEvidence? issues, long generation)
+        InstalledIssueEvidence? issues, long generation, PackageCheckFact? package = null)
     {
         if (!_facts.TryGetValue(skill, out var facts)) return false;
         // G alone preserves the CLI/legacy physical-scope OR exposure-scope
@@ -118,24 +118,25 @@ internal sealed class InstalledFilters
                 || facts.Memberships.Any(m => (selection.Agent is null || m.Agent == selection.Agent)
                     && (selection.Location is null || m.Location == selection.Location) && (scope is null || m.Scope == scope)))
             && (selection.Source is null || facts.Sources.Contains(selection.Source, StringComparer.Ordinal))
-            && MatchesIssue(facts, selection.Issue, issues, generation);
+            && MatchesIssue(facts, selection.Issue, issues, generation, package);
     }
 
-    private bool MatchesIssue(Facts facts, string? issue, InstalledIssueEvidence? evidence, long generation)
+    private bool MatchesIssue(Facts facts, string? issue, InstalledIssueEvidence? evidence, long generation, PackageCheckFact? package)
     {
         if (issue is null) return true;
         var current = evidence?.IsCurrent(Snapshot, generation) == true;
         var findings = current && evidence!.Findings.TryGetValue((facts.Id, facts.Path), out var found) ? found : [];
+        var check = package?.Matches(Snapshot, generation, facts.Id, facts.Path) == true ? package : null;
         return issue switch
         {
-            "unknown" => !current || evidence!.Partial,
-            "none-observed" => current && !evidence!.Partial && findings.Length == 0,
-            "any-finding" => findings.Length > 0,
+            "unknown" => !current || evidence!.Partial || check?.Incomplete == true,
+            "none-observed" => current && !evidence!.Partial && findings.Length == 0 && check?.HasFindings != true && check?.Incomplete != true,
+            "any-finding" => findings.Length > 0 || check?.HasFindings == true,
             _ => findings.Contains(issue, StringComparer.Ordinal),
         };
     }
 
-    internal IReadOnlyList<InstalledFilterChoice> IssueChoices(InstalledIssueEvidence? issues, long generation)
+    internal IReadOnlyList<InstalledFilterChoice> IssueChoices(InstalledIssueEvidence? issues, long generation, PackageCheckFact? package = null)
     {
         var choices = new Dictionary<string, string>(StringComparer.Ordinal) { ["unknown"] = "Unknown / incomplete checks" };
         if (issues?.IsCurrent(Snapshot, generation) == true)
@@ -147,6 +148,8 @@ internal sealed class InstalledFilters
                 if (issues.Findings.TryGetValue((facts.Id, facts.Path), out var found))
                     foreach (var issue in found) choices.TryAdd(issue, issue);
         }
+        if (package is not null && _facts.Values.Any(f => package.Matches(Snapshot, generation, f.Id, f.Path)) && package.HasFindings)
+            choices.TryAdd("any-finding", "Has captured findings");
         return Choices(choices);
     }
 

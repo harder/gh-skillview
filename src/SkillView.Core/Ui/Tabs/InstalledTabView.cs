@@ -38,7 +38,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Func<string, bool> _openPath;
     private readonly Action _onLeaveTab;
     private readonly Action? _onStateChange;
-    private readonly Action<InstalledSkill>? _onPackageCheck;
+    private readonly Action<InventorySnapshot, string, InstalledSkill>? _onPackageCheck;
     private readonly Action<InstalledSkill>? _onLocalReimport;
     private readonly Action<InstalledSkill>? _onLocalSourceSwitch;
     private readonly CancellationToken _lifetimeToken;
@@ -56,6 +56,8 @@ internal sealed class InstalledTabView : FrameView
     private readonly Button _coverageButton;
     private readonly Button _clearFilters;
     private readonly Func<InstalledIssueEvidence?> _capturedIssues;
+    private readonly Func<PackageCheckFact?> _packageCheck;
+    private PackageCheckFact? _packageView;
     private readonly Func<long> _catalogGeneration;
     private (InstalledIssueEvidence? Evidence, long Generation) _issueView;
     private InstalledFilterSelection _filters = new();
@@ -112,12 +114,13 @@ internal sealed class InstalledTabView : FrameView
         Action? onStateChange = null,
         CancellationToken lifetimeToken = default,
         Action<AggregateException>? onCancellationCallbackException = null,
-        Action<InstalledSkill>? onPackageCheck = null,
+        Action<InventorySnapshot, string, InstalledSkill>? onPackageCheck = null,
         Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null,
         Action<Exception>? onRemovalError = null, Func<string, bool>? openPath = null,
         UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null,
-        Action<InstalledSkill>? onReviewUpdate = null, Func<InstalledIssueEvidence?>? capturedIssues = null, Func<long>? catalogGeneration = null)
+        Action<InstalledSkill>? onReviewUpdate = null, Func<InstalledIssueEvidence?>? capturedIssues = null, Func<long>? catalogGeneration = null, Func<PackageCheckFact?>? packageCheck = null)
     {
+        _packageCheck = packageCheck ?? (() => null);
         _capturedIssues = capturedIssues ?? (() => null);
         _catalogGeneration = catalogGeneration ?? (() => 0);
         _runOnUi = runOnUi;
@@ -402,7 +405,7 @@ internal sealed class InstalledTabView : FrameView
             || s.Agents.Any(a => a.AgentId.Contains(q, cmp) || a.Path.Contains(q, cmp))
             || s.AllOwnershipClaims.Any(o => o.Source.Contains(q, cmp) || (o.SourceUrl?.Contains(q, cmp) ?? false))
             || (s.FrontMatter.Upstream?.Contains(q, cmp) ?? false) || (s.FrontMatter.LocalPath?.Contains(q, cmp) ?? false))
-            && (_overview.Filters?.Matches(s, _filters, ToScope(_scopeFilter), _issueView.Evidence, _issueView.Generation) ?? false)
+            && (_overview.Filters?.Matches(s, _filters, ToScope(_scopeFilter), _issueView.Evidence, _issueView.Generation, _packageView) ?? false)
             && (_pinFilter == PinFilter.All || (_pinFilter == PinFilter.PinnedOnly ? PinDisplayPolicy.From(s).HasPin
                 : PinDisplayPolicy.From(s).State == PinDisplayState.Unpinned));
     }
@@ -679,7 +682,7 @@ internal sealed class InstalledTabView : FrameView
         0 => _overview.Filters?.Agents ?? [],
         1 => _overview.Filters?.Locations ?? [],
         2 => _overview.Filters?.Sources ?? [],
-        _ => _overview.Filters?.IssueChoices(_issueView.Evidence, _issueView.Generation) ?? [],
+        _ => _overview.Filters?.IssueChoices(_issueView.Evidence, _issueView.Generation, _packageView) ?? [],
     };
 
     internal void SelectFilter(int facet, string? key)
@@ -777,6 +780,9 @@ internal sealed class InstalledTabView : FrameView
             text += "\n\nIssues not loaded for this capture. Visit Issues to load local findings; no checks run here.";
         else if (_issueView.Evidence?.Partial == true)
             text += "\n\nIssues capture is incomplete; missing findings remain unknown.";
+        if (_packageView is not null && _snapshot is not null && ReferenceEquals(_packageView.Request.Snapshot, _snapshot)
+            && _packageView.Request.Generation == _issueView.Generation)
+            text += "\n\nHas captured findings also includes the last explicit package check for its exact copy. Package Reviews and incomplete/omitted checks exclude No local findings observed; other copies remain package not checked for this inventory capture.";
         return text + $"\n\nPins: {DescribePin(_pinFilter)} · Scope: {DescribeScope(_scopeFilter)} · Sort: {_sort.ToString().ToLowerInvariant()}" + "\n\nCheck updates (C) checks the whole captured catalog, including copies outside these filters; it never prepares a plan.";
     }
 
@@ -796,7 +802,7 @@ internal sealed class InstalledTabView : FrameView
             Width = Dim.Fill(2),
             Height = 2,
             Text = facet == 3 && _issueView.Evidence?.IsCurrent(_snapshot, _issueView.Generation) != true
-                ? "Issues not loaded. Visit Issues first. Unknown is not clean."
+                ? "Issues not loaded. Package findings, if checked, are separate. Unknown is not clean."
                 : "Choose directly with arrows/Enter; Esc cancels. No scan runs."
         };
         var list = new ListView { X = 1, Y = 2, Width = Dim.Fill(2), Height = Dim.Fill(1) };
@@ -892,7 +898,7 @@ internal sealed class InstalledTabView : FrameView
             && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
         {
             key.Handled = true;
-            if (GetSelectedSkill() is { } selected) _onPackageCheck(selected);
+            if (GetSelectedSkill() is { } selected) CheckPackage(selected);
             return;
         }
         if (!_filterField.HasFocus && key.AsRune.Value == 'R' && _onLocalReimport is not null
@@ -969,7 +975,9 @@ internal sealed class InstalledTabView : FrameView
     private string RenderDetail(InstalledSkill skill, int? recordedPlacementCount)
     {
         var observation = _availability?.Get(skill);
+        var package = _snapshot is not null && _packageView?.Matches(_snapshot, _issueView.Generation, skill) == true ? _packageView : null;
         return InstalledScreen.RenderDetail(skill, _showDetails, showShortcuts: false, descriptionWidth: _descriptionWidth, recordedPlacementCount: recordedPlacementCount)
+            + "\n\n" + (package?.Detail ?? "Package not checked for this inventory capture. **K:** explicit local package check.\n\n" + PackageCheckFact.InventoryLifetimeNotice)
             + (observation is null ? "" : "\n" + observation.Detail
                 + (_showDetails && observation.Diagnostic.Length > 0 ? "\n````\n" + (TerminalEscapeSanitizer.Sanitize(observation.Diagnostic) ?? "").Replace("`", "'") + "\n````\n" : ""))
             + "\n" + _overview.Coverage + "\n\n**F2** Technical details · **u** Review update · **c** Cleanup\n";
@@ -1010,11 +1018,17 @@ internal sealed class InstalledTabView : FrameView
         FocusList();
     }
 
+    private void CheckPackage(InstalledSkill skill)
+    {
+        if (_snapshot is not null && SelectedRow?.Copy is { Ambiguous: false } copy && CanActOnSelection)
+            _onPackageCheck?.Invoke(_snapshot, copy.Id, skill);
+    }
+
     private void ShowMoreActions()
     {
         if (GetSelectedSkill() is not { } skill || !CanActOnSelection) return;
         var actions = new List<(string Label, Action Run)> { ("Open exact location", () => _openPath(skill.ResolvedPath)), ("Remove exact copy", () => TryStartSelectedRemove()) };
-        if (_onPackageCheck is not null) actions.Add(("Check package", () => _onPackageCheck(skill)));
+        if (_onPackageCheck is not null) actions.Add(("Check package", () => CheckPackage(skill)));
         if (skill.FrontMatter.LocalPath is not null)
         {
             if (_onLocalReimport is not null) actions.Add(("Review local reimport", () => _onLocalReimport(skill)));
@@ -1040,16 +1054,23 @@ internal sealed class InstalledTabView : FrameView
         if (CanActOnSelection && GetSelectedSkill() is { } selected) _onReviewUpdate?.Invoke(selected);
     }
 
-    private void CaptureIssueView() => _issueView = (_capturedIssues(), _catalogGeneration());
+    private void CaptureIssueView()
+    {
+        _issueView = (_capturedIssues(), _catalogGeneration());
+        _packageView = _packageCheck();
+    }
 
     internal void RefreshAvailability() => RefreshAvailability(captureIssues: true);
 
     private void RefreshAvailability(bool captureIssues)
     {
-        if (_disposed || _lifetimeToken.IsCancellationRequested || _availability is null) return;
+        if (_disposed || _lifetimeToken.IsCancellationRequested) return;
         if (captureIssues) CaptureIssueView();
-        _checkUpdates.Text = _availability.Running ? "Cancel check (C)" : "Check all updates (C)";
-        _checkUpdates.Enabled = !_availability.Stopping;
+        if (_availability is not null)
+        {
+            _checkUpdates.Text = _availability.Running ? "Cancel check (C)" : "Check all updates (C)";
+            _checkUpdates.Enabled = !_availability.Stopping;
+        }
         RefreshCoverage();
         _reviewUpdate.Enabled = CanActOnSelection && GetSelectedSkill() is not null;
         ApplyFilter();

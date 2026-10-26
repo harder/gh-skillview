@@ -12,12 +12,20 @@ internal sealed class DisplayInventoryCache(
     Func<DateTimeOffset>? clock = null,
     Action<AggregateException>? onCancellationCallbackException = null)
 {
+    internal static readonly TimeSpan ReuseWindow = TimeSpan.FromMinutes(1);
     private readonly object _gate = new();
     private readonly Func<DateTimeOffset> _now = clock ?? (() => DateTimeOffset.UtcNow);
     private InventorySnapshot? _snapshot;
     private long _snapshotGeneration;
     private DateTimeOffset _completedAt;
     private Flight? _flight;
+
+    internal bool CacheIsCurrent(InventorySnapshot snapshot, long capturedGeneration)
+    {
+        lock (_gate)
+            return ReferenceEquals(_snapshot, snapshot) && _snapshotGeneration == capturedGeneration
+                && generation() == capturedGeneration;
+    }
 
     internal async Task<InventorySnapshot> GetAsync(CancellationToken token, Func<CancellationToken, Task<InventorySnapshot>>? captureOverride = null)
     {
@@ -36,7 +44,7 @@ internal sealed class DisplayInventoryCache(
                 // visit retry incomplete coverage immediately.
                 if (_snapshot is not null && _snapshotGeneration == current
                     && !_snapshot.IsPartial && _snapshot.ConfiguredRootsComplete
-                    && _now() - _completedAt < TimeSpan.FromMinutes(1)) cached = _snapshot;
+                    && _now() - _completedAt < ReuseWindow) cached = _snapshot;
                 else
                 {
                     start = _flight is null;

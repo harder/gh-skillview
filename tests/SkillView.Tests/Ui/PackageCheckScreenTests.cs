@@ -25,13 +25,16 @@ public sealed class PackageCheckScreenTests
         using var app = Application.Create().Init("ansi");
         app.Driver!.SetScreenSize(width, height);
         InstalledSkill? captured = null;
+        InventorySnapshot? capturedSnapshot = null;
+        string? capturedId = null;
         var first = Target("first"); var second = Target("second");
         using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
         var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
             _ => Task.FromResult(InventorySnapshot.Empty), (_, _, _) => Task.CompletedTask, () => { },
-            onPackageCheck: target => captured = target)
+            onPackageCheck: (snapshot, id, target) => { capturedSnapshot = snapshot; capturedId = id; captured = target; })
         { Width = Dim.Fill(), Height = Dim.Fill(), Visible = true };
-        window.Add(view); view.LoadSeeded(InventorySnapshot.Empty with { Skills = [first, second] });
+        var snapshot = InventorySnapshot.Empty with { Skills = [first, second] };
+        window.Add(view); view.LoadSeeded(snapshot);
         var shellReceived = false;
         window.KeyDown += (_, key) => { if (!key.Handled && key.AsRune.Value == 'K') shellReceived = true; };
         var session = app.Begin(window);
@@ -40,6 +43,7 @@ public sealed class PackageCheckScreenTests
             view.SetSelectedRowForTests(3); view.FocusList(); Assert.True(view.TableHasFocusForTests);
             app.Keyboard.RaiseKeyDownEvent(new Key('K')); window.Draw(new DrawContext());
             Assert.Same(second, captured); Assert.False(shellReceived);
+            Assert.Same(snapshot, capturedSnapshot); Assert.Equal(second.InstallationId, capturedId);
             captured = null; view.FocusFilterForTests(); Assert.True(view.FilterHasFocusForTests);
             app.Keyboard.RaiseKeyDownEvent(new Key('K')); window.Draw(new DrawContext());
             Assert.Null(captured); Assert.True(view.FilterHasFocusForTests);
@@ -174,6 +178,84 @@ public sealed class PackageCheckScreenTests
             PackageCheckScreen.Show(app, new Logger(), Target("demo"), _ => Task.FromResult(report), readyForTests: dialog => modal = dialog);
         }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
         Assert.True(observed); Assert.False(timedOut);
+    }
+
+    [Theory]
+    [InlineData("publish")]
+    [InlineData("stale")]
+    [InlineData("close")]
+    [InlineData("cancel")]
+    public async Task BoundFactPublishesOnlyAtOwnedCurrentTerminalCompletion(string state)
+    {
+        var completed = false; var published = 0; var captures = 0; var timeout = false;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi");
+            app.Driver!.SetScreenSize(80, 24);
+            using var lifetime = new SkillView.Threading.CancellationSource(_ => { });
+            Action? queued = null; Dialog? modal = null;
+            var fact = PackageCheckFactTests.Fact(PackageCheckFactTests.Report());
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timeout = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                var commit = Interlocked.Exchange(ref queued, null);
+                if (commit is null || modal is null) return true;
+                Assert.Equal(0, published);
+                if (state == "cancel") lifetime.TryCancel();
+                if (state == "close") app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                commit();
+                Assert.Equal(state == "publish" ? 1 : 0, published);
+                if (state == "stale")
+                    Assert.Contains("Refresh Installed", modal.SubViews.OfType<Terminal.Gui.Editor.Editor>().Single().Text);
+                completed = true;
+                if (state is "publish" or "stale") app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                return false;
+            });
+            PackageCheckScreen.ShowBound(app, new Logger(), Target("demo"), _ =>
+            {
+                captures++;
+                return Task.FromResult(new PackageCheckResult(fact.Report, fact));
+            }, lifetime.Token, dialog => modal = dialog, action => Volatile.Write(ref queued, action), publish: _ =>
+            {
+                if (state == "stale") return false;
+                published++;
+                return true;
+            });
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.True(completed); Assert.False(timeout); Assert.Equal(1, captures);
+    }
+
+    [Fact]
+    public async Task CheckAgainPublishesOnlyEachRequestsCompletedFact()
+    {
+        var captures = 0; var publications = 0; var timeout = false;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi");
+            app.Driver!.SetScreenSize(120, 36);
+            Dialog? modal = null;
+            var fact = PackageCheckFactTests.Fact(PackageCheckFactTests.Report());
+            app.AddTimeout(TimeSpan.FromSeconds(8), () => { timeout = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (modal is null) return true;
+                var check = modal.SubViews.OfType<Button>().Single(b => b.Text == "_Check again");
+                if (!check.Enabled) return true;
+                if (publications == 1)
+                {
+                    check.SetFocus(); app.Keyboard.RaiseKeyDownEvent(Key.Enter);
+                    return true;
+                }
+                if (publications < 2) return true;
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc)); return false;
+            });
+            PackageCheckScreen.ShowBound(app, new Logger(), Target("demo"), _ =>
+            {
+                Interlocked.Increment(ref captures);
+                return Task.FromResult(new PackageCheckResult(fact.Report, fact with { CheckedAt = DateTimeOffset.UtcNow }));
+            }, readyForTests: dialog => modal = dialog, publish: _ => { publications++; return true; });
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(12), TestContext.Current.CancellationToken);
+        Assert.False(timeout); Assert.Equal(2, captures); Assert.Equal(2, publications);
     }
 
     private static InstalledSkill Target(string name) => new()

@@ -18,6 +18,13 @@ internal static class PackageCheckScreen
     internal static void Show(IApplication app, Logger logger, InstalledSkill selected,
         Func<CancellationToken, Task<PackageCheckReport>> capture, CancellationToken lifetimeToken = default,
         Action<Dialog>? readyForTests = null, Action<Action>? dispatchForTests = null)
+        => ShowBound(app, logger, selected, async token => new(await capture(token).ConfigureAwait(false), null),
+            lifetimeToken, readyForTests, dispatchForTests);
+
+    internal static void ShowBound(IApplication app, Logger logger, InstalledSkill selected,
+        Func<CancellationToken, Task<PackageCheckResult>> capture, CancellationToken lifetimeToken = default,
+        Action<Dialog>? readyForTests = null, Action<Action>? dispatchForTests = null,
+        Func<PackageCheckResult, bool>? publish = null)
     {
         if (lifetimeToken.IsCancellationRequested) return;
         using var dialog = new Dialog { Title = " Static package check ", Width = Dim.Percent(96), Height = Dim.Percent(92), SchemeName = SchemeNames.Dialog };
@@ -37,6 +44,7 @@ internal static class PackageCheckScreen
         var check = new SingleRowButton { Text = "_Check again", X = 0, Y = Pos.AnchorEnd(1), Enabled = false };
         var close = new SingleRowButton { Text = "_Close", X = Pos.Right(check) + 2, Y = Pos.AnchorEnd(1) };
         var closeRequested = false;
+        long epoch = 0;
         var readyToClose = false;
         void Finish()
         {
@@ -47,27 +55,30 @@ internal static class PackageCheckScreen
         void Start()
         {
             if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None || lifetimeToken.IsCancellationRequested) return;
+            var request = ++epoch;
             check.Enabled = false;
-            status.Text = "Checking local files for " + TerminalEscapeSanitizer.Sanitize(selected.Name) + "…";
+            status.Text = "Checking local files for " + InstalledOverview.Text(selected.Name, 64) + "…";
             operation.TryStart(async token =>
             {
                 using var cancellation = new CancellationSource(token, lifetimeToken, CancellationCallbackReporter.For(logger, "package.check"));
                 var ownedToken = cancellation.Token;
                 try
                 {
-                    var result = await capture(ownedToken).ConfigureAwait(false);
+                    var captured = await capture(ownedToken).ConfigureAwait(false);
+                    var result = captured.Report;
                     ownedToken.ThrowIfCancellationRequested();
-                    var rendered = CliDispatcher.RenderPackageCheckText(result);
+                    var rendered = RenderReport(result);
                     operation.InvokeTerminalIfActive(() =>
                     {
                         if (lifetimeToken.IsCancellationRequested) { Finish(); return; }
                         // The linked worker source may already be disposed while
                         // this commit remains queued. Its parents are stable
                         // token values and still reject late cancellation.
-                        if (!ownedToken.IsCancellationRequested && !token.IsCancellationRequested && !lifetimeToken.IsCancellationRequested)
+                        if (!closeRequested && request == epoch && !ownedToken.IsCancellationRequested && !token.IsCancellationRequested && !lifetimeToken.IsCancellationRequested)
                         {
-                            output.Text = rendered;
-                            status.Text = $"Format: {result.Format.State} · agent: {result.AgentAssessment.State} · intact: {result.PayloadIntact.State} · source: {result.SourceReviewed.State}";
+                            var attached = publish is null || publish(captured);
+                            output.Text = rendered + (attached ? "" : "\nCheck retained here only. The copy or displayed inventory could not be bound; Refresh Installed before checking again.\n");
+                            status.Text = (attached ? "" : "Refresh Installed · ") + $"Format: {result.Format.State} · agent: {result.AgentAssessment.State} · intact: {result.PayloadIntact.State} · source: {result.SourceReviewed.State}";
                         }
                         else if (!lifetimeToken.IsCancellationRequested) status.Text = "Check canceled.";
                         Finish();
@@ -87,7 +98,7 @@ internal static class PackageCheckScreen
                     operation.InvokeTerminalIfActive(() =>
                     {
                         if (!lifetimeToken.IsCancellationRequested)
-                            status.Text = TerminalEscapeSanitizer.Sanitize("Check unavailable: " + exception.Message) ?? "Check unavailable.";
+                            status.Text = InstalledOverview.Text("Check unavailable: " + exception.Message, 240);
                         Finish();
                     });
                 }
@@ -95,6 +106,7 @@ internal static class PackageCheckScreen
         }
         void RequestClose()
         {
+            ++epoch;
             if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None)
             { closeRequested = true; operation.Cancel(); status.Text = "Canceling check…"; return; }
             readyToClose = true; app.RequestStop();
@@ -104,7 +116,7 @@ internal static class PackageCheckScreen
         dialog.IsRunningChanging += (_, args) =>
         {
             if (args.NewValue || readyToClose || operation.CurrentOwnership == ModalOperationTracker.Ownership.None) return;
-            args.Cancel = true; closeRequested = true; operation.Cancel(); status.Text = "Canceling check…";
+            args.Cancel = true; ++epoch; closeRequested = true; operation.Cancel(); status.Text = "Canceling check…";
         };
         dialog.KeyDown += (_, key) =>
         {
@@ -117,4 +129,37 @@ internal static class PackageCheckScreen
         Start();
         app.Run(dialog);
     }
+
+    internal static void ShowRetained(IApplication app, PackageCheckFact fact, CancellationToken token)
+    {
+        if (token.IsCancellationRequested) return;
+        using var dialog = new Dialog { Title = " Retained package check ", Width = Dim.Percent(96), Height = Dim.Percent(92) };
+        var output = new Editor
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(2),
+            ReadOnly = true,
+            WordWrap = true,
+            Text = fact.Detail + "\n\n" + RenderReport(fact.Report)
+        };
+        var close = new SingleRowButton { Text = "_Close", X = 0, Y = Pos.AnchorEnd(1) };
+        close.Accepting += (_, e) => { e.Handled = true; app.RequestStop(); };
+        dialog.KeyDown += (_, key) => { if (key.KeyCode == KeyCode.Esc) { key.Handled = true; app.RequestStop(); } };
+        dialog.Add(output, close);
+        TuiHelpers.ApplyScheme(SchemeNames.Dialog, dialog, output, close);
+        TuiHelpers.ConfigureReadOnlyPane(output, SchemeNames.Dialog);
+        app.Run(dialog);
+    }
+
+    private static string RenderReport(PackageCheckReport report)
+    {
+        const int limit = 256 * 1024;
+        var text = CliDispatcher.RenderPackageCheckText(report);
+        if (text.Length <= limit) return text;
+        var end = char.IsHighSurrogate(text[limit - 1]) ? limit - 1 : limit;
+        return text[..end] + $"\nReport display limit: {text.Length - end} characters omitted. Retained totals: {report.FindingCount} findings, {report.ObservationCount} observations; check limits omitted {report.OmittedFindingCount} findings and {report.OmittedObservationCount} observations.\n";
+    }
+
 }
