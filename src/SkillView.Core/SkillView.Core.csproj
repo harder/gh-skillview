@@ -21,7 +21,7 @@
     <!-- Service Terminal.Gui's runtime dependencies independently of its release
          cadence. Keep these overrides together and verify all AOT targets. -->
     <PackageReference Include="Markdig" Version="1.4.2" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
