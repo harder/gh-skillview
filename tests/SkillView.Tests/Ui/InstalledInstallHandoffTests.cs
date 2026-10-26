@@ -252,13 +252,24 @@ public sealed class InstalledInstallHandoffTests
             "ambiguous" => snapshot with { Skills = [target, target] },
             _ => snapshot,
         };
-        if (reason == "native") File.WriteAllText(Path.Combine(target.ResolvedPath, "later"), "changed");
+        if (reason == "native")
+        {
+            Assert.True(fixture.ResolveAlternatives(snapshot, evidence, folders).BrowseOnly);
+            // A child addition need not change a Windows directory's observed
+            // timestamps. Keep the original alive and replace the exact copy.
+            var retained = target.ResolvedPath + "-retained";
+            Directory.Move(target.ResolvedPath, retained);
+            var replacement = fixture.Skill(target.ScanRoot, "copy");
+            Assert.NotEqual(target.ObservedSubject!.NativeObject.ObjectId, replacement.ObservedSubject!.NativeObject.ObjectId);
+            Assert.Equal(File.ReadAllBytes(Path.Combine(retained, "SKILL.md")), File.ReadAllBytes(Path.Combine(target.ResolvedPath, "SKILL.md")));
+        }
         if (reason == "groups")
         {
             var other = fixture.Observe(fixture.Skill(folders[0][1], "other") with { Name = "different-name" });
             snapshot = fixture.Snapshot(target, other);
         }
-        Assert.Throws<IOException>(() => fixture.ResolveAlternatives(snapshot, evidence, folders));
+        var error = Assert.Throws<IOException>(() => fixture.ResolveAlternatives(snapshot, evidence, folders));
+        if (reason == "native") Assert.Contains("physical copy changed", error.Message);
     }
 
     [Theory]
