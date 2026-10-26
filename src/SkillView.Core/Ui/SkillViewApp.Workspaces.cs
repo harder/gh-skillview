@@ -59,7 +59,10 @@ public sealed partial class SkillViewApp
 
     private void DeactivateDiscoverWorkspace(bool clearBusy)
     {
+        if (_discoverTab?.IsLoading == true)
+            SetSearchFeedback("Search canceled.\n\nNo results to show. Submit the search again to try it.");
         _discoverTab?.SetLoading(false);
+        if (clearBusy) ClearDiscoverFeedback();
         Interlocked.Increment(ref _discoverGeneration);
         _searchRequests.Cancel();
         CancelCurrentPreview();
@@ -68,10 +71,6 @@ public sealed partial class SkillViewApp
         {
             lifetime.TryCancel();
             lifetime.Dispose();
-        }
-        if (clearBusy)
-        {
-            ClearAllBusyOperations();
         }
     }
 

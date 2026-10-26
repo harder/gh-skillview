@@ -67,7 +67,7 @@ public sealed partial class SkillViewApp
     {
         if (_ghPath is null)
         {
-            SetStatus("cannot search — gh not found", TuiHelpers.NotificationLevel.Error);
+            SetDiscoverStatus("cannot search — gh not found", TuiHelpers.NotificationLevel.Error);
             return;
         }
         if (!TryCaptureActiveLifetimeToken(_discoverLifetime, out var discoverToken))
@@ -79,13 +79,17 @@ public sealed partial class SkillViewApp
         using var request = _searchRequests.Begin(discoverToken, TimeSpan.FromMinutes(2));
         var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
         var generation = System.Threading.Interlocked.Increment(ref _searchGeneration);
-        var busyOperation = BeginBusyOperation($"searching {query}…");
+        var busyOperation = BeginBusyOperation($"searching {query}…", discoverOwned: true);
         var cancellationToken = request.Token;
         try
         {
             await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
+                // A submitted search replaces the previous answer immediately.
+                // Failure or navigation must never reveal the old install targets.
+                ReplaceSearchResults([]);
+                SetSearchFeedback("Searching skills…");
                 _discoverTab?.SetLoading(true);
             }, discoverToken).ConfigureAwait(false);
             var options = new GhSkillSearchService.Options(
@@ -125,7 +129,7 @@ public sealed partial class SkillViewApp
                 {
                     _previewFrame.Title = "Preview";
                 }
-                SetStatus(DescribeSearchResults(results.Count, _results.Count, agent));
+                SetDiscoverStatus(DescribeSearchResults(results.Count, _results.Count, agent));
             }, discoverToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -137,7 +141,8 @@ public sealed partial class SkillViewApp
                 {
                     if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
                     {
-                        SetStatus("search timed out", TuiHelpers.NotificationLevel.Error);
+                        SetSearchFeedback("Search timed out.\n\nNo results to show. Try the search again or change the query.");
+                        SetDiscoverStatus("search timed out", TuiHelpers.NotificationLevel.Error);
                     }
                 }, discoverToken).ConfigureAwait(false);
             }
@@ -149,7 +154,8 @@ public sealed partial class SkillViewApp
             await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
-                SetStatus(snippet.Length > 0
+                SetSearchFeedback($"Search failed.\n\nNo results to show. Try the search again or change the query.\n\n{snippet}");
+                SetDiscoverStatus(snippet.Length > 0
                     ? $"search failed: {snippet}"
                     : "search failed — see logs (l)",
                     TuiHelpers.NotificationLevel.Error);
@@ -173,6 +179,12 @@ public sealed partial class SkillViewApp
                 EndBusyOperation(busyOperation);
             }
         }
+    }
+
+    private void SetSearchFeedback(string text)
+    {
+        SetPreviewText(text);
+        if (_previewFrame is not null) _previewFrame.Title = "Preview";
     }
 
     private void ReplaceSearchResults(IReadOnlyList<SearchResultSkill> results)
@@ -220,7 +232,7 @@ public sealed partial class SkillViewApp
         _searchSort = CycleSearchSort(_searchSort);
         _results = ApplySearchSort(_resultsNaturalOrder, _searchSort);
         RefreshResultsTable();
-        SetStatus(DescribeSearchSort(_searchSort));
+        SetDiscoverStatus(DescribeSearchSort(_searchSort));
     }
 
     private void RefreshResultsTable()
@@ -396,7 +408,7 @@ public sealed partial class SkillViewApp
         }
         else
         {
-            SetStatus("discover filters updated");
+            SetDiscoverStatus("discover filters updated");
         }
     }
 
@@ -407,29 +419,29 @@ public sealed partial class SkillViewApp
         if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {
-            SetStatus("no result to open");
+            SetDiscoverStatus("no result to open");
             return;
         }
         var row = _resultsTable.GetSelectedRow();
         if (row < 0 || row >= _results.Count)
         {
-            SetStatus("no result selected");
+            SetDiscoverStatus("no result selected");
             return;
         }
         var pick = _results[row];
         if (string.IsNullOrEmpty(pick.Repo))
         {
-            SetStatus("no repo on selected row");
+            SetDiscoverStatus("no repo on selected row");
             return;
         }
         var url = BuildRepoUrl(_lastReport?.Auth, pick.Repo);
         if (TuiHelpers.OpenInDefaultHandler(url))
         {
-            SetStatus($"opened {url}", TuiHelpers.NotificationLevel.Success);
+            SetDiscoverStatus($"opened {url}", TuiHelpers.NotificationLevel.Success);
         }
         else
         {
-            SetStatus("open failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
+            SetDiscoverStatus("open failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
             _services.Logger.Warn("open", $"failed to open {url}");
         }
     }
@@ -442,19 +454,19 @@ public sealed partial class SkillViewApp
         if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {
-            SetStatus("no results to install");
+            SetDiscoverStatus("no results to install");
             return;
         }
         var row = _resultsTable.GetSelectedRow();
         if (row < 0 || row >= _results.Count)
         {
-            SetStatus("no result selected");
+            SetDiscoverStatus("no result selected");
             return;
         }
         var pick = _results[row];
         if (string.IsNullOrEmpty(pick.Repo))
         {
-            SetStatus("no repo on selected row");
+            SetDiscoverStatus("no repo on selected row");
             return;
         }
         var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
@@ -477,19 +489,19 @@ public sealed partial class SkillViewApp
         if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {
-            SetStatus("no results to install");
+            SetDiscoverStatus("no results to install");
             return;
         }
         var row = _resultsTable.GetSelectedRow();
         if (row < 0 || row >= _results.Count)
         {
-            SetStatus("no result selected");
+            SetDiscoverStatus("no result selected");
             return;
         }
         var pick = _results[row];
         if (string.IsNullOrEmpty(pick.Repo))
         {
-            SetStatus("no repo on selected row");
+            SetDiscoverStatus("no repo on selected row");
             return;
         }
         _workflows.OpenRepoDiscoveryDialog(

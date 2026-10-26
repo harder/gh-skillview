@@ -72,6 +72,12 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   admission, cancel lifetimes, and drain owned work before disposing
   Terminal.Gui or logging resources.
 
+- A submitted Discover search clears the previous results and install targets.
+  Keep failure/timeout/cancellation context in the detail pane after transient
+  feedback expires. Deactivation clears only Discover-owned feedback and busy
+  owners; retain workflow notifications and progress. Status timers must reject
+  callbacks superseded by a newer status or workspace transition.
+
 - Keep advanced-remove policy evaluation off the Terminal.Gui thread. Cache
   per-target evaluations only for wizard display and always validate again in
   the owned background operation immediately before execution; if blocking or

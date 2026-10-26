@@ -29,7 +29,7 @@ public sealed partial class SkillViewApp
         _services.Logger.Debug("preview", $"picked: repo={repo} skill={pick.SkillName}");
         if (string.IsNullOrEmpty(repo))
         {
-            SetStatus("no repo on selected row");
+            SetDiscoverStatus("no repo on selected row");
             return;
         }
 
@@ -68,14 +68,14 @@ public sealed partial class SkillViewApp
                 ShowPreviewPane();
                 if (preview.Succeeded)
                 {
-                    SetStatus(preview.AssociatedFiles.Length == 0
+                    SetDiscoverStatus(preview.AssociatedFiles.Length == 0
                         ? "preview loaded"
                         : $"preview loaded · {preview.AssociatedFiles.Length} file(s)",
                         TuiHelpers.NotificationLevel.Success);
                 }
                 else
                 {
-                    SetStatus("preview failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
+                    SetDiscoverStatus("preview failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
                 }
             }, discoverToken).ConfigureAwait(false);
         }
@@ -96,7 +96,7 @@ public sealed partial class SkillViewApp
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
                 _loadedPreviewKey = null;
                 SetPreviewText("(preview timed out)\n\nThe gh subprocess did not respond within 30 seconds.");
-                SetStatus("preview timed out", TuiHelpers.NotificationLevel.Error);
+                SetDiscoverStatus("preview timed out", TuiHelpers.NotificationLevel.Error);
             }, discoverToken).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -111,7 +111,7 @@ public sealed partial class SkillViewApp
                     ? $"(preview failed)\n\n{snippet}"
                     : "(preview failed)\n\nSee logs for details.");
 
-                SetStatus(snippet.Length > 0
+                SetDiscoverStatus(snippet.Length > 0
                     ? $"preview failed: {snippet}"
                     : "preview failed — see logs (l)",
                     TuiHelpers.NotificationLevel.Error);
@@ -171,7 +171,7 @@ public sealed partial class SkillViewApp
         _previewRawPane.CanFocus = _showingRawPreview;
         _previewPane.Visible = !_showingRawPreview;
         _previewRawPane.Visible = _showingRawPreview;
-        SetStatus(_showingRawPreview ? "preview: source" : "preview: rendered");
+        SetDiscoverStatus(_showingRawPreview ? "preview: source" : "preview: rendered");
     }
 
     private void ShowPreviewPane()

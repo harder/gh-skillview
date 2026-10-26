@@ -99,7 +99,7 @@ public sealed partial class SkillViewApp
     private View? _lastDiscoverFocus;
     private string? _loadedPreviewKey;
     private readonly object _busyGate = new();
-    private readonly Dictionary<long, string> _busyOperations = new();
+    private readonly Dictionary<long, (string Text, bool DiscoverOwned)> _busyOperations = new();
     private long _nextBusyOperationId;
     private long? _legacyBusyOperationId;
     private long _activePreviewBusyOperationId;
@@ -110,7 +110,9 @@ public sealed partial class SkillViewApp
 
     private string _defaultStatus = "ready — press / to search or F1 for help";
     private string _currentStatus = string.Empty;
+    private bool _currentStatusDiscoverOwned;
     private object? _statusToken;
+    private long _statusVersion;
     private static readonly TimeSpan StatusAutoClear = TimeSpan.FromSeconds(6);
 
     public SkillViewApp(TuiServices services, AppOptions options)
