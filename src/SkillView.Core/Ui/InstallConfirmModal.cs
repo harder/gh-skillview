@@ -143,7 +143,8 @@ internal sealed class InstallConfirmModal
         string? projectRoot = null;
         var scopeDescription = new Label { X = 1, Y = 3, Width = Dim.Fill(2), Height = 1 };
         var baseLabel = new Label { X = 1, Y = 4, Text = "Base:" };
-        var basePath = new TextField { X = 9, Y = 4, Width = Dim.Fill(2), Text = FormatBasePath(home), ReadOnly = true };
+        // This scrollable field is one row; avoid auto-height measurement of the full bounded path.
+        var basePath = new TextField { X = 9, Y = 4, Width = Dim.Fill(2), Height = 1, Text = FormatBasePath(home), ReadOnly = true };
         TuiHelpers.ConfigureTextInput(basePath, SkillViewStyling.DialogSchemeName);
         void RefreshScopeDescription()
         {
