@@ -38,3 +38,35 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   A clean package report cannot establish queue absence. Other copies remain
   package not checked for this inventory capture and keep their own captured-scan
   filter semantics.
+- Installed More actions may offer one resource replacement review only for one
+  distinct ordinal raw `references/<safe ASCII segments>` root Problem in its
+  current bound fact. Duplicate targets deduplicate; zero/multiple targets do
+  not offer this action. Complete payload, raw fingerprint, valid captured root
+  metadata, zero omitted findings, unpinned tracked source and complete inventory
+  are required. Global reference/declaration incompleteness remains visible and
+  does not disqualify this selected path. Facts never grant mutation authority.
+- Freeze the exact copy/source/context/native intent before navigation. One
+  owned Updates activation may bind it once to its own schema-2 saved ID,
+  fingerprint and revision choice. Fresh existing inventory/native admission,
+  Installed raw fingerprint equality and the full comparison's exact absent
+  Installed/regular Candidate row are required. A candidate without that resource
+  remains an ordinary saved review with Skip. No intent/approval is persisted or
+  reconstructed from stored plans. Other preparation/copy/seed, Skip, cancellation
+  and deactivation discard intent. Both independent existing approvals remain.
+- Publish successful native apply/reconciliation and RememberUndo first. Then
+  schedule package verification as a separate application-tracked follow-up,
+  independent of the review-operation token; Undo stays available while the
+  result says “Verifying package…”. It checks the applied OriginalPath off thread
+  with the checker's finally verified capture. Complete raw equality to
+  Candidate, regular target presence and cleared selected finding permit only
+  “This resource was restored; other checks remain incomplete.” Keep residual
+  Reviews and coverage. Failure/timeout/mismatch says “Replacement installed;
+  package verification incomplete.” Checker failure never changes native results
+  or Undo eligibility. The separate transient note binds applied ID/fingerprint,
+  attaches after RememberUndo, and clears at ClearUndo/RememberUndo, entering Undo,
+  new operations, Skip, cancel and deactivation. A verification epoch and owned
+  cancellation reject late/queued notes even after Undo inspection is canceled
+  for the same plan. During pending verification, deactivation closes approvals
+  but preserves the already published idle native result/Undo until the existing
+  next-load boundary. Other cancellation behavior stays unchanged. Old root
+  identity is not required after native replacement. Saved schema/hash/parser/native/gh policy is unchanged.

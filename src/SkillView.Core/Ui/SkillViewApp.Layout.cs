@@ -189,6 +189,13 @@ public sealed partial class SkillViewApp
             onReviewUpdate: skill => OpenUpdatesWorkspace(OperationSubject.From(skill)),
             capturedIssues: () => _changesTab?.CapturedIssues,
             packageCheck: () => _workflows.CurrentPackageCheck,
+            onResourceReplacement: (fact, target) =>
+            {
+                if (!ReferenceEquals(fact, _workflows.CurrentPackageCheck) || !_workflows.PackageRequestIsCurrent(fact.Request)
+                    || _installedTab?.CurrentSnapshot is not { } snapshot || !fact.Matches(snapshot, _services.ListAdapter.Generation, fact.Request.Target)
+                    || PackageResourceReplacement.Target(fact) != target || _updatesTab is null || _updatesTab.Visible) return;
+                OpenUpdatesWorkspace(OperationSubject.From(fact.Request.Target), prepareImmediately: false, fact, target);
+            },
             catalogGeneration: () => _services.ListAdapter.Generation,
             onRemovalError: error =>
             {
@@ -217,6 +224,8 @@ public sealed partial class SkillViewApp
             unpinRunner: (target, hidden, token) => _workflows.PrepareUnpinAsync(target, hidden, token),
             inspectUndoRunner: (applied, hidden, token) => _workflows.InspectUpdateUndoAsync(applied, hidden, token),
             undoRunner: (review, hidden, token) => _workflows.UndoReviewedUpdateAsync(review, hidden, token),
+            resourcePrepareRunner: _workflows.PrepareResourceReplacementAsync,
+            resourceCheckRunner: _workflows.CheckResourceReplacementAsync,
             lifetimeToken: GetRunLifetimeToken())
         {
             X = 0,

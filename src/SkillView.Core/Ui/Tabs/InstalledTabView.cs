@@ -45,6 +45,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly UpdateAvailabilitySession? _availability;
     private readonly Action? _onCheckUpdates;
     private readonly Action<InstalledSkill>? _onReviewUpdate;
+    private readonly Action<PackageCheckFact, string>? _onResourceReplacement;
     private readonly Button _checkUpdates;
     private readonly Button _reviewUpdate;
     private readonly Label _coverage;
@@ -118,9 +119,11 @@ internal sealed class InstalledTabView : FrameView
         Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null,
         Action<Exception>? onRemovalError = null, Func<string, bool>? openPath = null,
         UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null,
-        Action<InstalledSkill>? onReviewUpdate = null, Func<InstalledIssueEvidence?>? capturedIssues = null, Func<long>? catalogGeneration = null, Func<PackageCheckFact?>? packageCheck = null)
+        Action<InstalledSkill>? onReviewUpdate = null, Func<InstalledIssueEvidence?>? capturedIssues = null, Func<long>? catalogGeneration = null, Func<PackageCheckFact?>? packageCheck = null,
+        Action<PackageCheckFact, string>? onResourceReplacement = null)
     {
         _packageCheck = packageCheck ?? (() => null);
+        _onResourceReplacement = onResourceReplacement;
         _capturedIssues = capturedIssues ?? (() => null);
         _catalogGeneration = catalogGeneration ?? (() => 0);
         _runOnUi = runOnUi;
@@ -1029,6 +1032,14 @@ internal sealed class InstalledTabView : FrameView
         if (GetSelectedSkill() is not { } skill || !CanActOnSelection) return;
         var actions = new List<(string Label, Action Run)> { ("Open exact location", () => _openPath(skill.ResolvedPath)), ("Remove exact copy", () => TryStartSelectedRemove()) };
         if (_onPackageCheck is not null) actions.Add(("Check package", () => CheckPackage(skill)));
+        if (_onResourceReplacement is not null && CurrentResourceReplacement(skill) is { } replacement)
+            actions.Add(("Review replacement for " + InstalledOverview.Text(replacement.Target, 240), () =>
+            {
+                // Re-read the coordinator's current fact at the click boundary.
+                if (CurrentResourceReplacement(skill) is { } current && ReferenceEquals(current.Fact, replacement.Fact)
+                    && current.Target == replacement.Target) _onResourceReplacement(current.Fact, current.Target);
+            }
+            ));
         if (skill.FrontMatter.LocalPath is not null)
         {
             if (_onLocalReimport is not null) actions.Add(("Review local reimport", () => _onLocalReimport(skill)));
@@ -1047,6 +1058,13 @@ internal sealed class InstalledTabView : FrameView
         }).ToArray())
         { App = App };
         _actionsMenu.MakeVisible();
+    }
+
+    private (PackageCheckFact Fact, string Target)? CurrentResourceReplacement(InstalledSkill skill)
+    {
+        var fact = _packageCheck();
+        return _snapshot is not null && fact is not null && fact.Matches(_snapshot, _catalogGeneration(), skill)
+            && PackageResourceReplacement.Target(fact) is { } target ? (fact, target) : null;
     }
 
     internal void ReviewSelectedUpdate()

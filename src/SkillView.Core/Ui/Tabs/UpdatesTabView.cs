@@ -62,7 +62,9 @@ internal sealed partial class UpdatesTabView : FrameView
         Func<InstalledSkill, bool, CancellationToken, Task<UpdateResult>>? unpinRunner = null,
         Func<InstalledSkill, string?>? chooseTag = null,
         Func<ReplacementResult, bool, CancellationToken, Task<ReplacementResult>>? inspectUndoRunner = null,
-        Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? undoRunner = null)
+        Func<ReplacementResult, bool, CancellationToken, Task<UpdateResult>>? undoRunner = null,
+        Func<PackageCheckFact, string, string, GhSkillUpdateService.Options, CancellationToken, Task<UpdateResult>>? resourcePrepareRunner = null,
+        Func<PackageCheckFact, string, ReplacementResult, CancellationToken, Task<string>>? resourceCheckRunner = null)
     {
         _runOnUi = runOnUi;
         _runTask = runTask;
@@ -71,6 +73,8 @@ internal sealed partial class UpdatesTabView : FrameView
         _unpinRunner = unpinRunner;
         _inspectUndoRunner = inspectUndoRunner;
         _undoRunner = undoRunner;
+        _resourcePrepareRunner = resourcePrepareRunner;
+        _resourceCheckRunner = resourceCheckRunner;
         _applyRunner = applyRunner;
         _preserveRunner = preserveRunner;
         _ghPathProvider = ghPathProvider;
@@ -82,6 +86,7 @@ internal sealed partial class UpdatesTabView : FrameView
         var cancellationReporter = CancellationCallbackReporter.For(logger, "updates tab");
         _loadCancellations = new CancellationOperationSlot(cancellationReporter);
         _operationCancellations = new CancellationOperationSlot(cancellationReporter);
+        _resourceChecks = new CancellationOperationSlot(cancellationReporter);
 
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
@@ -195,8 +200,9 @@ internal sealed partial class UpdatesTabView : FrameView
 
     internal Task LoadAsync() => _drillInSubject is { } subject ? LoadForSubjectAsync(subject) : Task.CompletedTask;
 
-    internal async Task<(InventorySnapshot Snapshot, long Generation)?> LoadForSubjectAsync(OperationSubject selected)
+    internal async Task<(InventorySnapshot Snapshot, long Generation)?> LoadForSubjectAsync(OperationSubject selected, bool resourceActivation = false)
     {
+        if (!resourceActivation) { _resourceIntent = null; ClearResourceNote(); }
         // App entry points use RunOwnedTask's default runOnThreadPool:false.
         // This pre-await chooser handshake therefore runs on the UI thread;
         // snapshot work may run elsewhere and publication returns through _runOnUi.
@@ -232,6 +238,9 @@ internal sealed partial class UpdatesTabView : FrameView
 
                 _inventoryNeedsRefresh = false;
                 PopulateSelected(snapshot, selected);
+                if (_resourceIntent is { } intent && (_target is null || !PackageResourceReplacement.FreshCopy(intent.Fact, snapshot, _target)))
+                    _resourceIntent = null;
+                ShowSelectedPreview();
                 published = true;
             }).ConfigureAwait(false);
             return published ? (snapshot, loadGeneration) : null;
@@ -291,12 +300,16 @@ internal sealed partial class UpdatesTabView : FrameView
     internal IReadOnlyList<string> LoadedSkillNamesForTests => _target is { } target ? [target.Name] : [];
     internal bool BusyForTests => _spinner.Visible || _spinner.AutoSpin;
 
-    internal void ActivateExactReview(OperationSubject selected, bool prepareImmediately = true)
+    internal void ActivateExactReview(OperationSubject selected, bool prepareImmediately = true, PackageCheckFact? resourceFact = null, string? resourceTarget = null)
     {
+        _resourceIntent = resourceFact is not null && PackageResourceReplacement.Target(resourceFact) == resourceTarget
+            && resourceFact.Request.Id == selected.InstallationId && resourceFact.Request.Target.ResolvedPath == selected.Path
+            && resourceTarget is not null ? new(resourceFact, resourceTarget) : null;
+        ClearResourceNote();
         Visible = true;
         _runTask(async () =>
         {
-            var loaded = await LoadForSubjectAsync(selected).ConfigureAwait(false);
+            var loaded = await LoadForSubjectAsync(selected, resourceActivation: true).ConfigureAwait(false);
             if (loaded is not { } current) return;
             await _runOnUi(() =>
             {
@@ -350,7 +363,7 @@ internal sealed partial class UpdatesTabView : FrameView
             AllowHiddenDirectories: _hiddenBox.Value == CheckState.Checked);
         _outcomes.Clear();
         _results = new();
-        await ExecuteReviewOperationAsync(token => _updateRunner(ghPath, _options, token)).ConfigureAwait(false);
+        await PrepareSelectedAsync(ghPath, _options).ConfigureAwait(false);
     }
 
     private async Task RunUnpinAsync()
@@ -362,11 +375,14 @@ internal sealed partial class UpdatesTabView : FrameView
         _options = new([selected.Name], false, false, false, Targets: [selected], AllowHiddenDirectories: hidden);
         _outcomes.Clear();
         _results = new();
+        _resourceIntent = null;
         await ExecuteReviewOperationAsync(token => _unpinRunner(selected, hidden, token), unpinOnly: true).ConfigureAwait(false);
     }
 
     internal void CancelPendingLoad()
     {
+        _resourceIntent = null;
+        ClearResourceNote();
         Interlocked.Increment(ref _loadGeneration);
         _versionReloadPending = false;
         _versionReloadSubject = null;
@@ -379,10 +395,19 @@ internal sealed partial class UpdatesTabView : FrameView
 
     internal void CancelPendingWork()
     {
+        // Only the new pending-verification window retains an idle published
+        // result. Other cancellation and active Undo/apply keep their existing
+        // conservative clear boundary.
+        var completed = _resourceNote is { Verifying: true } && !_operationCancellations.HasActive && _undoReview is null ? _undoResult : null;
+        _resourceIntent = null;
         CancelPendingLoad();
         _operationCancellations.Cancel();
         _review = null;
+        // Canceling a follow-up cannot erase an already published native apply
+        // result. Close every approval/note; a new selection/load still clears
+        // this retained result through the ordinary ClearUndo boundary.
         ClearUndo();
+        _undoResult = completed;
         _options = null;
         _retainBox.Value = CheckState.UnChecked;
         _sourceReviewBox.Value = CheckState.UnChecked;
