@@ -44,6 +44,13 @@ outside those ancestors, for example beneath `/var/tmp`. Keep the placement guar
 and sandbox marker intact. Record the initial environment refusal separately
 from the isolated rerun.
 
+Managed fixtures that intend equal Unix payload metadata must set explicit modes
+where one side is created or sealed with a fixed mode; do not inherit that intent
+from the contributor's umask. Keep intentional mode differences explicit and
+meaningful to equality/review checks. Verify such fixture changes under both
+`umask 0002` and `umask 0022`, reusing the same build with `dotnet test --no-build`.
+Native proof tools retain their own documented environment prerequisites.
+
 Archive-copy fixtures compare their recorded address with the held native
 lease's canonical path, then require the copy to preserve that exact address.
 Lexical temporary paths can differ on macOS (`/var` versus `/private/var`).
@@ -118,6 +125,28 @@ objects/bytes. HOME/CWD/state are private, network proxies are blocked and Git
 transport is disabled. Use `--app <built host> --output <evidence.json>` and repeat
 `--gh <binary>` for minimum/current contracts. CI runs it on both native hosts
 for every RID.
+
+### Scoped formatting
+
+Run scoped formatting from the repository root with repository-relative
+`--include` paths. With the pinned SDK **10.0.113**, absolute-only include paths
+can select zero files and exit 0, even when those files have formatting errors.
+This behavior was reproduced on that SDK; do not assume the same behavior for
+other SDK versions.
+
+Use formatter reports (`--report <path>`) or diagnostic output to confirm the
+intended file selection. Exit 0, an empty report or zero formatted files alone
+does not establish selection. For example, from the repository root:
+
+```sh
+dotnet format SkillView.sln --no-restore --verify-no-changes --include src/SkillView.Core/Ui/InstalledScreen.cs --verbosity diagnostic
+```
+
+Always finish with the full solution check, without `--include` restrictions:
+
+```sh
+dotnet format SkillView.sln --no-restore --verify-no-changes
+```
 
 ### Reviewed update PTY proof (POSIX)
 

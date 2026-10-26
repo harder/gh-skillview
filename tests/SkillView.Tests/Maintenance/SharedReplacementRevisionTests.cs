@@ -28,6 +28,8 @@ public sealed partial class SharedReplacementRevisionTests : IDisposable
     public SharedReplacementRevisionTests()
     {
         Directory.CreateDirectory(Payload); Directory.CreateDirectory(AgentRoot);
+        // Equal-update fixtures need the same explicit 0755 root mode as the sealed candidate.
+        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(Payload, (UnixFileMode)493);
         File.WriteAllText(Path.Combine(Payload, "SKILL.md"), Metadata + "Local instructions\n");
         File.WriteAllText(Path.Combine(Payload, "extra"), "Keep local extra");
         Directory.CreateSymbolicLink(Exposure, Payload);
@@ -193,11 +195,16 @@ public sealed partial class SharedReplacementRevisionTests : IDisposable
     {
         if (OperatingSystem.IsWindows()) return;
         File.SetUnixFileMode(Payload, (UnixFileMode)448);
+        var before = PayloadSnapshot.Capture(Payload, Token);
         var prepared = await PrepareEqual();
         Assert.Null(prepared.Unchanged);
         Assert.NotNull(prepared.Plan);
         Assert.Contains("/", prepared.Plan.ChangedPaths);
         Assert.Equal((UnixFileMode)448, File.GetUnixFileMode(Payload));
+        var after = PayloadSnapshot.Capture(Payload, Token);
+        Assert.Equal(before.RootIdentity, after.RootIdentity);
+        Assert.Equal(before.Objects, after.Objects);
+        Assert.Equal(OriginalRegistry, File.ReadAllText(Registry));
     }
 
     [Fact]
