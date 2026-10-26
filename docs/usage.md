@@ -37,6 +37,10 @@ The main "discover and inspect" loop:
 4. Press `e` to flip the detail pane between rendered markdown and raw, `o` to open the repo in a browser, or `l` to inspect logs.
 5. Press `i` to stage an install, or `I` for the advanced wizard.
 
+Submitting a search clears the previous results. If it fails, times out, or is
+canceled by leaving Discover, the detail pane keeps the explanation until you
+search again. Search feedback in the footer clears when you leave Discover.
+
 In the compact review, **Project** uses the displayed project base; **User**
 uses your home across projects. The default is Project when this Git project
 already has a known skills folder, otherwise User. Review the scope and base,

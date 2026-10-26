@@ -22,6 +22,7 @@ public sealed partial class SkillViewApp
     internal SkillView.Ui.Tabs.DiscoverTabView? DiscoverTabForTests => _discoverTab;
     internal string DiscoverActionsForTests => _detailPane?.ItemActionsLabel.Text ?? string.Empty;
     internal void SetStatusForTests(string text, TuiHelpers.NotificationLevel level) => SetStatus(text, level);
+    internal Func<bool> CaptureStatusAutoClearForTests() => CreateStatusAutoClearCallback();
 
     internal LatestRequestGate.Lease BeginPreviewRequestForTests()
     {

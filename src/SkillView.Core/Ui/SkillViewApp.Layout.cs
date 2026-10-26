@@ -78,6 +78,12 @@ public sealed partial class SkillViewApp
         _logPane = _discoverTab.DetailPane.LogPane;
 
         // Wire event handlers that require SkillViewApp state.
+        _resultsTable.KeyDown += (sender, key) =>
+        {
+            // Terminal.Gui consumes printable keys on an empty table before
+            // they reach the window. Keep retry, help and tab shortcuts usable.
+            if (_results.Count == 0) OnWindowKeyDown(sender, key);
+        };
         _queryField.KeyDown += OnSearchFieldKey;
         _ownerField.KeyDown += OnSearchFieldKey;
         _agentField.KeyDown += OnSearchFieldKey;
@@ -434,6 +440,6 @@ public sealed partial class SkillViewApp
     private void RefreshShellChrome()
     {
         UpdateContextBar();
-        UpdateStatusStrip(string.IsNullOrEmpty(_currentStatus) ? _defaultStatus : _currentStatus, TuiHelpers.NotificationLevel.Info);
+        UpdateStatusStrip(string.IsNullOrEmpty(_currentStatus) ? _defaultStatus : _currentStatus, TuiHelpers.NotificationLevel.Info, _currentStatusDiscoverOwned);
     }
 }
