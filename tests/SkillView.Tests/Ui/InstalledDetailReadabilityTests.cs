@@ -55,7 +55,7 @@ public sealed class InstalledDetailReadabilityTests
         Assert.Equal(!pairOmitted, literal.Contains("😀", StringComparison.Ordinal));
         Assert.DoesNotContain('\uFFFD', literal);
         Assert.DoesNotContain("[truncated]", literal);
-        Assert.Contains("\n\n[truncated]\n", detail);
+        Assert.Contains(System.Environment.NewLine + System.Environment.NewLine + "[truncated]\n" + System.Environment.NewLine, detail);
         Assert.Equal(input, skill.FrontMatter.Description);
         // Enumerating runes substitutes U+FFFD for an unpaired surrogate.
         Assert.DoesNotContain(literal.EnumerateRunes(), rune => rune.Value == 0xfffd);
