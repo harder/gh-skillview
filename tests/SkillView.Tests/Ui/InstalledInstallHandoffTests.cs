@@ -108,7 +108,22 @@ public sealed class InstalledInstallHandoffTests
             "duplicate" => snapshot with { Skills = [target, target] },
             _ => snapshot,
         };
-        if (reason == "changed-native") File.WriteAllText(Path.Combine(target.ResolvedPath, "later"), "changed");
+        if (reason == "changed-native")
+        {
+            var admitted = fixture.Resolve(snapshot);
+            Assert.False(admitted.BrowseOnly);
+            var exactCopy = Assert.Single(Assert.Single(admitted.Overview.Groups).Copies);
+            Assert.Same(target, exactCopy.Target);
+            Assert.Equal([exactCopy.Key], admitted.CopyKeys);
+            // Retain the observed directory so its native ID cannot be reused;
+            // replace its exact path without changing the authored payload.
+            var retained = target.ResolvedPath + "-retained";
+            Directory.Move(target.ResolvedPath, retained);
+            var replacement = fixture.Skill(target.ScanRoot, "exact");
+            Assert.Equal(target.ResolvedPath, replacement.ResolvedPath);
+            Assert.NotEqual(target.ObservedSubject!.NativeObject.ObjectId, replacement.ObservedSubject!.NativeObject.ObjectId);
+            Assert.Equal(File.ReadAllBytes(Path.Combine(retained, "SKILL.md")), File.ReadAllBytes(Path.Combine(replacement.ResolvedPath, "SKILL.md")));
+        }
         var roots = reason == "missing-destination" ? new[] { fixture.Root, Path.Combine(fixture.Root, "absent") } : [fixture.Root];
         if (reason == "missing-destination")
         {
@@ -122,6 +137,7 @@ public sealed class InstalledInstallHandoffTests
         }
         var refusal = Assert.Throws<IOException>(() => fixture.Resolve(snapshot, roots, reason != "legacy"));
         if (reason == "missing-destination") Assert.Contains("every installation folder", refusal.Message);
+        if (reason == "changed-native") Assert.Equal("The installed physical copy changed during verification; refresh Installed before choosing it.", refusal.Message);
     }
 
     [Theory]

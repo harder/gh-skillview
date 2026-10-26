@@ -1,8 +1,10 @@
 using System.Globalization;
+using System.Text;
 using SkillView.Inventory.Models;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
+using Terminal.Gui.Text;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -57,7 +59,7 @@ public static class InstalledScreen
         return default;
     }
 
-    internal static string RenderDetail(InstalledSkill s, bool showDetails = false, string? homeDirectory = null, bool showShortcuts = true)
+    internal static string RenderDetail(InstalledSkill s, bool showDetails = false, string? homeDirectory = null, bool showShortcuts = true, int? descriptionWidth = null, int? recordedPlacementCount = null)
     {
         if (!showDetails && homeDirectory is null && s.OwnershipRunner is { } runner)
             homeDirectory = DisplayPath.CaptureHome(runner);
@@ -69,9 +71,16 @@ public static class InstalledScreen
         {
             sb.AppendLine("Description · from skill metadata (untrusted):");
             sb.AppendLine();
-            var text = (TerminalEscapeSanitizer.Sanitize(description.Length > 2048 ? description[..2048] : description) ?? "")
-                .ReplaceLineEndings("\n");
+            var length = Math.Min(description.Length, 2048);
+            if (length < description.Length && char.IsHighSurrogate(description[length - 1]) && char.IsLowSurrogate(description[length]))
+                length--;
+            var text = (TerminalEscapeSanitizer.Sanitize(description[..length]) ?? "").ReplaceLineEndings("\n");
             text = string.Concat(text.Select(c => char.IsControl(c) && c is not '\n' and not '\t' ? '\uFFFD' : c));
+            // Wrap only normalized source lines, never generated Markdown. An unknown
+            // viewport defers wrapping; every reflow starts again from the source.
+            if (descriptionWidth is > 0)
+                text = string.Join("\n", text.Split('\n').SelectMany(line => line.Length == 0
+                    ? [""] : TextFormatter.WordWrapText(line, descriptionWidth.Value, tabWidth: 4)));
             var longestRun = 0;
             var run = 0;
             foreach (var c in text)
@@ -79,40 +88,39 @@ public static class InstalledScreen
                 run = c == '`' ? run + 1 : 0;
                 longestRun = Math.Max(longestRun, run);
             }
-            // Compute after bounding and sanitizing: neither embedded fences nor
-            // controls that join backtick runs can escape this literal block.
+            // Compute after final wrapping, which can create standalone fence lines.
             var fence = new string('`', Math.Max(3, longestRun + 1));
             sb.AppendLine(fence);
             sb.AppendLine(text);
-            if (description.Length > 2048) sb.AppendLine("[truncated]");
             sb.AppendLine(fence);
             sb.AppendLine();
+            if (length < description.Length) sb.AppendLine("[truncated]\n");
         }
 
         if (!showDetails)
         {
             var recorded = s.ObservedSubject?.Source ?? s.SourceIdentity;
-            AppendDetailItem(sb, "Source", MarkdownTableFormatter.FormatCodeSpan(recorded.Key is null
-                ? (recorded.Conflicted ? "Conflicting source" : "Unknown or incomplete source") + (recorded.Origin is null ? "" : " · recorded " + InstalledOverview.SourceLabel(recorded)) : InstalledOverview.SourceLabel(recorded)));
-            AppendDetailItem(sb, "Location", MarkdownTableFormatter.FormatCodeSpan(s.ResolvedPath));
-            AppendDetailItem(sb, "Scope", InstalledInventoryFormatter.DescribeLocation(s));
+            sb.AppendLine("Source: " + Literal(recorded.Key is null
+                ? (recorded.Conflicted ? "Conflicting source" : "Unknown or incomplete source") + (recorded.Origin is null ? "" : " · recorded " + InstalledOverview.SourceLabel(recorded))
+                : InstalledOverview.SourceLabel(recorded)));
+            sb.AppendLine();
             var revision = s.Revision;
-            if (revision.RepositoryRef is { } gitRef) AppendDetailItem(sb, "Recorded Git ref", MarkdownTableFormatter.FormatCodeSpan(gitRef));
-            if (revision.AuthoredVersion is { } authored) AppendDetailItem(sb, "Authored version", MarkdownTableFormatter.FormatCodeSpan(authored));
-            if (revision.DistributorVersion is { } distributor) AppendDetailItem(sb, "Distributor version", MarkdownTableFormatter.FormatCodeSpan(distributor));
             var policy = PinDisplayPolicy.From(s);
-            AppendDetailItem(sb, "Pinned", MarkdownTableFormatter.FormatTableCell(policy.Label + " · " + policy.Description));
-            if (policy.PinnedRef is { } summaryPinnedRef) AppendDetailItem(sb, "Pinned ref", MarkdownTableFormatter.FormatCodeSpan(summaryPinnedRef));
+            var facts = new List<string> { s.Scope.ToString() };
+            if (revision.RepositoryRef is { } gitRef)
+                facts.Add(gitRef.StartsWith("refs/tags/", StringComparison.Ordinal)
+                    ? "Git tag " + Literal(gitRef["refs/tags/".Length..]) : "Recorded ref " + Literal(gitRef));
+            facts.Add("Pin: " + Literal(policy.Description));
+            sb.AppendLine(string.Join(" · ", facts));
             sb.AppendLine();
-            sb.AppendLine("## Used by · recorded placements");
-            sb.AppendLine($"{s.Agents.Length} placement(s) share this one physical copy.");
-            foreach (var agent in s.Agents)
-                sb.AppendLine("- " + MarkdownTableFormatter.FormatTableCell(agent.AgentId + " · " + (agent.Scope ?? s.Scope))
-                    + " · " + MarkdownTableFormatter.FormatCodeSpan(agent.Path)
-                    + (agent.Context is { } context ? " · " + MarkdownTableFormatter.FormatCodeSpan(context) : "")
-                    + (agent.Profile is { } profile ? " · Profile: " + MarkdownTableFormatter.FormatTableCell(profile) : ""));
-            if (s.Agents.IsEmpty) sb.AppendLine("No consumers recorded; other consumers may exist.");
+            var placements = recordedPlacementCount ?? s.Agents.Distinct().Count();
+            sb.AppendLine("1 physical copy · " + PlacementCount(placements));
             sb.AppendLine();
+            sb.AppendLine("- **Location:** " + Literal(s.ResolvedPath));
+            sb.AppendLine();
+            sb.Append(RenderPlacements(s));
+            if (revision.AuthoredVersion is { } authored) AppendDetailItem(sb, "Authored version", Literal(authored));
+            if (revision.DistributorVersion is { } distributor) AppendDetailItem(sb, "Distributor version", Literal(distributor));
             foreach (var owner in s.AllOwnershipClaims)
             {
                 AppendDetailItem(sb, "Also recorded by", MarkdownTableFormatter.FormatCodeSpan(owner.Provider + ": " + owner.Source));
@@ -217,8 +225,9 @@ public static class InstalledScreen
         if (s.Agents.Length > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("## Used by · recorded placements");
-            sb.AppendLine($"{s.Agents.Length} placement(s) share this one physical copy.");
+            sb.AppendLine("## Agent/profile placements (recorded)");
+            var count = recordedPlacementCount ?? s.Agents.Distinct().Count();
+            sb.AppendLine(PlacementCount(count) + (count == 1 ? " shares" : " share") + " this one physical copy.");
             sb.AppendLine();
             foreach (var a in s.Agents)
             {
@@ -249,6 +258,97 @@ public static class InstalledScreen
             OperationImpactFormatter.Append(sb, OperationImpact.Payload(subject, "inspect"));
         }
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
+    }
+
+    internal const int MaxRecordedPlacements = 128;
+    internal const int MaxPlacementCharacters = 32768;
+    private const int PlacementNoticeReserve = 256;
+
+    internal static string PlacementCount(int count) => $"{count} recorded placement{(count == 1 ? "" : "s")}";
+
+    private static string NormalizeLiteral(string value) => string.Concat(
+        (TerminalEscapeSanitizer.Sanitize(value) ?? "").ReplaceLineEndings(" ")
+        .Select(c => c == '\t' ? ' ' : char.IsControl(c) ? '\uFFFD' : c));
+
+    private static string Literal(string value) => MarkdownTableFormatter.FormatCodeSpan(NormalizeLiteral(value));
+
+    internal static string RenderPlacements(InstalledSkill skill)
+    {
+        // Equality remains the existing structural AgentMembership record equality.
+        // Grouping and normalized labels never change the observed denominator.
+        var ordered = skill.Agents.Distinct()
+            .OrderBy(a => a.Path, StringComparer.Ordinal)
+            .ThenBy(a => a.Scope ?? skill.Scope)
+            .ThenBy(a => a.Context is null)
+            .ThenBy(a => a.Context, StringComparer.Ordinal)
+            .ThenBy(a => NormalizeLiteral(a.AgentId), StringComparer.Ordinal)
+            .ThenBy(a => a.Profile is null ? null : NormalizeLiteral(a.Profile), StringComparer.Ordinal)
+            .ThenBy(a => a, Comparer<AgentMembership>.Create(CompareMemberships)).ToArray();
+        var included = new List<AgentMembership>();
+        var block = PlacementBlock(skill, included);
+        foreach (var member in ordered.Take(MaxRecordedPlacements))
+        {
+            included.Add(member);
+            var candidate = PlacementBlock(skill, included);
+            if (candidate.Length > MaxPlacementCharacters - PlacementNoticeReserve)
+            {
+                included.RemoveAt(included.Count - 1);
+                break;
+            }
+            block = candidate;
+        }
+        var omitted = ordered.Length - included.Count;
+        if (omitted > 0) block += $"{omitted} more recorded placement{(omitted == 1 ? "" : "s")} omitted\n\n";
+        if (ordered.Length == 0) block += "No consumers recorded; other consumers may exist.\n\n";
+        return block;
+    }
+
+    private static string PlacementBlock(InstalledSkill skill, IEnumerable<AgentMembership> members)
+    {
+        var sb = new StringBuilder("## Agent/profile placements (recorded)\n\n");
+        foreach (var path in members.GroupBy(a => a.Path, StringComparer.Ordinal))
+        {
+            sb.AppendLine(string.Equals(path.Key, skill.ResolvedPath, StringComparison.Ordinal)
+                ? "Same location" : "Location: " + Literal(path.Key));
+            sb.AppendLine();
+            foreach (var group in path.GroupBy(a => (Scope: a.Scope ?? skill.Scope, a.Context)))
+            {
+                sb.Append(group.Key.Scope);
+                if (group.Key.Context is { } context) sb.Append(" · Context: " + Literal(context));
+                else if (group.Key.Scope == Scope.Project) sb.Append(" — project root not recorded");
+                sb.Append(": ");
+                sb.AppendLine(string.Join(", ", group.GroupBy(a => (Agent: NormalizeLiteral(a.AgentId), Profile: a.Profile is null ? null : NormalizeLiteral(a.Profile)))
+                    .Select(label => MarkdownTableFormatter.FormatCodeSpan(label.Key.Agent)
+                        + (label.Key.Profile is { } profile ? " (Profile: " + MarkdownTableFormatter.FormatCodeSpan(profile) + ")" : "")
+                        + (label.Count() > 1 ? $" ×{label.Count()}" : ""))));
+                sb.AppendLine();
+            }
+        }
+        return sb.ToString();
+    }
+
+    private static int CompareMemberships(AgentMembership a, AgentMembership b)
+    {
+        // Declaration-order ties: ordinal strings (null first), ascending enums
+        // and false before true, including evidence hidden in ordinary detail.
+        var comparison = StringComparer.Ordinal.Compare(a.AgentId, b.AgentId);
+        if (comparison != 0) return comparison;
+        comparison = StringComparer.Ordinal.Compare(a.Path, b.Path);
+        if (comparison != 0) return comparison;
+        comparison = a.IsSymlink.CompareTo(b.IsSymlink);
+        if (comparison != 0) return comparison;
+        comparison = Nullable.Compare(a.Scope, b.Scope);
+        if (comparison != 0) return comparison;
+        comparison = StringComparer.Ordinal.Compare(a.Context, b.Context);
+        if (comparison != 0) return comparison;
+        comparison = StringComparer.Ordinal.Compare(a.DiscoveryRoot, b.DiscoveryRoot);
+        if (comparison != 0) return comparison;
+        comparison = StringComparer.Ordinal.Compare(a.Profile, b.Profile);
+        if (comparison != 0) return comparison;
+        comparison = StringComparer.Ordinal.Compare(a.AgentVersion, b.AgentVersion);
+        if (comparison != 0) return comparison;
+        comparison = Nullable.Compare(a.Enabled, b.Enabled);
+        return comparison != 0 ? comparison : StringComparer.Ordinal.Compare(a.LoadingRule, b.LoadingRule);
     }
 
     private static string FormatBool(bool value) => value ? "Yes" : "No";

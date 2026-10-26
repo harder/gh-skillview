@@ -23,7 +23,7 @@ public sealed class InstalledScreenTests
         var document = Markdig.Markdown.Parse(detail, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
         var description = Assert.Single(document.Descendants<FencedCodeBlock>());
         Assert.Equal("## Summary\n- **Health:** trusted claim", description.Lines.ToString());
-        Assert.Equal(2, document.Descendants<HeadingBlock>().Count()); // Only trusted name/Used by headings.
+        Assert.Equal(2, document.Descendants<HeadingBlock>().Count()); // Only trusted name/placements headings.
         Assert.DoesNotContain(document.Descendants<EmphasisInline>(), emphasis => emphasis.ToString()!.Contains("Health", StringComparison.Ordinal));
     }
 
@@ -66,19 +66,32 @@ public sealed class InstalledScreenTests
         { FrontMatter = SkillFrontMatter.Empty with { Description = input } };
         var detail = InstalledScreen.RenderDetail(skill);
         var document = Markdig.Markdown.Parse(detail, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
-        var lines = Assert.Single(document.Descendants<FencedCodeBlock>()).Lines;
-        var marker = lines.Lines[lines.Count - 1].Slice;
-        var descriptionEnd = lines.Lines[lines.Count - 2].Slice.End + 1;
+        var block = Assert.Single(document.Descendants<FencedCodeBlock>());
+        var lines = block.Lines;
+        var descriptionEnd = lines.Lines[lines.Count - 1].Slice.End + 1;
         var boundedDescription = detail[lines.Lines[0].Slice.Start..descriptionEnd];
-        Assert.Equal("[truncated]", marker.ToString());
-        Assert.Equal(System.Environment.NewLine, detail[descriptionEnd..marker.Start]);
-        // Change only this trusted AppendLine separator, leaving metadata bytes
-        // intact, so both platform conventions are exercised on every host.
-        detail = detail[..descriptionEnd] + generatedNewLine + detail[marker.Start..];
+        var markerStart = detail.IndexOf("[truncated]", StringComparison.Ordinal);
+        Assert.True(markerStart > block.Span.End);
+        var marker = Assert.Single(document.Descendants<ParagraphBlock>(), paragraph => paragraph.Span.Start == markerStart);
+        Assert.Equal("[truncated]", detail[marker.Span.Start..(marker.Span.End + 1)]);
+        Assert.Equal(block.OpeningFencedCharCount, block.ClosingFencedCharCount);
+        var fence = new string(block.FencedChar, block.ClosingFencedCharCount);
+        Assert.Equal(System.Environment.NewLine + fence + System.Environment.NewLine + System.Environment.NewLine,
+            detail[descriptionEnd..markerStart]);
+        // C3 closes the fence before the separate notice paragraph. Change only
+        // these trusted AppendLine separators; metadata's interior bytes stay raw.
+        detail = detail[..descriptionEnd] + generatedNewLine + fence + generatedNewLine + generatedNewLine + detail[markerStart..];
         document = Markdig.Markdown.Parse(detail, new MarkdownPipelineBuilder().UseAdvancedExtensions().Build());
-        var literal = Assert.Single(document.Descendants<FencedCodeBlock>()).Lines.ToString();
-        Assert.EndsWith("\n[truncated]", literal);
-        Assert.Equal(boundedDescription + generatedNewLine + "[truncated]", literal);
+        block = Assert.Single(document.Descendants<FencedCodeBlock>());
+        var literal = block.Lines.ToString();
+        Assert.Equal(boundedDescription, detail[block.Lines.Lines[0].Slice.Start..(block.Lines.Lines[block.Lines.Count - 1].Slice.End + 1)]);
+        Assert.Equal(boundedDescription, literal);
+        Assert.DoesNotContain("[truncated]", literal);
+        Assert.Contains(fence + generatedNewLine + generatedNewLine + "[truncated]\n", detail);
+        markerStart = detail.IndexOf("[truncated]", StringComparison.Ordinal);
+        Assert.True(markerStart > block.Span.End);
+        marker = Assert.Single(document.Descendants<ParagraphBlock>(), paragraph => paragraph.Span.Start == markerStart);
+        Assert.Equal("[truncated]", detail[marker.Span.Start..(marker.Span.End + 1)]);
         Assert.DoesNotContain("file:///tail", detail);
         Assert.Empty(document.Descendants<LinkInline>());
         // Inspect the raw payload span, including its original interior newlines:
@@ -245,7 +258,7 @@ public sealed class InstalledScreenTests
         Assert.Contains("- **Package URL:** [Open package source](https://example.test/owner/repo)", detail);
         Assert.Contains("Description · from skill metadata", detail);
         Assert.Contains("Example description", detail);
-        Assert.Contains("## Used by", detail);
+        Assert.Contains("## Agent/profile placements (recorded)", detail);
         Assert.Contains($"- {TuiHelpers.AgentIcon("copilot")} **copilot** — symlink", detail);
         Assert.Contains("  Path: `/Users/test/.config/skills/demo`", detail);
     }

@@ -92,8 +92,8 @@ public sealed class DiscoveryTests : IDisposable
         Assert.Equal(["one", "two"], skill.Agents.Select(agent => agent.Profile).Order());
         Assert.All(skill.Agents, agent => { Assert.Null(agent.Enabled); Assert.Contains("unknown", agent.LoadingRule); });
         var detail = InstalledScreen.RenderDetail(skill);
-        Assert.Contains("Profile: one", detail, StringComparison.Ordinal);
-        Assert.Contains("Profile: two", detail, StringComparison.Ordinal);
+        Assert.Contains("Profile: `one`", detail, StringComparison.Ordinal);
+        Assert.Contains("Profile: `two`", detail, StringComparison.Ordinal);
     }
 
     [Fact]

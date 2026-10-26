@@ -100,7 +100,7 @@ public sealed class TerminalEscapeSanitizerTests
 
         Assert.DoesNotContain('\x1b', detail);
         Assert.DoesNotContain('\x07', detail);
-        Assert.Contains("## Used by", detail);
+        Assert.Contains("## Agent/profile placements (recorded)", detail);
         Assert.Contains("legacy-lock: pkg", detail);
         Assert.DoesNotContain("bad", detail);
     }
