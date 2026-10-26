@@ -54,8 +54,10 @@ internal sealed class ChangesTabView : FrameView
     private bool _showDetails;
     private long _loadGeneration;
     private CachedQueue? _cachedQueue;
-    private sealed record CachedQueue(InventorySnapshot Snapshot, ChangesQueueProjection Projection, bool Partial);
+    private sealed record CachedQueue(InventorySnapshot Snapshot, ChangesQueueProjection Projection, bool Partial, InstalledIssueEvidence Evidence);
     private readonly CancellationOperationSlot _loadCancellations;
+    private readonly Func<long> _catalogGeneration;
+    internal InstalledIssueEvidence? CapturedIssues => _disposed || _lifetimeToken.IsCancellationRequested ? null : _cachedQueue?.Evidence;
 
     internal ChangesTabView(
         Func<Action, Task> runOnUi,
@@ -68,8 +70,9 @@ internal sealed class ChangesTabView : FrameView
         Action<Func<Task>, string>? runTask = null,
         Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? activateEntryAsync = null,
         Action? onRefresh = null, string? homeDirectory = null,
-        UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null)
+        UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null, Func<long>? catalogGeneration = null)
     {
+        _catalogGeneration = catalogGeneration ?? (() => 0);
         _homeDirectory = homeDirectory;
         _availability = availability;
         _onCheckUpdates = onCheckUpdates;
@@ -179,23 +182,31 @@ internal sealed class ChangesTabView : FrameView
 
         try
         {
+            var catalogGeneration = _catalogGeneration();
             var snapshot = await _snapshotLoader(loadCancellation.Token).ConfigureAwait(false);
             var cached = Volatile.Read(ref _cachedQueue);
-            if (cached is null || !ReferenceEquals(cached.Snapshot, snapshot))
+            if (cached is null || !ReferenceEquals(cached.Snapshot, snapshot) || cached.Evidence.Generation != catalogGeneration)
             {
                 // A cached snapshot can complete synchronously on the UI thread.
                 // Classification still performs filesystem observations.
                 cached = await Task.Run(() =>
                 {
                     var queue = MaintenanceQueueBuilder.Build(snapshot, loadCancellation.Token);
-                    return new CachedQueue(snapshot, ChangesQueueBuilder.Build(queue, loadCancellation.Token), queue.Partial);
+                    return new CachedQueue(snapshot, ChangesQueueBuilder.Build(queue, loadCancellation.Token), queue.Partial, InstalledIssueEvidence.Capture(snapshot, catalogGeneration, queue));
                 }, loadCancellation.Token).ConfigureAwait(false);
             }
             var projection = cached.Projection;
 
             await _runOnUi(() =>
             {
-                if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested) return;
+                if (Interlocked.Read(ref _loadGeneration) != gen || loadCancellation.Token.IsCancellationRequested
+                    || _disposed || _lifetimeToken.IsCancellationRequested) return;
+                if (catalogGeneration != _catalogGeneration())
+                {
+                    SetLoading(false);
+                    _status.Text = " Inventory changed; refresh Issues to load current findings.";
+                    return;
+                }
                 _snapshot = snapshot;
                 _cachedQueue = cached;
                 _projection = projection;

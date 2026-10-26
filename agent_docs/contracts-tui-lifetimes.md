@@ -291,3 +291,18 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   old rows visibly refreshing with copy actions paused. Bound display to 8,192
   rows including headings and omission indication. C (Shift+c) remains global
   check/cancel; c remains Cleanup. The existing Issues copy chooser is separate.
+
+- Installed's four visible selectors use stable captured keys, never shortened
+  display labels. Tab reaches each direct choice popup; Esc cancels it. Keep
+  missing choices visibly unavailable with zero matches until explicit clearing.
+  Preserve exact selection, expansion, top-row anchor, sort and detail focus;
+  local filters/coverage must not capture, classify, hash or launch gh children.
+  Coverage reuses the shared inline detail and Back; no inventory browser/modal.
+- Issues exposes only its already-built queue's read-only finding addresses,
+  associated with the exact capture reference and catalog generation. Installed
+  never loads findings itself. Partial evidence can prove a finding, never safe
+  absence; mismatched/stale/not-loaded evidence is unknown. Subjectless findings
+  remain Issues-only. Installed captures the evidence reference and catalog
+  generation once per view refresh and reuses that pair for every row, choice,
+  count and status in that refresh. No new event bus/cache/classifier owns this
+  handoff. Restore selector focus only while its view lifetime is still active.
