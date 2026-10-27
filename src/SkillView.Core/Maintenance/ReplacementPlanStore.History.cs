@@ -15,7 +15,7 @@ internal sealed record ReplacementHistoryEntry(string Id, string Hint, bool MayN
 internal sealed record ReplacementHistory(ImmutableArray<ReplacementHistoryEntry> Entries,
     int ObservedCount, bool HasOmissions, string? Error = null)
 {
-    internal const string LimitGuidance = "History has reached the read-only limit of 16 retained operations. Open History (F4) to inspect retained evidence. This version cannot retire operations or free this capacity.";
+    internal const string LimitGuidance = "History quota has reached the read-only limit of 16 retained operations. Open History (F4) to inspect retained evidence. This version cannot retire operations or free this capacity.";
     internal string Summary => Error is not null ? "History unavailable: " + Error
         : $"{ObservedCount}{(HasOmissions ? "+" : "")} retained operations; "
             + $"{Entries.Count(entry => entry.MayNeedRecovery)} shown may need recovery (hint)."

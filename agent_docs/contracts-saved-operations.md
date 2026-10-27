@@ -289,6 +289,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   fresh inventory and existing full Observe/schema/hash checks. Keep current
   inspection fingerprints separate from immutable plan fingerprints. History
   provides no resume/undo/retire action or quota-release promise. Preflight new
-  reviews before source resolution/private staging and retain the writer-held
-  allocation quota check. CLI `replacement-history` lists hints; `history` keeps
-  its existing backup verification semantics and wire format.
+  reviews before source resolution/private staging, except same-source local
+  reimport: its allocation-free no-op requires the existing bounded held capture,
+  metadata checks and actual private gh preview even at full capacity. Source
+  switching keeps early admission. Changed reimports must pass the writer-held
+  allocation quota check before creating any final operation. Quota refusals
+  retain the literal `quota` and History guidance. CLI `replacement-history` lists
+  hints; `history` keeps its existing backup verification semantics and wire format.
