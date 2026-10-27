@@ -3,6 +3,7 @@ using System.Drawing;
 using SkillView.Gh;
 using SkillView.Gh.Models;
 using SkillView.Logging;
+using SkillView.Subprocess;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
@@ -33,13 +34,11 @@ public sealed class InstallScreen
     private static readonly ImmutableArray<InstallAgentCatalog.Entry> KnownAgentEntries = InstallAgentCatalog.Entries;
 
     // Labels are user-facing; values are the literals `gh skill install --scope`
-    // accepts. "Global" reads more clearly than "User" — per `gh skill install
-    // --help`, the user scope installs into the home directory and is
-    // available everywhere, which is what people mean by "global".
+    // accepts. User scope installs into home folders across projects.
     public static readonly (string Label, string Value)[] ScopeChoices =
     {
         ("Project", "project"),
-        ("Global", "user"),
+        ("User", "user"),
         ("Custom", "custom"),
     };
 
@@ -50,6 +49,11 @@ public sealed class InstallScreen
     private readonly InstallRequest _request;
 
     private readonly InstallAttemptRun _attempts;
+    private readonly ProcessRunner _runner;
+    private readonly Func<bool> _contextCurrent;
+    private readonly Func<InstallNavigationEvidence, CancellationToken, Task<InstalledInstallHandoff>>? _findInstalled;
+    private readonly Func<InstalledInstallHandoff, bool>? _canPublish;
+    internal InstalledInstallHandoff? Handoff { get; private set; }
 
     internal IReadOnlyList<InstallAttemptReceipt> Attempts => _attempts.Receipts;
 
@@ -64,30 +68,49 @@ public sealed class InstallScreen
         Logger logger,
         string ghPath,
         InstallRequest request,
-        InstallAttemptRun attempts)
+        InstallAttemptRun attempts,
+        Func<InstallNavigationEvidence, CancellationToken, Task<InstalledInstallHandoff>>? findInstalled = null,
+        Func<InstalledInstallHandoff, bool>? canPublish = null)
     {
         _attempts = attempts;
         _app = app;
-        _install = new GhSkillInstallService(install.CaptureContext(), logger);
+        _runner = install.CaptureContext();
+        var contextKey = InstallNavigationEvidence.Context(_runner);
+        _contextCurrent = () => contextKey == InstallNavigationEvidence.Context(install.CaptureContext());
+        _install = new(_runner, logger);
+        _findInstalled = findInstalled;
+        _canPublish = canPublish;
         _logger = logger;
         _ghPath = ghPath;
         _request = request;
     }
 
-    public void Show()
+    public void Show() => ShowCore(null);
+
+    internal void ShowForTests(Action<Dialog, ModalOperationTracker> ready) => ShowCore(ready);
+
+    private void ShowCore(Action<Dialog, ModalOperationTracker>? ready)
     {
         using var dialog = new Dialog
         {
             Title = $"Install — {_request.Repo}{(_request.SkillName is null ? "" : "/" + _request.SkillName)}",
-            Width = Dim.Percent(85),
-            Height = Dim.Percent(85),
+            Width = Dim.Func(_ => Math.Min(100, _app.Screen.Width - 4)),
+            Height = Dim.Fill(2),
         };
         using var operation = new ModalOperationTracker(_app, _logger, "install.ui");
+
+        var form = new View { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(6), CanFocus = true };
+        form.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
+        var preparing = true;
+        form.FrameChanged += (_, _) => form.SetContentSize(new Size(Math.Max(1, form.Viewport.Width),
+            form.GetContentSize().Height));
 
         // ── SOURCE ─────────────────────────────────────────────────────
         var sourceFrame = new FrameView
         {
             Title = "Source",
+            CanFocus = true,
+            TabStop = TabBehavior.TabStop,
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
@@ -107,7 +130,8 @@ public sealed class InstallScreen
         {
             X = Pos.Right(skillField) + 2,
             Y = 0,
-            Text = "(blank = repo's default skill)",
+            Text = "(blank lists the repository; no install)",
+            Visible = false,
         };
 
         var versionLabel = new Label { Text = "Version    :", X = 0, Y = 1 };
@@ -119,6 +143,9 @@ public sealed class InstallScreen
             Text = string.Empty,
         };
         TuiHelpers.ConfigureTextInput(versionField, SkillViewStyling.DialogSchemeName);
+        // Discover's path was observed at this initial version only. A later
+        // version choice cannot borrow that source-path navigation evidence.
+        var navigationVersion = NullIfEmpty(versionField.Text);
         var pinBox = new CheckBox
         {
             X = Pos.Right(versionField) + 2,
@@ -131,7 +158,7 @@ public sealed class InstallScreen
             X = 13,
             Y = 2,
             Width = Dim.Fill(2),
-            Text = "→ blank uses the latest release",
+            Text = "→ gh default (not resolved)",
         };
 
         // gh uses a boolean flag to install from the upstream source when a
@@ -151,6 +178,8 @@ public sealed class InstallScreen
         var whereFrame = new FrameView
         {
             Title = "Where",
+            CanFocus = true,
+            TabStop = TabBehavior.TabStop,
             X = 0,
             Y = Pos.Bottom(sourceFrame),
             Width = Dim.Fill(),
@@ -164,14 +193,16 @@ public sealed class InstallScreen
             Y = 0,
             Orientation = Orientation.Horizontal,
             Labels = ScopeChoices.Select(s => s.Label).ToList(),
-            Value = DefaultScopeIndex(),
+            Value = 1,
+            FocusedItem = 1,
+            Enabled = false,
         };
         var scopeHint = new Label
         {
             X = 13,
             Y = 1,
             Width = Dim.Fill(2),
-            Text = "Project = repo skill dir · Global = home skill dir (everywhere)",
+            Text = "Project: this project · User: across projects",
         };
 
         var pathLabel = new Label { Text = "Custom path:", X = 0, Y = 2 };
@@ -186,28 +217,23 @@ public sealed class InstallScreen
         TuiHelpers.ConfigureTextInput(pathField, SkillViewStyling.DialogSchemeName);
 
         var agentsLabel = new Label { Text = "Agents     :", X = 0, Y = 3 };
-        var installedAgents = DetectInstalledAgents();
-        var anyInstalled = installedAgents.Count > 0;
         var agentsView = new View
         {
             X = 13,
             Y = 3,
             Width = Dim.Fill(2),
             Height = AgentsVisibleRows,
+            Enabled = false,
         };
         agentsView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
-        var agentGrid = AgentCheckboxGrid.Build(KnownAgentEntries, installedAgents, perRow: 4);
-        var agentBoxes = agentGrid.Boxes;
-        foreach (var cb in agentBoxes) agentsView.Add(cb);
-        agentsView.SetContentSize(new Size(agentGrid.ContentWidth, agentGrid.RowCount));
+        var agentSelection = new InstallAgentSelection(agentsView);
+        var agentBoxes = agentSelection.Boxes;
         var agentsHint = new Label
         {
-            X = 13,
+            X = 0,
             Y = 3 + AgentsVisibleRows,
             Width = Dim.Fill(2),
-            Text = anyInstalled
-                ? "(pre-checked from detected agents — adjust as needed)"
-                : "(blank = universal — shared .agents/skills, not agent-specific)",
+            Text = "Detected config first; no selection = Universal/shared.",
         };
 
         whereFrame.Add(scopeLabel, scopeSelector, scopeHint,
@@ -218,6 +244,8 @@ public sealed class InstallScreen
         var behaviorFrame = new FrameView
         {
             Title = "Behavior",
+            CanFocus = true,
+            TabStop = TabBehavior.TabStop,
             X = 0,
             Y = Pos.Bottom(whereFrame),
             Width = Dim.Fill(),
@@ -228,7 +256,7 @@ public sealed class InstallScreen
         {
             X = 0,
             Y = 0,
-            Text = "_force overwrite existing install",
+            Text = "_force fresh install (occupied folders stay refused)",
         };
         behaviorFrame.Add(forceBox);
         var behaviorRow = 1;
@@ -251,6 +279,19 @@ public sealed class InstallScreen
         behaviorFrame.Add(fromLocalBox);
 
         // ── PREVIEW + STATUS ───────────────────────────────────────────
+        behaviorFrame.Visible = false;
+        behaviorFrame.Height = 0;
+        var moreOptions = new SingleRowButton { X = 0, Y = Pos.Bottom(whereFrame), Text = "More options" };
+        behaviorFrame.Y = Pos.Bottom(moreOptions);
+        moreOptions.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            behaviorFrame.Visible = !behaviorFrame.Visible;
+            behaviorFrame.Height = behaviorFrame.Visible ? BehaviorFrameHeight() : 0;
+            moreOptions.Text = behaviorFrame.Visible ? "Fewer options" : "More options";
+            form.SetContentSize(new Size(Math.Max(1, form.Viewport.Width), SourceFrameHeight() + WhereFrameHeight() + 3 + (behaviorFrame.Visible ? BehaviorFrameHeight() : 0)));
+        };
+
         var previewLabel = new Label
         {
             X = 0,
@@ -281,7 +322,7 @@ public sealed class InstallScreen
         var installButton = new Button
         {
             Text = "_Install",
-            X = Pos.Center() - 12,
+            X = 0,
             Y = Pos.AnchorEnd(1),
             IsDefault = true,
         };
@@ -295,9 +336,25 @@ public sealed class InstallScreen
         var cancelButton = new Button
         {
             Text = "_Cancel",
-            X = Pos.Right(installButton) + 4,
+            X = Pos.Right(installButton) + 2,
             Y = Pos.AnchorEnd(1),
         };
+
+        var placementText = "Placement observation pending.";
+        var placementButton = new SingleRowButton { X = Pos.Right(installButton) + 2, Y = Pos.AnchorEnd(1), Text = "Review placement" };
+        cancelButton.X = Pos.Right(placementButton) + 2;
+        placementButton.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            if (operation.CurrentOwnership == ModalOperationTracker.Ownership.None)
+                InstallFailureDetails.Show(_app, placementText, title: " Placement and conflicts (guidance) ");
+        };
+        using var placement = new InstallPlacementPreview(_runner, _logger, _app.Invoke,
+            observation => placementText = observation.Detail, _contextCurrent);
+
+        scopeSelector.KeyBindings.ReplaceCommands(KeyCode.Enter, Command.Activate);
+        foreach (var box in scopeSelector.SubViews.OfType<CheckBox>().Concat(new[] { pinBox, upstreamBox, forceBox, allowHiddenBox, fromLocalBox }))
+            box.KeyBindings.ReplaceCommands(KeyCode.Enter, Command.Activate);
 
         // ── LIVE BEHAVIOR ──────────────────────────────────────────────
         // Build Options from the current widget state. Used both by the
@@ -327,7 +384,12 @@ public sealed class InstallScreen
                 Overwrite: forceBox.Value == CheckState.Checked,
                 Upstream: upstreamBox.Value == CheckState.Checked,
                 AllowHiddenDirs: allowHiddenBox.Value == CheckState.Checked,
-                FromLocal: fromLocalBox.Value == CheckState.Checked);
+                FromLocal: fromLocalBox.Value == CheckState.Checked)
+            {
+                NavigationSource = NullIfEmpty(skillField.Text) == _request.SkillName
+                    && NullIfEmpty(versionField.Text) == navigationVersion
+                    ? InstallNavigationEvidence.SourceAnchor(_request.Repo, _request.SourcePath) : null,
+            };
         }
 
         void Refresh()
@@ -340,7 +402,7 @@ public sealed class InstallScreen
                 (pinBox.Value == CheckState.Checked || string.IsNullOrWhiteSpace(skillField.Text));
             versionResolved.Text = hasVersion
                 ? $"→ will install ref '{versionField.Text!.Trim()}'" + (effectivePin ? " (pinned)" : "")
-                : "→ blank uses the latest release";
+                : "→ gh default (not resolved)";
 
             // Custom-path enable
             var scopeIdx = scopeSelector.Value ?? 0;
@@ -350,13 +412,15 @@ public sealed class InstallScreen
 
             // Validation: Custom scope needs a path
             var customMissing = isCustom && string.IsNullOrWhiteSpace(pathField.Text);
-            installButton.Enabled = !customMissing && !spinner.Visible;
+            installButton.Enabled = !preparing && !customMissing && !spinner.Visible;
             if (customMissing) status.Text = " custom scope needs a path";
             else if (!spinner.Visible) status.Text = " ready — review the options, then press Install";
 
             // Command preview
             var args = GhSkillInstallService.BuildArgs(_request.Repo, NullIfEmpty(skillField.Text), BuildOptions());
             previewLabel.Text = "$ gh " + string.Join(' ', args);
+            if (!preparing && LastResult?.Succeeded != true)
+                placement.Update(_ghPath, _request.Repo, NullIfEmpty(skillField.Text), BuildOptions());
         }
 
         versionField.TextChanged += (_, _) => Refresh();
@@ -412,15 +476,39 @@ public sealed class InstallScreen
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
-                    if (result.Succeeded)
+                    if (result.ReadOnlyDiscovery)
                     {
-                        status.Text = $" install succeeded — closing";
-                        dialog.RequestStop();
+                        operation.Release();
+                        form.Visible = false; installButton.Visible = placementButton.Visible = false;
+                        cancelButton.Enabled = true; cancelButton.Text = "Back to Discover"; cancelButton.X = 0;
+                        status.Text = "Repository listing completed. No install started.";
+                        cancelButton.SetFocus();
+                    }
+                    else if (result.Succeeded)
+                    {
+                        operation.Release();
+                        form.Visible = false;
+                        installButton.Text = result.Navigation is null ? "Browse Installed" : "View installed skill";
+                        installButton.Enabled = true;
+                        placementButton.Visible = false;
+                        cancelButton.X = Pos.Right(installButton) + 2;
+                        cancelButton.Text = "Back to Discover";
+                        cancelButton.Enabled = true;
+                        dialog.Height = 12;
+                        status.Y = 1;
+                        status.Height = 7;
+                        status.Text = "Install completed. " + (receipt.Refresh == InstallRefreshState.Completed
+                            ? (result.Navigation is null ? "Installed refreshed. Exact-copy navigation is unavailable for this placement/source; browse Installed manually." : "Installed refreshed. Choose View installed skill to verify the exact copy.") : receipt.Guidance);
+                        installButton.SetFocus();
                     }
                     else
                     {
                         operation.Release();
                         status.Text = (result.Canceled ? "Install canceled. " : "Install failed. ") + receipt.Guidance;
+                        form.Enabled = true;
+                        placementButton.Enabled = true;
+                        detailsButton.X = Pos.Right(placementButton) + 2;
+                        cancelButton.X = Pos.Right(detailsButton) + 2;
                         detailsButton.Visible = true;
                         detailsButton.Enabled = true;
                         installButton.Enabled = !result.Canceled;
@@ -448,6 +536,8 @@ public sealed class InstallScreen
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
                     var snippet = TuiHelpers.ErrorSnippet(ex.Message);
+                    form.Enabled = true;
+                    placementButton.Enabled = true;
                     status.Text = snippet.Length > 0
                         ? $" install failed: {snippet}"
                         : " install failed — see logs";
@@ -461,8 +551,40 @@ public sealed class InstallScreen
             ev.Handled = true;
             if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None) return;
 
-            var options = BuildOptions();
+            if (LastResult?.Succeeded == true)
+            {
+                operation.TryStart(async token =>
+                {
+                    try
+                    {
+                        if (LastResult.Navigation is not { } evidence || _findInstalled is null)
+                            throw new IOException("Exact-copy navigation needs the unchanged named Discover source at User or Project scope. Browse Installed after inspection; custom folders may need a scan root.");
+                        var found = await _findInstalled(evidence, token).ConfigureAwait(false);
+                        operation.InvokeTerminalIfActive(() =>
+                        {
+                            if (token.IsCancellationRequested || dialog.StopRequested || !dialog.IsRunning || !ReferenceEquals(_app.TopRunnableView, dialog)) return;
+                            if (_canPublish?.Invoke(found) != true) { operation.Release(); status.Text = "Inventory or context changed; refresh Installed."; return; }
+                            Handoff = found; dialog.RequestStop();
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        operation.InvokeTerminalIfActive(() => { operation.Release(); status.Text = InstallFailureDetails.Literal(ex.Message); cancelButton.SetFocus(); });
+                    }
+                });
+                return;
+            }
+            if (!_contextCurrent()) { status.Text = "Installation context changed; reopen this dialog."; return; }
+            var reviewed = placement.Current;
+            placement.Cancel();
+            var options = BuildOptions() with
+            {
+                ReviewedDestinations = reviewed?.Roots.Count > 0 ? reviewed.Roots : null,
+                ReviewedContext = reviewed?.ContextKey,
+            };
             var skillName = NullIfEmpty(skillField.Text);
+            form.Enabled = false;
+            placementButton.Enabled = false;
             spinner.Visible = true;
             spinner.AutoSpin = true;
             installButton.Enabled = false;
@@ -490,9 +612,52 @@ public sealed class InstallScreen
             dialog.RequestStop();
         };
 
-        dialog.Add(sourceFrame, whereFrame, behaviorFrame,
-            previewLabel, status, spinner,
-            installButton, detailsButton, cancelButton);
+        form.Add(sourceFrame, whereFrame, moreOptions, behaviorFrame, previewLabel);
+        void KeepFocusVisible(View view)
+        {
+            foreach (var child in view.SubViews)
+            {
+                KeepFocusVisible(child);
+                child.HasFocusChanged += (_, _) =>
+                {
+                    if (!child.HasFocus || child.SubViews.Count > 0) return;
+                    var top = child.FrameToScreen().Top - form.ViewportToScreen().Top + form.Viewport.Y;
+                    var viewport = form.Viewport;
+                    var offset = top < viewport.Y ? top : top >= viewport.Bottom ? top - viewport.Height + 1 : viewport.Y;
+                    if (offset != viewport.Y) form.Viewport = viewport with { Y = Math.Max(0, offset) };
+                };
+            }
+        }
+        KeepFocusVisible(form);
+        // Nested frame groups restore their last focused child on re-entry.
+        // Keep one ordered Tab route through the entire scrolling form/footer.
+        var tabOrder = new View[] { skillField, versionField, pinBox, upstreamBox }
+            .Concat(scopeSelector.SubViews.OfType<CheckBox>()).Concat([pathField, agentSelection.More])
+            .Concat(agentBoxes).Concat([moreOptions, forceBox, allowHiddenBox, fromLocalBox,
+                installButton, placementButton, detailsButton, cancelButton]).ToArray();
+        bool Available(View view)
+        {
+            if (!view.CanFocus) return false;
+            for (var current = view; current is not null; current = current.SuperView)
+                if (!current.Visible || !current.Enabled) return false;
+            return true;
+        }
+        void Traverse(object? sender, Key key)
+        {
+            if (key.Handled || key.KeyCode is not KeyCode.Tab && key.KeyCode != (KeyCode.Tab | KeyCode.ShiftMask)) return;
+            var choices = tabOrder.Where(Available).ToArray();
+            if (choices.Length == 0) return;
+            var selected = Array.FindIndex(choices, view => view.HasFocus);
+            var step = key.KeyCode == KeyCode.Tab ? 1 : -1;
+            var index = selected < 0 ? (step > 0 ? 0 : choices.Length - 1)
+                : (selected + step + choices.Length) % choices.Length;
+            key.Handled = true;
+            choices[index].SetFocus();
+        }
+        foreach (var control in tabOrder) control.KeyDown += Traverse;
+        dialog.KeyDown += Traverse;
+        form.SetContentSize(new Size(Math.Max(1, form.Viewport.Width), SourceFrameHeight() + WhereFrameHeight() + 3));
+        dialog.Add(form, status, spinner, installButton, placementButton, detailsButton, cancelButton);
 
         dialog.KeyDown += (_, key) =>
         {
@@ -517,7 +682,35 @@ public sealed class InstallScreen
         };
 
         Refresh();
-        installButton.SetFocus();
+        status.Text = "Preparing captured project scope and agent observations…";
+        operation.TryStart(async token =>
+        {
+            try
+            {
+                using var deadline = new SkillView.Threading.CancellationSource(token, TimeSpan.FromSeconds(15),
+                    SkillView.Threading.CancellationCallbackReporter.For(_logger, "install preparation"));
+                var preparationToken = deadline.Token;
+                var detected = InstallAgentSelection.Detect(_runner);
+                var project = await GhPlacementCatalog.ProjectRootAsync(_runner, new(), _runner.EffectiveWorkingDirectory, preparationToken).ConfigureAwait(false);
+                var projectSelected = InstallAgentCatalog.HasProjectScopeCandidate(project);
+                operation.InvokeTerminalIfActive(() =>
+                {
+                    if (token.IsCancellationRequested) { dialog.RequestStop(); return; }
+                    agentSelection.SetDetected(detected);
+                    scopeSelector.Value = projectSelected ? 0 : 1;
+                    scopeSelector.FocusedItem = scopeSelector.Value!.Value;
+                    scopeSelector.Enabled = agentsView.Enabled = true;
+                    preparing = false;
+                    operation.Release(); Refresh(); installButton.SetFocus();
+                });
+            }
+            catch (Exception ex)
+            {
+                operation.InvokeTerminalIfActive(() => { operation.Release(); status.Text = "Preparation failed: " + InstallFailureDetails.Literal(ex.Message); });
+            }
+        });
+        cancelButton.SetFocus();
+        ready?.Invoke(dialog, operation);
         try
         {
             _app.Run(dialog);
@@ -550,38 +743,6 @@ public sealed class InstallScreen
         // 2 frame borders + scope row + scope-hint row + path row +
         // agents grid (scrollable, fixed height) + agents hint row
         return 2 + 1 + 1 + 1 + AgentsVisibleRows + 1;
-    }
-
-    private int DefaultScopeIndex()
-    {
-        // If any project-scope agent dir exists in cwd, default to Project,
-        // otherwise default to User. Saves the user a click in the common
-        // "I'm not in a project" case.
-        try
-        {
-            if (InstallAgentCatalog.HasProjectScopeCandidate(Directory.GetCurrentDirectory())) return 0;
-        }
-        catch { /* fall through to User */ }
-        return 1;
-    }
-
-    private static HashSet<string> DetectInstalledAgents()
-    {
-        // Heuristic: an agent is "installed" if its conventional home
-        // directory exists. Cheap, AOT-safe, and good enough to pre-check
-        // the right boxes for most users. False negatives just mean the
-        // user toggles the box themselves.
-        var found = new HashSet<string>(StringComparer.Ordinal);
-        try
-        {
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (string.IsNullOrEmpty(home)) return found;
-            return InstallAgentCatalog.DetectInstalledGhIds(
-                home,
-                Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR"), Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"));
-        }
-        catch { /* best-effort detection */ }
-        return found;
     }
 
     private static string? NullIfEmpty(string? s)

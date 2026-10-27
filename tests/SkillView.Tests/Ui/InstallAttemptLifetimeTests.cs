@@ -77,7 +77,7 @@ public sealed class InstallAttemptLifetimeTests
     [InlineData(120, 36)]
     public async Task ForcedModalShutdownWithRefusedTerminationReturnsUnknownWriterWithoutLateUi(int width, int height)
     {
-        using var child = new RefusingTerminationChild();
+        using var child = new RefusingTerminationChild { OnlyMutatingInstalls = true };
         using var fixture = new InstallAttemptTests.Fixture("wait", child.Runner);
         var coordinator = fixture.Coordinator();
         var attempts = coordinator.CreateInstallAttemptRun(fixture.Report);

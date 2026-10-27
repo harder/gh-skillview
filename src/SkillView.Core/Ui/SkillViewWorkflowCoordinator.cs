@@ -12,6 +12,12 @@ namespace SkillView.Ui;
 internal sealed partial class SkillViewWorkflowCoordinator
 {
     private readonly DisplayInventoryCache _displayInventory;
+    internal DiscoverInstalledObservation? DiscoverObservation => _displayInventory.Observation;
+    internal event Action? DisplayObservationChanged
+    {
+        add => _displayInventory.ObservationChanged += value;
+        remove => _displayInventory.ObservationChanged -= value;
+    }
     private long _installHandoffGeneration;
     private readonly TuiServices _services;
     private readonly AppOptions _options;
@@ -91,7 +97,9 @@ internal sealed partial class SkillViewWorkflowCoordinator
             var compact = new InstallConfirmModal(app, _services.InstallService, _services.Logger, ghPath, request,
                 findInstalled: (evidence, token) => CaptureInstallHandoffAsync(evidence, report, token, attempts.Last),
                 canPublish: found => IsInstallHandoffCurrent(found) && isOwnerActive?.Invoke() == true,
-                attempts: attempts);
+                attempts: attempts,
+                browseInstalled: token => CaptureRepositoryHandoffAsync(request.Repo,
+                    SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner), attempts.Last, token));
             var result = compact.Show();
             if (result.Handoff is { } handoff && IsInstallHandoffCurrent(handoff) && isOwnerActive?.Invoke() == true)
             {
@@ -104,8 +112,15 @@ internal sealed partial class SkillViewWorkflowCoordinator
                 return;
             }
         }
-        var screen = new InstallScreen(app, _services.InstallService, _services.Logger, ghPath, request, attempts);
+        var screen = new InstallScreen(app, _services.InstallService, _services.Logger, ghPath, request, attempts,
+            (evidence, token) => CaptureInstallHandoffAsync(evidence, report, token, attempts.Last),
+            found => IsInstallHandoffCurrent(found) && isOwnerActive?.Invoke() == true);
         screen.Show();
+        if (screen.Handoff is { } advancedHandoff && IsInstallHandoffCurrent(advancedHandoff) && isOwnerActive?.Invoke() == true)
+        {
+            revealInstalled?.Invoke(advancedHandoff);
+            return;
+        }
         ReportInstallAttempts(attempts);
     }
 
@@ -224,7 +239,7 @@ internal sealed partial class SkillViewWorkflowCoordinator
     internal bool IsInstallHandoffCurrent(InstalledInstallHandoff handoff) =>
         handoff.CatalogGeneration == _services.ListAdapter.Generation
         && handoff.RequestGeneration == Interlocked.Read(ref _installHandoffGeneration)
-        && handoff.Evidence?.ContextKey == SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner);
+        && (handoff.Evidence?.ContextKey ?? handoff.BrowseContextKey) == SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner);
 
     /// Open the "install every skill in a repo" flow (gh 2.94 `--all`,
     /// cli/cli#13471). Reuses the compact modal's scope/agent pickers in
@@ -250,7 +265,7 @@ internal sealed partial class SkillViewWorkflowCoordinator
     /// List repository skills in an owned, retryable modal before opening the
     /// subset picker. Listing failures never widen the request to install-all.
     public void OpenRepoDiscoveryDialog(InstallRequest request, Func<bool>? isOwnerActive = null,
-        CancellationToken lifetimeToken = default)
+        CancellationToken lifetimeToken = default, Action<InstalledInstallHandoff>? revealInstalled = null)
     {
         var app = _getApp();
         var ghPath = _getGhPath();
@@ -268,10 +283,44 @@ internal sealed partial class SkillViewWorkflowCoordinator
         if (listing is null || !IsCurrent()) return;
 
         var attempts = CreateInstallAttemptRun(report);
-        var picker = new RepoSkillPickerModal(app, install, _services.Logger, ghPath, request, listing.Skills, attempts);
-        picker.Show();
+        var picker = new RepoSkillPickerModal(app, install, _services.Logger, ghPath, request, listing.Skills, attempts,
+            token => CaptureRepositoryHandoffAsync(request.Repo, contextKey, attempts.Last, token),
+            found => IsCurrent() && IsInstallHandoffCurrent(found));
+        var result = picker.Show();
+        if (result.Handoff is { } handoff && IsCurrent() && IsInstallHandoffCurrent(handoff))
+        {
+            revealInstalled?.Invoke(handoff);
+            return;
+        }
         ReportInstallAttempts(attempts);
     }
+
+    internal async Task<InstalledInstallHandoff> CaptureRepositoryHandoffAsync(string repo, string context,
+        InstallAttemptReceipt? receipt, CancellationToken token)
+    {
+        var generation = _services.ListAdapter.Generation;
+        if (receipt is not { Summary.Succeeded: true, Snapshot: { } snapshot }
+            || receipt.CatalogGeneration != generation || context != SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner))
+            throw new IOException("A current post-install observation is unavailable. Refresh Installed explicitly.");
+        var anchor = SkillView.Gh.InstallNavigationEvidence.SourceAnchor(repo, "")
+            ?? throw new IOException("Repository identity is unknown; browse Installed manually.");
+        var overview = await Task.Run(() => InstalledOverview.Build(snapshot, token), token).ConfigureAwait(false);
+        if (!snapshot.Skills.Any(skill => RepositoryBrowseMatches(skill, anchor.Origin!)))
+            throw new IOException("No source with this repository was verified in the observed inventory. Custom folders may need an explicit scan root.");
+        token.ThrowIfCancellationRequested();
+        return new(snapshot, overview, "", [])
+        {
+            BrowseOnly = true,
+            BrowseRepository = anchor.Origin,
+            BrowseContextKey = context,
+            CatalogGeneration = generation,
+            RequestGeneration = Interlocked.Increment(ref _installHandoffGeneration),
+        };
+    }
+
+    internal static bool RepositoryBrowseMatches(InstalledSkill skill, string repository) =>
+        skill.SourceIdentity is { Provider: "repository", Key: not null } source && source.Origin == repository
+        && skill.MetadataConflicts.IsEmpty && skill.OwnershipDiagnostics.IsEmpty;
 
     public void ShowCleanupScreen()
     {

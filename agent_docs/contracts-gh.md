@@ -204,3 +204,17 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   Never call every observed installation newly added. Text clean success keeps
   the selected repo/skill/version confirmation and complete observation count;
   warning/retry guidance belongs to failed, canceled or unverified outcomes.
+
+- Install placement review is read-only guidance under the install service's frozen
+  child context. Use `GhPlacementCatalog` and the existing non-interactive repository
+  listing for flat materialization names; those names never establish source
+  subpaths. Preserve conservative legacy/override alternatives and unknown ALL or
+  upstream target sets. Review's optional typed folder/context binding only rejects
+  stale admission; all existing shared-selector, managed and owner checks still run.
+- Discover paging uses `GhSkillSearchService.Options.Page`. Previous/Next reuse the
+  submitted query/owner/agent/hidden/cap tuple, never current unsubmitted text. An
+  empty raw page disables Next, not Previous; a client cap or agent-filtered count
+  cannot establish a total or a last page. The JSON `path` field is the only search
+  source-subpath evidence; a missing, empty or untrustworthy path stays unknown (explicit `SKILL.md` or `.` can identify a root skill). The tabular
+  install listing contains selectors/descriptions, not source paths, and cannot
+  fill this adapter evidence gap from an authored name.

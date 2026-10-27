@@ -55,9 +55,11 @@ internal sealed class InstallConfirmModal
     private readonly InstallRequest _request;
     private readonly bool _installAll;
     private readonly ProcessRunner _runner;
+    private readonly Func<bool> _contextCurrent;
     private readonly InstallAttemptRun _attempts;
     private readonly Func<InstallNavigationEvidence, CancellationToken, Task<InstalledInstallHandoff>>? _findInstalled;
     private readonly Func<InstalledInstallHandoff, bool>? _canPublish;
+    private readonly Func<CancellationToken, Task<InstalledInstallHandoff>>? _browseInstalled;
 
     internal InstallConfirmModal(
         IApplication app,
@@ -68,11 +70,15 @@ internal sealed class InstallConfirmModal
         bool installAll = false,
         Func<InstallNavigationEvidence, CancellationToken, Task<InstalledInstallHandoff>>? findInstalled = null,
         Func<InstalledInstallHandoff, bool>? canPublish = null,
-        InstallAttemptRun? attempts = null)
+        InstallAttemptRun? attempts = null,
+        Func<CancellationToken, Task<InstalledInstallHandoff>>? browseInstalled = null)
     {
         _attempts = attempts ?? new();
+        _browseInstalled = browseInstalled;
         _app = app;
         _runner = install.CaptureContext();
+        var contextKey = InstallNavigationEvidence.Context(_runner);
+        _contextCurrent = () => contextKey == InstallNavigationEvidence.Context(install.CaptureContext());
         _install = new GhSkillInstallService(_runner, logger);
         _logger = logger;
         _ghPath = ghPath;
@@ -166,11 +172,6 @@ internal sealed class InstallConfirmModal
         }
         scopeSelector.ValueChanged += (_, _) => RefreshScopeDescription();
         RefreshScopeDescription();
-        string? ConfigPath(string key) => _runner.GetEffectiveEnvironmentVariable(key) is { Length: > 0 } value
-            ? Path.GetFullPath(value, _runner.EffectiveWorkingDirectory) : null;
-        var preChecked = InstallAgentCatalog.DetectInstalledGhIds(
-            home,
-            ConfigPath("PI_CODING_AGENT_DIR"), ConfigPath("CLAUDE_CONFIG_DIR"));
         var entries = InstallAgentCatalog.Entries;
         var agentsView = new View
         {
@@ -181,10 +182,21 @@ internal sealed class InstallConfirmModal
             Enabled = false,
         };
         agentsView.ViewportSettings |= ViewportSettingsFlags.HasVerticalScrollBar;
-        var agentGrid = AgentCheckboxGrid.Build(entries, preChecked, perRow: 3);
-        var agentBoxes = agentGrid.Boxes;
-        foreach (var box in agentBoxes) agentsView.Add(box);
-        agentsView.SetContentSize(new Size(agentGrid.ContentWidth, agentGrid.RowCount));
+        var agentSelection = new InstallAgentSelection(agentsView);
+        var agentBoxes = agentSelection.Boxes;
+        var detectedHint = new Label { X = 1, Y = 10, Width = Dim.Fill(2), Text = "Detected config first; detection does not mean a client is active." };
+        var versionLabel = new Label { X = 1, Y = 1, Width = Dim.Fill(2), Text = "Version: gh default (not resolved)" };
+        var placementText = "Placement observation pending.";
+        using var placement = new InstallPlacementPreview(_runner, _logger, invokeForTests ?? _app.Invoke,
+            observation => placementText = observation.Detail, _contextCurrent);
+        void RefreshPlacement()
+        {
+            if (preparing || outcome == Outcome.Installed) return;
+            placement.Update(_ghPath, _request.Repo, _request.SkillName,
+                BuildOptions(scopeSelector.Value ?? 0, customPathField.Text, agentBoxes, entries, _installAll)
+                with
+                { AllowHiddenDirs = _request.AllowHiddenDirs });
+        }
 
         var status = new Label
         {
@@ -214,7 +226,9 @@ internal sealed class InstallConfirmModal
                     ? "Selected agents use their gh installation folders."
                     : "No agents checked: Universal, shared .agents/skills folder.";
         }
-        scopeSelector.ValueChanged += (_, _) => RefreshPlacementHint();
+        scopeSelector.ValueChanged += (_, _) => { RefreshPlacementHint(); RefreshPlacement(); };
+        customPathField.TextChanged += (_, _) => RefreshPlacement();
+        agentSelection.Changed += RefreshPlacement;
         foreach (var box in agentBoxes) box.ValueChanged += (_, _) => RefreshPlacementHint();
         RefreshPlacementHint();
 
@@ -243,9 +257,21 @@ internal sealed class InstallConfirmModal
             Visible = false,
             Enabled = false,
         };
-        var cancelButton = new SingleRowButton
+        var placementButton = new SingleRowButton
         {
             X = _installAll ? Pos.Right(installButton) + 2 : Pos.Right(advancedButton) + 2,
+            Y = Pos.AnchorEnd(1),
+            Text = "Review placement",
+        };
+        placementButton.Accepting += (_, e) =>
+        {
+            e.Handled = true;
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None) return;
+            InstallFailureDetails.Show(_app, placementText, title: " Placement and conflicts (guidance) ");
+        };
+        var cancelButton = new SingleRowButton
+        {
+            X = Pos.Right(placementButton) + 2,
             Y = Pos.AnchorEnd(1),
             Text = "Cancel",
         };
@@ -261,6 +287,7 @@ internal sealed class InstallConfirmModal
         void ShowFailure(string detail, int? exitCode = null)
         {
             failureDetails = detail;
+            placementButton.Visible = false;
             detailsButton.Visible = true;
             detailsButton.Enabled = true;
             cancelButton.X = Pos.Right(detailsButton) + 2;
@@ -308,8 +335,10 @@ internal sealed class InstallConfirmModal
             spinner.AutoSpin = false;
             installButton.Enabled = true;
             advancedButton.Enabled = !_installAll;
+            placementButton.Enabled = true;
             status.Text = " ready";
             operation.Release();
+            RefreshPlacement();
             // The loading status owns initial focus. Preserve any focus the
             // user moved to Cancel or the base field while lookup was pending.
             if (status.HasFocus || dialog.Focused is null) installButton.SetFocus();
@@ -326,6 +355,7 @@ internal sealed class InstallConfirmModal
         // submit a provisional choice, and Esc cancels its child Git probe.
         installButton.Enabled = false;
         advancedButton.Enabled = false;
+        placementButton.Enabled = false;
         spinner.Visible = true;
         spinner.AutoSpin = true;
         status.Text = " checking project scope…";
@@ -333,12 +363,17 @@ internal sealed class InstallConfirmModal
         {
             try
             {
+                using var deadline = new SkillView.Threading.CancellationSource(token, TimeSpan.FromSeconds(15),
+                    SkillView.Threading.CancellationCallbackReporter.For(_logger, "install preparation"));
+                var preparationToken = deadline.Token;
+                var detected = InstallAgentSelection.Detect(_runner);
                 var project = await GhPlacementCatalog.ProjectRootAsync(
-                    _runner, new(), _runner.EffectiveWorkingDirectory, token).ConfigureAwait(false);
+                    _runner, new(), _runner.EffectiveWorkingDirectory, preparationToken).ConfigureAwait(false);
                 var hasProject = InstallAgentCatalog.HasProjectScopeCandidate(project);
                 token.ThrowIfCancellationRequested();
                 operation.InvokeTerminalIfActive(() =>
                 {
+                    agentSelection.SetDetected(detected);
                     FinishPreparation(project, hasProject);
                 });
             }
@@ -389,11 +424,11 @@ internal sealed class InstallConfirmModal
                     {
                         if (installResult.ReadOnlyDiscovery) { outcome = Outcome.Cancelled; _app.RequestStop(); return; }
                         outcome = Outcome.Installed;
-                        if (_installAll) { _app.RequestStop(); return; }
+
                         operation.Release();
                         dialog.Title = " Install completed ";
                         foreach (var control in new View[] { scopeLabel, scopeSelector, scopeDescription, baseLabel, basePath,
-                            customPathLabel, customPathField, agentsLabel, agentsView, placementHint }) control.Visible = false;
+                            customPathLabel, customPathField, agentsLabel, agentsView, placementHint, detectedHint, versionLabel, placementButton }) control.Visible = false;
                         dialog.Height = 9;
                         dialog.Y = Pos.Center();
                         repoLabel.Height = 1;
@@ -415,7 +450,7 @@ internal sealed class InstallConfirmModal
                             dialog.Height = 12;
                             status.Height = 6;
                         }
-                        installButton.Text = "View installed skill";
+                        installButton.Text = _installAll || options.Path is not null || installResult.Navigation is null ? "Browse repository" : "View installed skill";
                         installButton.Enabled = true;
                         advancedButton.Visible = false;
                         cancelButton.X = Pos.Right(installButton) + 2;
@@ -443,6 +478,7 @@ internal sealed class InstallConfirmModal
                         scopeSelector.Enabled = true;
                         agentsView.Enabled = true;
                         customPathField.Enabled = true;
+                        placementButton.Enabled = true;
                         installButton.Enabled = !installResult.Canceled && CurrentValidationError() is null;
                         advancedButton.Enabled = !_installAll;
                         cancelButton.Enabled = true;
@@ -485,11 +521,10 @@ internal sealed class InstallConfirmModal
         {
             try
             {
-                if (installResult?.Navigation is not { } evidence || _findInstalled is null)
-                    throw new IOException(scopeSelector.Value == 2
-                        ? "Automatic navigation is not supported for custom folders. Outside the current scan, add an explicit scan root."
-                        : "Automatic navigation is available for a named Discover skill with a known source path at User or Project scope.");
-                var found = await _findInstalled(evidence, token).ConfigureAwait(false);
+                var found = installResult?.Navigation is { } evidence && _findInstalled is not null
+                    ? await _findInstalled(evidence, token).ConfigureAwait(false)
+                    : _browseInstalled is not null ? await _browseInstalled(token).ConfigureAwait(false)
+                    : throw new IOException("No exact-copy claim is available. Browse Installed manually; custom folders outside the scan need an explicit scan root.");
                 token.ThrowIfCancellationRequested();
                 operation.InvokeTerminalIfActive(() =>
                 {
@@ -549,17 +584,31 @@ internal sealed class InstallConfirmModal
                 return;
             }
 
+            if (!_contextCurrent())
+            {
+                ShowFailure("Installation context changed; reopen the dialog before installing.");
+                return;
+            }
+            var reviewed = placement.Current;
+            placement.Cancel();
             var options = BuildOptions(
                 scopeSelector.Value ?? 0,
                 customPathField.Text.ToString() ?? string.Empty,
                 agentBoxes,
                 entries,
                 _installAll) with
-            { NavigationSource = InstallNavigationEvidence.SourceAnchor(_request.Repo, _request.SourcePath) };
+            {
+                NavigationSource = InstallNavigationEvidence.SourceAnchor(_request.Repo, _request.SourcePath),
+                AllowHiddenDirs = _request.AllowHiddenDirs,
+                ReviewedDestinations = reviewed?.Roots.Count > 0 ? reviewed.Roots : null,
+                ReviewedContext = reviewed?.ContextKey,
+            };
             failureDetails = null;
             detailsButton.Visible = false;
             detailsButton.Enabled = false;
-            cancelButton.X = _installAll ? Pos.Right(installButton) + 2 : Pos.Right(advancedButton) + 2;
+            placementButton.Visible = true;
+            placementButton.Enabled = false;
+            cancelButton.X = Pos.Right(placementButton) + 2;
             operationName = "install";
             scopeSelector.Enabled = false;
             agentsView.Enabled = false;
@@ -633,9 +682,9 @@ internal sealed class InstallConfirmModal
         // operation (or silently cancel a review before Install is chosen).
         dialog.Accepting += (_, ev) => ev.Handled = true;
 
-        dialog.Add(status, repoLabel, scopeLabel, scopeSelector, scopeDescription, baseLabel, basePath, customPathLabel, customPathField,
+        dialog.Add(detectedHint, versionLabel, status, repoLabel, scopeLabel, scopeSelector, scopeDescription, baseLabel, basePath, customPathLabel, customPathField,
                    agentsLabel, agentsView);
-        dialog.Add(placementHint, spinner, installButton, advancedButton, detailsButton, cancelButton);
+        dialog.Add(placementHint, spinner, installButton, advancedButton, placementButton, detailsButton, cancelButton);
 
         TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
             dialog, repoLabel, scopeLabel, scopeSelector, scopeDescription, baseLabel, basePath,

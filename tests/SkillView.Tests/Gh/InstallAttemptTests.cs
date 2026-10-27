@@ -328,6 +328,8 @@ public sealed class InstallAttemptTests
                 #!/bin/sh
                 printf '%s\n' "$*" >> "$FIXTURE_ROOT/calls"
                 case "$*" in
+                  'skill install -- fixture/source')
+                    printf 'demo\tFixture\none\tFixture\ntwo\tFixture\n'; exit 0 ;;
                   'skill list '*)
                     touch "$FIXTURE_ROOT/list-entered"
                     while [ -f "$FIXTURE_ROOT/block-list" ]; do /bin/sleep 0.01; done

@@ -14,10 +14,10 @@ internal static class InstallFailureDetails
 {
     internal const int MaxFieldCharacters = 8192;
 
-    internal static string Literal(string? value)
+    internal static string Literal(string? value, int maxCharacters = MaxFieldCharacters)
     {
         value ??= string.Empty;
-        var length = Math.Min(value.Length, MaxFieldCharacters);
+        var length = Math.Min(value.Length, maxCharacters);
         if (length > 0 && char.IsHighSurrogate(value[length - 1])) length--;
         var text = TerminalEscapeSanitizer.Sanitize(value[..length]) ?? string.Empty;
         text = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
@@ -61,11 +61,11 @@ internal static class InstallFailureDetails
         CaretOffset = 0
     };
 
-    internal static void Show(IApplication app, string text, Action<Dialog>? readyForTests = null)
+    internal static void Show(IApplication app, string text, Action<Dialog>? readyForTests = null, string title = " Install failure details ")
     {
         using var dialog = new Dialog
         {
-            Title = " Install failure details ",
+            Title = title,
             Width = Dim.Percent(94),
             Height = Dim.Percent(90),
         };

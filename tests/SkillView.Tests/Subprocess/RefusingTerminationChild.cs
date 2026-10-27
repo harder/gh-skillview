@@ -11,6 +11,7 @@ namespace SkillView.Tests.Subprocess;
 internal sealed class RefusingTerminationChild : IDisposable
 {
     internal static readonly TimeSpan Grace = TimeSpan.FromMilliseconds(100);
+    internal bool OnlyMutatingInstalls { get; init; }
     private Process? _child;
     private readonly TaskCompletionSource _observed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     internal Task Observed => _observed.Task;
@@ -21,6 +22,9 @@ internal sealed class RefusingTerminationChild : IDisposable
 
     private bool Refuse(Process actualChild)
     {
+        // Placement review also launches read-only listing children. This fault
+        // must target the submitted install, not a preview canceled on submit.
+        if (OnlyMutatingInstalls && !actualChild.StartInfo.ArgumentList.Contains("demo")) return true;
         if (_child is null)
         {
             _child = Process.GetProcessById(actualChild.Id);

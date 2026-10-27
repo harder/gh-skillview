@@ -39,6 +39,9 @@ public sealed class GhSkillInstallService
         IReadOnlyDictionary<string, string>? ProcessEnvironment = null,
         string? WorkingDirectory = null)
     {
+        // UI review binding can only restrict admission. It never replaces a guard.
+        internal IReadOnlyList<string>? ReviewedDestinations { get; init; }
+        internal string? ReviewedContext { get; init; }
         internal SkillView.Inventory.Models.SkillSourceIdentity? NavigationSource { get; init; }
     }
 
@@ -59,6 +62,9 @@ public sealed class GhSkillInstallService
             args = BuildArgs(repo, skillName, options);
             var mutates = options.All || !string.IsNullOrEmpty(skillName);
             var destinations = mutates ? await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false) : [];
+            if (options.ReviewedDestinations is { } reviewed && (!destinations.SequenceEqual(reviewed, StringComparer.Ordinal)
+                || options.ReviewedContext != InstallNavigationEvidence.Context(_runner)))
+                throw new IOException("The reviewed placement or installation context changed; reopen placement review before installing.");
             var context = mutates ? GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken) : null;
             if (options.All && context?.NeedsManagedSelectors(destinations) == true)
                 throw new IOException("Installing --all beside managed resources requires an immutable staged maintenance plan; install exact named skills individually.");

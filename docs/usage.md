@@ -41,10 +41,26 @@ Submitting a search clears the previous results. If it fails, times out, or is
 canceled by leaving Discover, the detail pane keeps the explanation until you
 search again. Search feedback in the footer clears when you leave Discover.
 
+Use the visible **Previous** and **Next** buttons (Tab, then Enter) to browse gh
+search pages. They retain the submitted query and filters even while you type a
+new query. Submitting starts at page 1. Page counts are unknown; an empty page
+still permits Previous. A failed or canceled page clears install targets and
+keeps its explanation. Agent filtering and the result cap apply within each page.
+
+A **✓** beside stars means the captured inventory observed that repository and
+source subpath. **?** means no matching observation or an unknown source path;
+the detail pane distinguishes these and reports incomplete coverage. A matching
+name alone never counts. These observations cover captured locations only and
+never bypass install checks.
+
 In the compact review, **Project** uses the displayed project base; **User**
 uses your home across projects. The default is Project when this Git project
-already has a known skills folder, otherwise User. Review the scope and base,
-then press Enter on **Install**. Tab reaches **Advanced…** and **Cancel**;
+already has a known skills folder, otherwise User. Choose **Review placement** to read the current source, unresolved/default or
+selected version, selected agents, catalog destinations and existing-copy or
+ownership conflicts in a scrollable pane. Catalog alternatives and unknown
+repository-wide targets are labeled explicitly. This is guidance; install rechecks
+admission and refuses shared-selector or managed/ownership conflicts. Then press
+Enter on **Install**. Tab reaches **Advanced…**, **Review placement** and **Cancel**;
 Escape cancels, including while an install is running. If installation is refused,
 choose **Details** to read the full bounded explanation and captured output.
 
@@ -52,13 +68,17 @@ Press **A** on a Discover result to list repository skills and choose a subset.
 If listing fails, the dialog retains the explanation with **Retry** and **Cancel**.
 Cancel is the default; retrying lists skills again without installing them.
 
-Agent checkboxes select gh's installation folders. With none checked,
+Agent checkboxes select gh's installation folders. Detected configuration folders
+come first; detection does not establish a running or enabled client. **More agents**
+exposes the full catalog without changing selections. Selected agents remain in
+the collapsed list. The advanced form scrolls and keeps behavior flags behind
+**More options**. With none checked,
 **Universal** installs into the shared `.agents/skills` folder under the
 displayed base. **Custom path** requires an explicit folder and overrides
 the scope and agent folders.
 
 After a named Discover install succeeds, the review says **Install completed**.
-Choose **View installed skill** to find it with a fresh scan. A verified single
+Choose **View installed skill** to verify it using the single post-install inventory observation. A verified single
 copy opens its Installed detail when the selected agents each have one known
 folder. Multiple copies open their source group so you can choose a copy.
 Some agents have more than one possible folder, including Codex at User scope
@@ -73,8 +93,20 @@ filters and says **Adjusted Installed filters to show this result.** When browsi
 possible agent folders, the choose-copy notice follows that adjustment notice.
 Sort and Discover search state stay as they were. If the source, folder or scan coverage
 cannot be verified, the completed review explains why and stays open. Automatic
-navigation covers named remote skills at User or Project scope; custom folders,
-install-all and advanced flows retain their existing paths. A custom folder
+navigation covers unchanged named remote Discover skills at User or Project scope
+in compact and advanced reviews. Repository picker success offers **Browse repository**:
+it shows observed sources from that repository without selecting an arbitrary copy.
+A persistent **Repository: owner/repo — Clear shows all** indicator identifies this
+restriction through reloads and explicit refresh, including when no rows match.
+**Clear** removes it along with the ordinary filters. A verified exact install
+result clears an earlier repository restriction before revealing that copy.
+Changing Advanced's version drops the original Discover source-path anchor, so
+that request shows a safe notice instead of claiming an exact installed copy.
+Returning to the original version restores eligibility for the existing exact
+verification; it does not bypass its context or inventory checks.
+Compact custom, unnamed or install-all success offers the same safe browse where
+current source observations exist, otherwise a truthful notice. No browse result
+claims which copy a repository-wide child wrote. A custom folder
 outside the current scan needs an explicit scan root to appear in Installed.
 
 The same operations are available from the CLI; see [CLI usage](#cli-usage).

@@ -22,6 +22,75 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class SkillViewAppTests
 {
+    [Fact]
+    public void PagingUsesSubmittedQueryFiltersAndPreservesReturnContext()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var seen = new List<(string Query, string? Owner, int Page)>();
+        app.SetSearchAdapterForTests((query, options, _) =>
+        {
+            seen.Add((query, options.Owner, options.Page));
+            return Task.FromResult(new SearchResponse(options.Page == 3 ? [] : [new(null, null, "skills/demo", "owner/repo", "page" + options.Page, 1)], 0, null));
+        });
+        app.QueryFieldForTests!.Text = "submitted";
+        app.OwnerFieldForTests!.Text = "original-owner";
+        app.SubmitSearchForTests();
+        app.QueryFieldForTests.Text = "unsubmitted";
+        app.OwnerFieldForTests.Text = "other-owner";
+        var tab = app.DiscoverTabForTests!;
+        tab.NextPage.InvokeCommand(Command.Accept);
+        Assert.Equal(("submitted", "original-owner", 2), seen[^1]);
+        Assert.Equal("page2", app.ResultsTableForTests!.Table![0, 1]);
+        app.StopBackgroundAdmissionForTests();
+        var row = app.ResultsTableForTests!.GetSelectedRow();
+        var offset = app.ResultsTableForTests!.RowOffset;
+        app.ActivateTabForTests(SkillViewTab.Installed);
+        app.ActivateTabForTests(SkillViewTab.Discover);
+        Assert.Equal("unsubmitted", app.QueryFieldForTests.Text);
+        Assert.Contains("Page 2", tab.PageStatus.Text);
+        Assert.Equal(row, app.ResultsTableForTests.GetSelectedRow());
+        Assert.Equal(offset, app.ResultsTableForTests.RowOffset);
+        Assert.Equal(2, seen.Count);
+    }
+
+    [Theory]
+    [InlineData("empty")]
+    [InlineData("failed")]
+    [InlineData("canceled")]
+    public async Task NewPageClearsTargetsAndPreviousRecoversUsingSubmittedState(string outcome)
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var pending = new TaskCompletionSource<SearchResponse>();
+        app.SetSearchAdapterForTests((_, options, _) => options.Page == 1
+            ? Task.FromResult(new SearchResponse([new(null, null, "skills/demo", "owner/repo", "first", 1)], 0, null)) : pending.Task);
+        app.QueryFieldForTests!.Text = "submitted";
+        app.SubmitSearchForTests();
+        app.QueryFieldForTests.Text = "unsubmitted";
+        var tab = app.DiscoverTabForTests!;
+        tab.NextPage.InvokeCommand(Command.Accept);
+        Assert.Equal(0, app.ResultsTableForTests!.Table!.Rows);
+        Assert.DoesNotContain("Install", app.DiscoverActionsForTests);
+        if (outcome == "canceled")
+        {
+            app.ActivateTabForTests(SkillViewTab.Installed);
+            app.ActivateTabForTests(SkillViewTab.Discover);
+        }
+        pending.SetResult(new([], outcome == "failed" ? 1 : 0, outcome == "failed" ? "page failure" : null));
+        // Completion runs inline on the editor-owning thread in this direct-dispatch fixture.
+        await Task.CompletedTask;
+        Assert.True(tab.PreviousPage.Enabled);
+        if (outcome == "empty") Assert.False(tab.NextPage.Enabled);
+        else Assert.Contains(outcome == "failed" ? "Search failed" : "Search canceled", app.PreviewTextForTests);
+        app.CaptureStatusAutoClearForTests()();
+        tab.PreviousPage.InvokeCommand(Command.Accept);
+        Assert.Equal(1, app.ResultsTableForTests.Table!.Rows);
+        Assert.Contains("Page 1", tab.PageStatus.Text);
+        Assert.Equal("first", app.ResultsTableForTests.Table![0, 1]);
+        Assert.Equal("unsubmitted", app.QueryFieldForTests.Text);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

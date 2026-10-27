@@ -7,6 +7,8 @@ namespace SkillView.Ui;
 internal sealed record InstalledInstallHandoff(InventorySnapshot Snapshot, InstalledOverview Overview,
     string GroupKey, IReadOnlyList<string> CopyKeys)
 {
+    internal string? BrowseRepository { get; init; }
+    internal string? BrowseContextKey { get; init; }
     internal bool BrowseOnly { get; init; }
     internal InstallNavigationEvidence? Evidence { get; init; }
     internal long CatalogGeneration { get; init; }
