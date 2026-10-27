@@ -395,7 +395,11 @@ internal sealed partial class WindowsSecureRemovalBackend
             try { CheckWindowsPrivateState(handle, user); return new FileStream(handle, FileAccess.Read); }
             catch { handle.Dispose(); throw; }
         }
-        internal override IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token)
+        internal override IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token) =>
+            EnumerateHistoryEntries(token).Select(entry => (entry.Name, entry.Bytes,
+                entry.Directory ? "Unexpected directory/link in state." : entry.Error));
+
+        internal override IEnumerable<(string Name, long Bytes, string? Error, bool Directory)> EnumerateHistoryEntries(CancellationToken token)
         {
             ValidateLocation(token);
             using var frame = new DirectoryFrame(root, canonical, ReadIdentity(root), 0, ownsDirectory: false);
@@ -405,11 +409,14 @@ internal sealed partial class WindowsSecureRemovalBackend
                 if (!frame.TryReadNext(out var entry, out var error))
                 { if (error is not null) throw new IOException(error); yield break; }
                 if (entry is null) continue;
-                if ((entry.Value.Attributes & (FileAttributeDirectory | FileAttributeReparsePoint)) != 0)
-                { yield return (entry.Value.Name, 0, "Unexpected directory/link in state."); continue; }
+                if ((entry.Value.Attributes & FileAttributeReparsePoint) != 0)
+                { yield return (entry.Value.Name, 0, "Unexpected directory/link in state.", false); continue; }
+                if ((entry.Value.Attributes & FileAttributeDirectory) != 0)
+                { yield return (entry.Value.Name, 0, null, true); continue; }
                 // The exclusive writer lock is already verified as zero length.
-                if (entry.Value.Name == "writer.lock") { yield return (entry.Value.Name, 0, null); continue; }
-                yield return ObserveEntry(entry.Value);
+                if (entry.Value.Name == "writer.lock") { yield return (entry.Value.Name, 0, null, false); continue; }
+                var observed = ObserveEntry(entry.Value);
+                yield return (observed.Name, observed.Bytes, observed.Error, false);
             }
         }
         private (string Name, long Bytes, string? Error) ObserveEntry(DirectoryEntry entry)

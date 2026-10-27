@@ -385,3 +385,12 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   Compact install failures expose Details with bounded, sanitized plain text for
   the full refusal and retained stdout/stderr. Keep the original result intact;
   output cannot create Markdown, active links or terminal controls.
+
+- Main-shell History is visible and reachable with F4 even from text inputs.
+  Its startup hints begin after the shell's first DrawComplete, through app-owned
+  background work and lifetime-checked dispatch, independently of gh/inventory.
+  Opening History invalidates queued startup hints. Modal refresh and explicit
+  Inspect own LatestRequestGate leases through awaited dispatch; selection,
+  refresh, leaving and shutdown cancel stale requests and clear old inspections.
+  Refresh retains the selected operation ID when it is still present. History
+  work remains owned by the app task tracker after a canceled modal closes.

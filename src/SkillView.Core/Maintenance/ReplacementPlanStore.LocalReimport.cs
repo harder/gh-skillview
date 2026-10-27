@@ -30,6 +30,7 @@ internal sealed partial class ReplacementPlanStore
         InventorySnapshot inventory, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        RequireHistoryCapacity(inventory, token);
         RequireLocalSourceMetadata(target.FrontMatter, requirePath: true);
         if (target.AllOwnershipClaims.Any()) throw new IOException("Local reimport currently requires an ownerless installation; native owner transitions remain pending.");
         var canonical = Canonical(target.ResolvedPath);
@@ -136,9 +137,7 @@ internal sealed partial class ReplacementPlanStore
                     RevalidatePlacements();
                     using var state = NativeStateDirectory.OpenOrCreate(Root, LocalImportExclusions(), token);
                     using var writer = state.OpenFile("writer.lock", true, token); CheckWriter(writer);
-                    var entries = state.EnumerateEntries(token).Take(MaxPlans + 2).ToArray();
-                    if (entries.Length > MaxPlans || entries.Any(entry => entry.Name != "writer.lock" && !QuarantineStore.ValidId(entry.Name)))
-                        throw new IOException("Retained replacement plan quota is full; local preview evidence remains charged.");
+                    CheckPlanCapacity(state, token);
                     using var operation = state.CreateStagingDirectory(id, token);
                     finalPath = operation.CanonicalPath;
                     using var operationWriter = operation.OpenFile("writer.lock", true, token); CheckWriter(operationWriter);

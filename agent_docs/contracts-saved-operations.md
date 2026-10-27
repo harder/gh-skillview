@@ -276,3 +276,19 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   subject-bearing result using captured progress, with one added error. Preserve
   earlier cleanup rows and continue independent targets; low-level removal APIs
   still throw, and unrelated cancellation must not be labeled owned cancellation.
+
+- Retained replacement History is an existing-only, read-only view of the same
+  16-operation store. Bound root enumeration to 18 entries (lock plus operations
+  plus overflow), display at most 16, and report omissions/counts as lower bounds.
+  Unknown, unreadable, partial and historical merge entries remain protected and
+  visible. Startup/listing reads only bounded saved metadata and immediate native
+  entry names/types; never capture/hash payloads, open owner registries, launch
+  processes, stage sources or create state. Metadata/name hints confer no
+  mutation authority. Owner-journal presence conservatively means recovery may
+  be needed even when completion filenames exist. Only explicit Inspect runs
+  fresh inventory and existing full Observe/schema/hash checks. Keep current
+  inspection fingerprints separate from immutable plan fingerprints. History
+  provides no resume/undo/retire action or quota-release promise. Preflight new
+  reviews before source resolution/private staging and retain the writer-held
+  allocation quota check. CLI `replacement-history` lists hints; `history` keeps
+  its existing backup verification semantics and wire format.

@@ -13,6 +13,8 @@ try
         return ExposureLifetimeProof.Run(args[1]);
     if (args.Length == 2 && args[0] == "--exposure-link-roundtrip")
         return ExposureLinkProof.Run(args[1]);
+    if (args.Length == 2 && args[0] == "--retained-history-fixture")
+        return await RetainedHistoryProof.CreateAsync(args[1]);
     Console.Error.WriteLine("maintenance-proof phase: started");
     var checkDiskFullRoot = args.Length == 2 && args[0] == "--check-disk-full-root";
     if (!checkDiskFullRoot && args.Length != 6)

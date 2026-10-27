@@ -286,8 +286,10 @@ public sealed partial class SkillViewApp
         void InvalidateUpdateObservations() => _workflows.InvalidateAvailability(RefreshUpdateAvailability);
         _services.ListAdapter.Invalidated += InvalidateUpdateObservations;
         window.Disposing += (_, _) => _services.ListAdapter.Invalidated -= InvalidateUpdateObservations;
+        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = "History (F4)", Width = 30 };
+        _historyButton.Accepting += (_, args) => { args.Handled = true; OpenHistory(); };
         window.Add(_tabBar, _contextBar, _discoverTab, _installedTab, _updatesTab, _doctorTab,
-                   _changesTab,
+                   _changesTab, _historyButton,
                    _statusStrip, _sizeGuard);
         window.FrameChanged += (_, _) =>
             _sizeGuard.UpdateForSize(window.Frame.Width, window.Frame.Height);
