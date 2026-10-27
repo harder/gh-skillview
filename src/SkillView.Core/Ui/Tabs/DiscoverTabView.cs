@@ -30,6 +30,18 @@ internal sealed class DiscoverTabView : FrameView
     internal CheckBox HiddenDirsBox { get; }
     internal Label FilterSummaryLabel { get; }
     internal TableView ResultsTable { get; }
+    internal Button PreviousPage { get; }
+    internal Button NextPage { get; }
+    internal Label PageStatus { get; }
+    internal Label SubmittedSummary { get; }
+    internal event Action<int>? PageRequested;
+
+    internal void SetPage(int page, string state, bool canNext, bool loading = false)
+    {
+        PreviousPage.Enabled = !loading && page > 1;
+        NextPage.Enabled = !loading && canNext && page < int.MaxValue;
+        PageStatus.Text = $"Page {page}" + (state.Length > 0 ? " · " + state : "");
+    }
 
     // Right pane — persistent skill detail panel.
     internal SkillDetailPaneView DetailPane { get; }
@@ -95,7 +107,7 @@ internal sealed class DiscoverTabView : FrameView
             X = 0,
             Y = 4,
             Width = Dim.Fill(),
-            Height = Dim.Fill(),
+            Height = Dim.Fill(2),
             FullRowSelect = true,
         };
         TuiHelpers.ConfigureTableKeyBindings(ResultsTable);
@@ -103,7 +115,14 @@ internal sealed class DiscoverTabView : FrameView
         TuiHelpers.ConfigureTableScheme(ResultsTable);
         TuiHelpers.ConfigureTableChrome(ResultsTable);
 
-        LeftFrame.Add(
+        SubmittedSummary = new Label { X = 0, Y = 1, Width = Dim.Fill(), Height = 1 };
+        PreviousPage = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Previous", Enabled = false };
+        NextPage = new SingleRowButton { X = Pos.Right(PreviousPage) + 1, Y = Pos.AnchorEnd(1), Text = "Next", Enabled = false };
+        PageStatus = new Label { X = Pos.Right(NextPage) + 1, Y = Pos.AnchorEnd(1), Width = Dim.Fill(), Text = "Page 1" };
+        PreviousPage.Accepting += (_, e) => { e.Handled = true; PageRequested?.Invoke(-1); };
+        NextPage.Accepting += (_, e) => { e.Handled = true; PageRequested?.Invoke(1); };
+
+        LeftFrame.Add(SubmittedSummary, PreviousPage, NextPage, PageStatus,
             queryLabel, QueryField,
             FilterSummaryLabel,
             ResultsTable);

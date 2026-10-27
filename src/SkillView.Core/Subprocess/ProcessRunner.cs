@@ -16,6 +16,9 @@ public sealed class ProcessRunner
     private readonly IReadOnlyDictionary<string, string>? _environment;
     private readonly string? _defaultWorkingDirectory;
     private bool ReplaceEnvironment { get; init; }
+    // Tests can refuse termination at the actual child boundary. Production
+    // always attempts Process.Kill; this does not replace process execution.
+    internal Func<Process, bool>? TerminationAdmissionForTests { get; init; }
     internal string EffectiveWorkingDirectory => _defaultWorkingDirectory ?? Environment.CurrentDirectory;
 
     internal string? GetEffectiveEnvironmentVariable(string name, IReadOnlyDictionary<string, string>? overrides = null)
@@ -54,7 +57,7 @@ public sealed class ProcessRunner
                 if (entry.Key is string key && entry.Value is string value) values[key] = value;
         if (_environment is not null) foreach (var pair in _environment) values[pair.Key] = pair.Value;
         foreach (var pair in overrides) values[pair.Key] = pair.Value;
-        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true };
+        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true, TerminationAdmissionForTests = TerminationAdmissionForTests };
     }
 
     /// An explicit allowlist context uses the same frozen-environment mechanism
@@ -63,12 +66,12 @@ public sealed class ProcessRunner
     {
         var values = new Dictionary<string, string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         foreach (var pair in environment) values[pair.Key] = pair.Value;
-        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true };
+        return new(_logger, _maxCapturedCharsPerStream, _terminationWait, values, workingDirectory) { ReplaceEnvironment = true, TerminationAdmissionForTests = TerminationAdmissionForTests };
     }
 
     internal ProcessRunner WithCaptureLimit(int remainingCharacters) =>
         new(_logger, Math.Min(_maxCapturedCharsPerStream, Math.Max(1, remainingCharacters)), _terminationWait, _environment, _defaultWorkingDirectory)
-        { ReplaceEnvironment = ReplaceEnvironment };
+        { ReplaceEnvironment = ReplaceEnvironment, TerminationAdmissionForTests = TerminationAdmissionForTests };
 
     public async Task<ProcessResult> RunAsync(
         string executable,
@@ -76,7 +79,13 @@ public sealed class ProcessRunner
         string? workingDirectory = null,
         CancellationToken cancellationToken = default,
         bool retainCancellationOutput = false,
-        IReadOnlyDictionary<string, string>? environment = null)
+        IReadOnlyDictionary<string, string>? environment = null) =>
+        await RunCoreAsync(executable, arguments, workingDirectory, cancellationToken,
+            retainCancellationOutput, environment, retainExecutionFailure: false).ConfigureAwait(false);
+
+    private async Task<ProcessResult> RunCoreAsync(string executable, IReadOnlyList<string> arguments,
+        string? workingDirectory, CancellationToken cancellationToken, bool retainCancellationOutput,
+        IReadOnlyDictionary<string, string>? environment, bool retainExecutionFailure, Action? beforeStart = null)
     {
         // Cancellation closes process admission. In particular, do not start
         // and then immediately kill a child for an already-canceled caller.
@@ -113,28 +122,41 @@ public sealed class ProcessRunner
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            process.Start();
+            beforeStart?.Invoke();
+            if (!process.Start())
+                return new(executable, arguments, -1, "", "Process.Start returned no child.", sw.Elapsed)
+                { StartState = ProcessStartState.NotStarted, ChildDrained = true };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.Warn("subprocess", $"failed to start {executable}: {ex.Message}");
-            return new ProcessResult(executable, arguments, -1, string.Empty, ex.Message, sw.Elapsed);
+            return new ProcessResult(executable, arguments, -1, string.Empty, ex.Message, sw.Elapsed)
+            { StartState = ProcessStartState.Unknown, ChildDrained = false };
         }
 
-        process.StandardInput.Close();
-        var stdoutDrain = DrainAsync(process.StandardOutput, stdout, cancellationToken);
-        var stderrDrain = DrainAsync(process.StandardError, stderr, cancellationToken);
-
+        using var readers = new CancellationSource(cancellationToken,
+            CancellationCallbackReporter.For(_logger, "subprocess output readers", "subprocess"));
+        Task stdoutDrain = Task.CompletedTask, stderrDrain = Task.CompletedTask;
         try
         {
+            process.StandardInput.Close();
+            stdoutDrain = DrainAsync(process.StandardOutput, stdout, readers.Token);
+            stderrDrain = DrainAsync(process.StandardError, stderr, readers.Token);
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             await Task.WhenAll(stdoutDrain, stderrDrain).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (Exception failure) when (failure is OperationCanceledException || retainExecutionFailure)
         {
+            // A transport failure can reach here without caller cancellation.
+            // Cancel both original readers before observing them; otherwise a
+            // sibling pipe held open by a surviving child could wait forever.
+            readers.TryCancel();
             try
             {
-                process.Kill(entireProcessTree: true);
+                if (TerminationAdmissionForTests?.Invoke(process) != false)
+                    process.Kill(entireProcessTree: true);
+                else
+                    _logger.Warn("subprocess", $"termination refused by test admission: {executable}");
             }
             catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or System.ComponentModel.Win32Exception)
             {
@@ -165,11 +187,17 @@ public sealed class ProcessRunner
                 {
                     // Process exited between Kill and the wait registration.
                 }
+                catch (System.ComponentModel.Win32Exception ex) when (retainExecutionFailure)
+                {
+                    // Retain the positively observed start even if the OS
+                    // cannot confirm exit. Ordinary RunAsync still propagates.
+                    _logger.Warn("subprocess", $"child exit wait failed for {executable}: {ex.Message}");
+                }
             }
 
-            // Observe both readers. They use the same cancellation token, so
-            // cancellation cannot leave background reads attached to a process
-            // that this method is about to dispose.
+            // Observe both canceled readers before the independent bounded
+            // retention drain. No parent-exit or pipe-EOF wait is unbounded,
+            // including when termination fails or is unconfirmed.
             try { await Task.WhenAll(stdoutDrain, stderrDrain).ConfigureAwait(false); }
             catch (OperationCanceledException) { }
             catch (ObjectDisposedException) { }
@@ -186,9 +214,13 @@ public sealed class ProcessRunner
                         DrainAsync(process.StandardError, stderr, retention.Token)).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException) { }
-                return new ProcessResult(executable, arguments, 130,
-                    stdout.ToString(), stderr.ToString(), sw.Elapsed)
-                { Started = true, Cancelled = true, StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
+                var childDrained = false;
+                try { childDrained = process.HasExited; }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                { _logger.Warn("subprocess", $"child exit could not be verified for {executable}: {ex.Message}"); }
+                return new ProcessResult(executable, arguments, failure is OperationCanceledException ? 130 : -1,
+                    stdout.ToString(), stderr + (failure is OperationCanceledException ? string.Empty : "\n" + failure.Message), sw.Elapsed)
+                { Started = true, StartState = ProcessStartState.Started, ChildDrained = childDrained, Cancelled = failure is OperationCanceledException, StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
             }
             throw;
         }
@@ -202,11 +234,51 @@ public sealed class ProcessRunner
             stdout.ToString(),
             stderr.ToString(),
             sw.Elapsed)
-        { Started = true, StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
+        { Started = true, StartState = ProcessStartState.Started, ChildDrained = true, StdOutTruncated = stdout.Truncated, StdErrTruncated = stderr.Truncated };
 
         _logger.Debug("subprocess",
             $"exit={result.ExitCode} dur={result.Duration.TotalMilliseconds:F0}ms {executable}");
         return result;
+    }
+
+    // Install-only transport boundary. Legacy RunAsync cancellation semantics
+    // stay unchanged; this path retains output and reports whether the writer
+    // exited within the same bounded grace. Unknown exit forbids reconciliation.
+    internal async Task<ProcessResult> RunInstallAsync(string executable, IReadOnlyList<string> arguments,
+        string? workingDirectory, CancellationToken token, IReadOnlyDictionary<string, string>? environment)
+    {
+        var startAdmissionReached = false;
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            // This install-only absence check closes admission itself. A
+            // Process.Start exception, even Win32Exception, cannot establish
+            // whether a platform failed before or after creating a child.
+            if (Path.IsPathFullyQualified(executable))
+            {
+                try { _ = File.GetAttributes(executable); }
+                catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+                {
+                    return new(executable, arguments, -1, "", ex.Message, TimeSpan.Zero)
+                    { StartState = ProcessStartState.NotStarted, ChildDrained = true };
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+            return await RunCoreAsync(executable, arguments, workingDirectory, token,
+                retainCancellationOutput: true, environment: environment, retainExecutionFailure: true,
+                beforeStart: () => startAdmissionReached = true).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The flag can only weaken an uncertain outcome to Unknown. Only
+            // Process.Start returning true ever confirms a started child.
+            return new(executable, arguments, 130, "", "Install canceled.", TimeSpan.Zero)
+            {
+                StartState = startAdmissionReached ? ProcessStartState.Unknown : ProcessStartState.NotStarted,
+                ChildDrained = !startAdmissionReached,
+                Cancelled = true,
+            };
+        }
     }
 
     private static async Task DrainAsync(

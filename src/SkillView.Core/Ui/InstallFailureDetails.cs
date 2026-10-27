@@ -14,10 +14,10 @@ internal static class InstallFailureDetails
 {
     internal const int MaxFieldCharacters = 8192;
 
-    internal static string Literal(string? value)
+    internal static string Literal(string? value, int maxCharacters = MaxFieldCharacters)
     {
         value ??= string.Empty;
-        var length = Math.Min(value.Length, MaxFieldCharacters);
+        var length = Math.Min(value.Length, maxCharacters);
         if (length > 0 && char.IsHighSurrogate(value[length - 1])) length--;
         var text = TerminalEscapeSanitizer.Sanitize(value[..length]) ?? string.Empty;
         text = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
@@ -29,7 +29,25 @@ internal static class InstallFailureDetails
     }
 
     internal static string Render(InstallResult result) =>
-        $"Install failed (exit {result.ExitCode})\n\n{Literal(result.ErrorMessage)}\n\nStandard error:\n{Literal(result.StdErr)}\n\nStandard output:\n{Literal(result.StdOut)}";
+        $"Install {(result.Succeeded ? "completed" : result.Canceled ? "canceled" : "failed")} (exit {result.ExitCode})\n\n{Literal(result.ErrorMessage)}\n\nStandard error:\n{Literal(result.StdErr)}{(result.StdErrTruncated ? "\n[stderr truncated]" : "")}\n\nStandard output:\n{Literal(result.StdOut)}{(result.StdOutTruncated ? "\n[stdout truncated]" : "")}";
+
+    internal static string Render(InstallAttemptReceipt receipt)
+    {
+        var text = new StringBuilder(receipt.Guidance);
+        if (receipt.Error is { } error) text.Append("\nRefresh: ").Append(Literal(error));
+        text.Append("\n\nSelection outcomes (repository-wide children do not prove per-skill outcomes):");
+        foreach (var result in receipt.Summary.Results.Take(128))
+            text.Append("\n").Append(Literal(result.SkillName ?? "ALL / repository discovery"))
+                .Append(": ").Append(result.Attempt).Append(" (exit ").Append(result.ExitCode).Append(')');
+        if (receipt.Summary.Results.Count > 128) text.Append("\n[additional child outcomes omitted]");
+        text.Append("\n\nNot attempted:\n").Append(Literal(string.Join("\n", receipt.Summary.NotAttempted)));
+        // Put the partial selection before verbose child output so a noisy
+        // first child cannot hide the later failure or unsubmitted selectors.
+        foreach (var result in receipt.Summary.Results.Take(128))
+            text.Append("\n\n").Append(Literal(result.Repo)).Append(" / ")
+                .Append(Literal(result.SkillName ?? "ALL / repository discovery")).Append("\n").Append(Render(result));
+        return Literal(text.ToString());
+    }
 
     internal static Editor CreatePane(string text) => new()
     {
@@ -43,11 +61,11 @@ internal static class InstallFailureDetails
         CaretOffset = 0
     };
 
-    internal static void Show(IApplication app, string text, Action<Dialog>? readyForTests = null)
+    internal static void Show(IApplication app, string text, Action<Dialog>? readyForTests = null, string title = " Install failure details ")
     {
         using var dialog = new Dialog
         {
-            Title = " Install failure details ",
+            Title = title,
             Width = Dim.Percent(94),
             Height = Dim.Percent(90),
         };

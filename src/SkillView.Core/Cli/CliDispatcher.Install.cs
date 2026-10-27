@@ -68,15 +68,6 @@ public static partial class CliDispatcher
             FromLocal: parsed.FromLocal,
             All: parsed.All);
 
-        // Snapshot pre-install so we can surface the post-install diff.
-        var preSnapshot = await services.InventoryService.CaptureAsync(
-            report.GhPath,
-            new Inventory.LocalInventoryService.Options(
-                ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles,
-                AllowHiddenDirs: parsed.AllowHiddenDirs),
-            cancellationToken
-        ).ConfigureAwait(false);
-
         var result = await services.InstallService.InstallAsync(
             report.GhPath!,
             parsed.Repo,
@@ -85,31 +76,35 @@ public static partial class CliDispatcher
             cancellationToken
         ).ConfigureAwait(false);
 
-        if (!result.Succeeded)
+        InventorySnapshot? observed = null;
+        string? refreshError = null;
+        if (result.MayHaveChangedFiles)
         {
-            if (parsed.Json) WriteInstallJson(result, parsed, added: Array.Empty<InstalledSkill>());
+            services.ListAdapter.Invalidate();
+            if (!result.ChildDrained) refreshError = "Child completion is unverified; refresh after it stops.";
             else
             {
-                Console.Error.WriteLine($"skillview: install failed (exit {result.ExitCode}): {result.ErrorMessage}");
-                if (!string.IsNullOrWhiteSpace(result.StdErr)) Console.Error.WriteLine(result.StdErr.TrimEnd());
+                using var reconciliation = new SkillView.Threading.CancellationSource(TimeSpan.FromSeconds(10),
+                    SkillView.Threading.CancellationCallbackReporter.For(services.Logger, "CLI install reconciliation"));
+                try
+                {
+                    observed = await services.InventoryService.CaptureAsync(report.GhPath,
+                        new LocalInventoryService.Options(ScanRoots: options.ScanRoots,
+                            WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles,
+                            AllowHiddenDirs: parsed.AllowHiddenDirs)
+                        { BypassGhCache = true },
+                        reconciliation.Token).ConfigureAwait(false);
+                    if (observed.IsPartial || !observed.ConfiguredRootsComplete)
+                        refreshError = "Inventory refresh is incomplete; unknown files remain protected.";
+                }
+                catch (Exception ex) { refreshError = ex.Message; }
             }
-            return result.ExitCode == 0 ? ExitCodes.UserError : ExitCodes.EnvironmentError;
         }
-
-        services.ListAdapter.Invalidate();
-        var postSnapshot = await services.InventoryService.CaptureAsync(
-            report.GhPath,
-            new Inventory.LocalInventoryService.Options(
-                ScanRoots: options.ScanRoots, WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles,
-                AllowHiddenDirs: parsed.AllowHiddenDirs),
-            cancellationToken
-        ).ConfigureAwait(false);
-        var added = InventoryDiff(preSnapshot, postSnapshot);
-
-        if (parsed.Json) WriteInstallJson(result, parsed, added);
-        else WriteInstallText(result, added);
-
-        return ExitCodes.Success;
+        // A preflight refusal must not trigger inventory I/O. Without a
+        // pre-install capture, report observations rather than invented additions.
+        if (parsed.Json) WriteInstallJson(result, parsed, added: null, observed, refreshError);
+        else WriteInstallText(result, observed, refreshError, Console.Out, Console.Error);
+        return result.Canceled ? ExitCodes.Cancelled : result.Succeeded ? ExitCodes.Success : ExitCodes.EnvironmentError;
     }
 
     internal record ParsedInstallArgs(
@@ -175,57 +170,69 @@ public static partial class CliDispatcher
             upstream, fromLocal, allowHidden, json, all);
     }
 
-    internal static IReadOnlyList<InstalledSkill> InventoryDiff(
-        Inventory.Models.InventorySnapshot before,
-        Inventory.Models.InventorySnapshot after)
+    internal static void WriteInstallText(InstallResult result, InventorySnapshot? observed, string? refreshError,
+        TextWriter output, TextWriter error)
     {
-        var beforeKeys = new HashSet<string>(
-            before.Skills.Select(s => PathIdentity.NormalizeKey(s.ResolvedPath)),
-            StringComparer.Ordinal);
-        var added = new List<InstalledSkill>();
-        foreach (var s in after.Skills)
-        {
-            if (!beforeKeys.Contains(PathIdentity.NormalizeKey(s.ResolvedPath))) added.Add(s);
-        }
-        return added;
+        var completeObservation = result.ChildDrained && refreshError is null
+            && observed is { IsPartial: false, ConfiguredRootsComplete: true };
+        var cleanSuccess = result.Succeeded && !result.Canceled && completeObservation;
+        if (cleanSuccess)
+            output.WriteLine($"installed: {result.Repo}{(result.SkillName is null ? "" : "/" + result.SkillName)}"
+                + (result.Version is null ? "" : $"@{result.Version}"));
+        if (!string.IsNullOrWhiteSpace(result.StdOut)) output.WriteLine(result.StdOut.TrimEnd());
+        if (result.Succeeded && !string.IsNullOrWhiteSpace(result.StdErr)) error.WriteLine(result.StdErr.TrimEnd());
+        if (!result.Succeeded)
+            error.WriteLine($"skillview: install {(result.Canceled ? "canceled" : "failed")} (exit {result.ExitCode}): {result.ErrorMessage}");
+        if (result.MayHaveChangedFiles && !cleanSuccess)
+            error.WriteLine("The install may have changed files. " + (completeObservation
+                ? "Inventory refreshed; review the result before retrying."
+                : "Inventory refresh could not establish complete coverage; refresh explicitly before retrying. "
+                    + (refreshError ?? "A complete fresh observation is unavailable.")));
+        else if (!result.MayHaveChangedFiles) error.WriteLine("No install started.");
+        if (completeObservation) output.WriteLine($"rescan: {observed!.Skills.Length} skill(s) observed");
     }
 
-    private static void WriteInstallText(InstallResult r, IReadOnlyList<InstalledSkill> added)
-    {
-        Console.Out.WriteLine($"installed: {r.Repo}{(r.SkillName is null ? "" : "/" + r.SkillName)}" +
-                              (r.Version is null ? "" : $"@{r.Version}"));
-        if (!string.IsNullOrWhiteSpace(r.StdOut)) Console.Out.WriteLine(r.StdOut.TrimEnd());
-        if (added.Count == 0)
-        {
-            Console.Out.WriteLine("rescan: no new inventory entries detected");
-        }
-        else
-        {
-            Console.Out.WriteLine($"rescan: +{added.Count} new skill(s):");
-            foreach (var s in added)
-            {
-                Console.Out.WriteLine($"  {s.Name,-24}  {s.Scope,-7}  {s.ResolvedPath}");
-            }
-        }
-    }
+    private static void WriteInstallJson(InstallResult r, ParsedInstallArgs p, IReadOnlyList<InstalledSkill>? added,
+        InventorySnapshot? observed = null, string? refreshError = null)
+        => WriteJson(w => WriteInstallJson(w, r, p, added, observed, refreshError));
 
-    private static void WriteInstallJson(InstallResult r, ParsedInstallArgs p, IReadOnlyList<InstalledSkill> added)
-        => WriteJson(w => WriteInstallJson(w, r, p, added));
-
-    internal static string RenderInstallJson(InstallResult r, ParsedInstallArgs p, IReadOnlyList<InstalledSkill> added)
-        => RenderJson(w => WriteInstallJson(w, r, p, added));
+    internal static string RenderInstallJson(InstallResult r, ParsedInstallArgs p, IReadOnlyList<InstalledSkill>? added,
+        InventorySnapshot? observed = null, string? refreshError = null)
+        => RenderJson(w => WriteInstallJson(w, r, p, added, observed, refreshError));
 
     private static void WriteInstallJson(
         Utf8JsonWriter w,
         InstallResult r,
         ParsedInstallArgs p,
-        IReadOnlyList<InstalledSkill> added)
+        IReadOnlyList<InstalledSkill>? added, InventorySnapshot? observed = null, string? refreshError = null)
     {
         w.WriteStartObject();
         w.WriteString("repo", r.Repo);
         w.WriteString("skillName", r.SkillName);
         w.WriteString("version", r.Version);
         w.WriteBoolean("succeeded", r.Succeeded);
+        w.WriteString("attempt", r.Attempt.ToString());
+        w.WriteBoolean("mayHaveChangedFiles", r.MayHaveChangedFiles);
+        w.WriteBoolean("childDrained", r.ChildDrained);
+        w.WriteBoolean("canceled", r.Canceled);
+        w.WriteString("stdout", r.StdOut);
+        w.WriteString("stderr", r.StdErr);
+        w.WriteBoolean("stdoutTruncated", r.StdOutTruncated);
+        w.WriteBoolean("stderrTruncated", r.StdErrTruncated);
+        w.WriteString("refresh", !r.MayHaveChangedFiles ? "not-needed" : !r.ChildDrained ? "writer-unverified"
+            : observed is not null ? observed.IsPartial || !observed.ConfiguredRootsComplete ? "incomplete" : "completed"
+            : refreshError is not null ? "failed" : "not-captured");
+        if (refreshError is not null) w.WriteString("refreshError", refreshError);
+        w.WriteStartArray("observed");
+        if (observed is not null)
+            foreach (var skill in observed.Skills)
+            {
+                w.WriteStartObject();
+                w.WriteString("name", skill.Name);
+                w.WriteString("resolvedPath", skill.ResolvedPath);
+                w.WriteEndObject();
+            }
+        w.WriteEndArray();
         w.WriteNumber("exitCode", r.ExitCode);
         if (r.ErrorMessage is not null) w.WriteString("errorMessage", r.ErrorMessage);
 
@@ -242,19 +249,24 @@ public static partial class CliDispatcher
         foreach (var arg in r.CommandLine) w.WriteStringValue(arg);
         w.WriteEndArray();
 
-        w.WriteStartArray("added");
-        foreach (var s in added)
+        w.WriteBoolean("addedKnown", added is not null);
+        if (added is null) w.WriteNull("added");
+        else
         {
-            w.WriteStartObject();
-            w.WriteString("name", s.Name);
-            w.WriteString("resolvedPath", s.ResolvedPath);
-            w.WriteString("scope", s.Scope.ToString());
-            w.WriteStartArray("agents");
-            foreach (var ag in s.Agents) w.WriteStringValue(ag.AgentId);
+            w.WriteStartArray("added");
+            foreach (var s in added)
+            {
+                w.WriteStartObject();
+                w.WriteString("name", s.Name);
+                w.WriteString("resolvedPath", s.ResolvedPath);
+                w.WriteString("scope", s.Scope.ToString());
+                w.WriteStartArray("agents");
+                foreach (var ag in s.Agents) w.WriteStringValue(ag.AgentId);
+                w.WriteEndArray();
+                w.WriteEndObject();
+            }
             w.WriteEndArray();
-            w.WriteEndObject();
         }
-        w.WriteEndArray();
 
         w.WriteEndObject();
     }

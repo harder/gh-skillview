@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using SkillView.Bootstrapping;
 using SkillView.Gh;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
@@ -7,6 +8,10 @@ using SkillView.Subprocess;
 using SkillView.Ui;
 using SkillView.Ui.Tabs;
 using Terminal.Gui.Input;
+using Terminal.Gui.App;
+using Terminal.Gui.Drawing;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 using Xunit;
 
 namespace SkillView.Tests.Ui;
@@ -329,6 +334,56 @@ public sealed class InstalledInstallHandoffTests
             + "Showing verified copies of this skill; choose a copy to review it.", view.FooterTextForTests);
     }
 
+    [Fact]
+    public void RepositoryBrowseShowsAllVerifiedSourcesWithoutSelectingAnArbitraryCopy()
+    {
+        using var fixture = new Fixture();
+        var one = fixture.Skill(fixture.Root, "one");
+        var two = fixture.Observe(fixture.Skill(fixture.Root, "two") with
+        {
+            Name = "second",
+            FrontMatter = new() { Upstream = "https://github.com/owner/repo", GithubPath = "skills/second" },
+        });
+        var other = fixture.Skill(fixture.Root, "other", "other/repo");
+        var snapshot = fixture.Snapshot(one, two, other);
+        var overview = InstalledOverview.Build(snapshot, TestContext.Current.CancellationToken);
+        var loads = 0;
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
+            _ => { loads++; return Task.FromResult(snapshot); }, (_, _, _) => throw new InvalidOperationException("No mutation"), () => { });
+        Assert.True(view.RevealInstall(new(snapshot, overview, "", []) { BrowseOnly = true, BrowseRepository = "https://github.com/owner/repo" }));
+        Assert.Equal(2, view.RowsForTests.Count);
+        Assert.All(view.RowsForTests, row => Assert.NotNull(row.Group));
+        Assert.Null(view.GetSelectedSkill());
+        Assert.Null(view.SelectedKeyForTests);
+        Assert.False(view.DetailOpenForTests);
+        Assert.Contains(view.SubViews.OfType<Terminal.Gui.Views.Label>(), label => label.Visible && label.Text == "Repository: owner/repo — Clear shows all");
+        Assert.Equal(0, loads);
+    }
+
+    [Fact]
+    public void ExactCrossRepositoryHandoffClearsBrowseRestrictionButRejectedHandoffDoesNot()
+    {
+        using var fixture = new Fixture();
+        var one = fixture.Skill(fixture.Root, "one");
+        var other = fixture.Skill(fixture.Root, "other", "other/repo");
+        var snapshot = fixture.Snapshot(one, other);
+        var overview = InstalledOverview.Build(snapshot, TestContext.Current.CancellationToken);
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
+            _ => throw new InvalidOperationException("No load"), (_, _, _) => throw new InvalidOperationException("No mutation"), () => { });
+        Assert.True(view.RevealInstall(new(snapshot, overview, "", []) { BrowseOnly = true, BrowseRepository = "https://github.com/owner/repo" }));
+        var indicator = view.SubViews.OfType<Label>().Single(label => label.Text.StartsWith("Repository:", StringComparison.Ordinal));
+        var exact = InstalledInstallHandoffResolver.Resolve(new(InstallNavigationEvidence.SourceAnchor("other/repo", "skills/source")!,
+            [fixture.Root], "user", "context", true, ["universal"]), snapshot, overview, TestContext.Current.CancellationToken);
+        Assert.False(view.RevealInstall(exact with { GroupKey = "missing" }));
+        Assert.True(indicator.Visible);
+        Assert.Contains("owner/repo", indicator.Text);
+        Assert.True(view.RevealInstall(exact));
+        Assert.Same(other, view.GetSelectedSkill());
+        Assert.False(indicator.Visible);
+        Assert.Empty(indicator.Text);
+        Assert.True(view.DetailOpenForTests);
+    }
+
     private sealed class Fixture : IDisposable
     {
         internal string Root { get; } = Path.Combine(Path.GetTempPath(), "skillview-handoff-" + Guid.NewGuid().ToString("N"));
@@ -396,5 +451,128 @@ public sealed class InstalledInstallHandoffTests
             InstalledInstallHandoffResolver.Resolve(new(Anchor, roots ?? [Root], "user", "context", exact, ["universal"]), snapshot,
                 InstalledOverview.Build(snapshot, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
         public void Dispose() => Directory.Delete(Root, true);
+    }
+}
+
+[Collection(TestCollections.TerminalGuiStaticState)]
+public sealed class InstalledRepositoryBrowseRenderingTests
+{
+    [Theory]
+    [InlineData(80, 24, false)]
+    [InlineData(80, 24, true)]
+    [InlineData(120, 36, false)]
+    [InlineData(120, 36, true)]
+    public async Task BrowseRestrictionStaysVisibleThroughReloadExplicitRefreshAndFilteredEmptyThenKeyboardClear(int width, int height, bool newSnapshot)
+    {
+        using var app = Application.Create().Init("ansi");
+        app.Driver!.SetScreenSize(width, height);
+        var services = TuiServices.Build(new Logger(), logDirectory: Path.GetTempPath(), workingDirectory: Path.GetTempPath());
+        var shell = new SkillViewApp(services, new(InvocationMode.Standalone, DispatchMode.Tui, false, AppTheme.Default, [], null, []));
+        using var window = shell.BuildUiForTests();
+        var one = InstalledOverviewTests.Copy(Path.Combine(Path.GetTempPath(), "demo-a"), "demo-a", "owner/repo") with
+        { Agents = [new("universal", Path.Combine(Path.GetTempPath(), "demo-a"), false, Scope: Scope.User)] };
+        var other = InstalledOverviewTests.Copy(Path.Combine(Path.GetTempPath(), "demo-b"), "demo-b", "other/repo");
+        var snapshot = InventorySnapshot.Empty with { Skills = [one, other] };
+        var nextSnapshot = snapshot;
+        var loads = 0; var actions = 0;
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
+            _ => { loads++; return Task.FromResult(nextSnapshot); }, (_, _, _) => { actions++; return Task.CompletedTask; }, () => { },
+            onReviewUpdate: _ => actions++)
+        { Width = Dim.Fill(), Height = Dim.Fill() };
+        window.Add(view);
+        shell.SetInstalledTabForTests(view);
+        shell.ForceActiveTabForTests(SkillViewTab.Installed);
+        var overview = InstalledOverview.Build(snapshot, TestContext.Current.CancellationToken);
+        Assert.True(view.RevealInstall(new(snapshot, overview, "", []) { BrowseOnly = true, BrowseRepository = "https://github.com/owner/repo" }));
+        var session = app.Begin(window);
+        try
+        {
+            Draw();
+            var indicator = view.SubViews.OfType<Label>().Single(label => label.Text.StartsWith("Repository:", StringComparison.Ordinal));
+            var clear = view.SubViews.OfType<Button>().Single(button => button.Text == "Clear");
+            var table = view.SubViews.OfType<TableView>().Single();
+            var detail = view.SubViews.OfType<Markdown>().Single();
+            AssertRestriction();
+            Assert.All(view.RowsForTests, row => Assert.Equal("demo-a", row.Group?.Name));
+            Assert.Null(view.GetSelectedSkill());
+            view.SetSelectedRowForTests(0); view.NewKeyDownEvent(new Key(Terminal.Gui.Drivers.KeyCode.CursorRight));
+            view.SetSelectedRowForTests(1);
+            Assert.Same(one, view.GetSelectedSkill());
+            var selected = view.SelectedKeyForTests;
+            view.SelectFilter(0, view.FilterChoices(0).Single(choice => choice.Key == InstalledFilters.Key("agent", "universal")).Key);
+            view.SetFilterTextForTests("demo-a"); view.FocusList();
+            view.NewKeyDownEvent(new Key('G')); view.NewKeyDownEvent(new Key('s'));
+            nextSnapshot = newSnapshot ? snapshot with { CapturedAt = snapshot.CapturedAt.AddSeconds(1) } : snapshot;
+            await view.LoadAsync(); Draw();
+            Assert.Equal(1, loads);
+            AssertRestriction();
+            Assert.Equal(selected, view.SelectedKeyForTests);
+            Assert.Same(one, view.GetSelectedSkill());
+            Assert.Equal("demo-a", view.GetFilterText());
+            Assert.Contains("Agent: `universal`", view.DetailTextForTests);
+            shell.SetStatusForTests("Unrelated workflow notice", TuiHelpers.NotificationLevel.Info);
+            view.RefreshAvailability(); Draw(); AssertRestriction();
+
+            // Exercise the shell's actual explicit Refresh key: invalidate and
+            // invoke the same Installed loader, with a now-missing repository.
+            nextSnapshot = snapshot with { Skills = [other], CapturedAt = snapshot.CapturedAt.AddSeconds(2) };
+            view.FocusList();
+            app.Keyboard.RaiseKeyDownEvent(new Key('r')); Draw();
+            Assert.Equal(2, loads);
+            Assert.Same(nextSnapshot, view.CurrentSnapshot);
+            AssertRestriction();
+            Assert.Empty(view.RowsForTests);
+            Assert.Null(view.GetSelectedSkill());
+            Assert.Contains("No matching installed skills", view.DetailTextForTests);
+            Assert.DoesNotContain("No installed skills found", view.DetailTextForTests);
+            Assert.Contains("https://github.com/owner/repo", view.DetailTextForTests);
+            Assert.False(view.SubViews.OfType<Button>().Single(button => button.Text == "Review update (u)").Enabled);
+            Assert.False(view.TryStartSelectedRemoveForTests());
+
+            // Existing keyboard Clear resets independent facets/search/scope
+            // and the repository restriction in the same visible transition.
+            view.FocusFilterForTests();
+            for (var i = 0; i < 5; i++) Assert.True(view.HandleLocalNavigation(Key.Tab));
+            Assert.True(clear.HasFocus);
+            app.Keyboard.RaiseKeyDownEvent(Key.Enter); Draw();
+            Assert.False(indicator.Visible); Assert.Empty(indicator.Text);
+            Assert.Equal(3, table.Frame.Y); Assert.Equal(3, detail.Frame.Y);
+            Assert.Empty(view.GetFilterText());
+            Assert.DoesNotContain("Repository:", view.DetailTextForTests);
+            Assert.Contains(view.RowsForTests, row => row.Group?.Name == "demo-b");
+            Assert.Contains(view.SubViews.OfType<Label>(), label => label.Text == "P:any G:any s:S");
+            Assert.Contains(view.SubViews.OfType<Button>(), button => button.Text == "Agent:Any");
+            Assert.Null(view.GetSelectedSkill());
+            Assert.Equal(0, actions); Assert.Equal(2, loads);
+
+            void AssertRestriction()
+            {
+                Assert.True(indicator.Visible);
+                Assert.Equal("Repository: owner/repo — Clear shows all", indicator.Text);
+                Assert.True(clear.Visible); Assert.True(clear.Enabled);
+                Assert.True(view.ViewportToScreen().Contains(indicator.FrameToScreen()));
+                Assert.True(view.ViewportToScreen().Contains(clear.FrameToScreen()));
+                Assert.Equal(4, table.Frame.Y); Assert.Equal(4, detail.Frame.Y);
+                Assert.True(indicator.Frame.Bottom <= table.Frame.Top);
+                Assert.InRange(indicator.Frame.Right, 1, view.Viewport.Width);
+                Assert.Equal(1, indicator.Frame.Height);
+            }
+        }
+        finally { app.End(session!); }
+        void Draw() { window.Layout(); window.Draw(new DrawContext()); }
+    }
+
+    [Theory]
+    [InlineData(78)]
+    [InlineData(118)]
+    public void RepositoryIndicatorIsLiteralBoundedAndKeepsClearGuidance(int columns)
+    {
+        var text = InstalledTabView.RepositoryFilterText("https://github.com/owner_under/" + new string('x', 300) + "\u001b[31m\nrepo", columns);
+        Assert.StartsWith("Repository: ", text);
+        Assert.EndsWith(" — Clear shows all", text);
+        Assert.InRange(text.Length, 1, columns);
+        Assert.DoesNotContain('\u001b', text);
+        Assert.DoesNotContain('\n', text);
+        Assert.Empty(InstalledTabView.RepositoryFilterText(null, columns));
     }
 }
