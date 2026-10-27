@@ -8,6 +8,13 @@ namespace SkillView.Ui;
 public sealed partial class SkillViewApp
 {
 
+    private Func<string, SkillView.Gh.GhSkillSearchService.Options, CancellationToken, Task<SkillView.Gh.SearchResponse>>? _searchForTests;
+    internal void SetSearchAdapterForTests(Func<string, SkillView.Gh.GhSkillSearchService.Options, CancellationToken, Task<SkillView.Gh.SearchResponse>> search)
+    {
+        _ghPath ??= "search-fixture";
+        _searchForTests = search;
+    }
+    internal void SubmitSearchForTests() => SubmitSearch();
     internal void LoadSearchResultsForTests(IReadOnlyList<SearchResultSkill> results)
     {
         ReplaceSearchResults(results);

@@ -77,6 +77,16 @@ public sealed partial class SkillViewApp
         _previewRawPane = _discoverTab.DetailPane.PreviewRawPane;
         _logPane = _discoverTab.DetailPane.LogPane;
 
+        _discoverTab.PageRequested += ChangeSearchPage;
+        void RefreshInstallMarkers() => Invoke(() => { RefreshResultsTable(); UpdateMetadataPane(); });
+        _services.ListAdapter.Invalidated += RefreshInstallMarkers;
+        _workflows.DisplayObservationChanged += RefreshInstallMarkers;
+        window.Disposing += (_, _) =>
+        {
+            _services.ListAdapter.Invalidated -= RefreshInstallMarkers;
+            _workflows.DisplayObservationChanged -= RefreshInstallMarkers;
+        };
+
         // Wire event handlers that require SkillViewApp state.
         _resultsTable.KeyDown += (sender, key) =>
         {

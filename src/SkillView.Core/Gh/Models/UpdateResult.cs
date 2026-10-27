@@ -10,6 +10,8 @@ namespace SkillView.Gh.Models;
 public sealed record UpdateResult
 {
     internal SkillView.Maintenance.ReplacementResult? SavedPlan { get; init; }
+    public ImmutableArray<InstallResult> StagingInstallAttempts { get; init; } = [];
+
     public required bool DryRun { get; init; }
     public required bool Succeeded { get; init; }
     public required int ExitCode { get; init; }
