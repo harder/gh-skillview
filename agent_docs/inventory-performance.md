@@ -237,3 +237,116 @@ matches skip skill address probes. Explicit-selector matching still checks
 physical aliases, including differently named exposures. Cached comparisons and
 strict admission now share the PathIdentity/OwnershipPath implementation through
 observation providers; strict providers retain no lookup cache.
+
+## Disposable workloads and opt-in measurements
+
+`tools/inventory_fixture.py` creates a new private directory outside any checkout
+or ancestor `.git` marker. It reuses `tools/test_once.py`'s output validation and
+isolated homes. It never invokes SkillView, gh, Git, or an AI client. The relative
+paths, payload bytes, and lock contents are deterministic; native identities and
+host permission/link capabilities are observations, not reproducible constants.
+
+The default `messy` story contains twelve named scenarios in `fixture.json`:
+shared user/project links to one payload; two independent duplicate payloads;
+different user/project override bodies; contradictory authored/lock revisions;
+a pin found only in the lock; invalid required metadata; an absent Markdown
+resource; a dangling link; an empty leftover; an owner without a payload; a
+managed `.codex/skills/.system` payload with read-only modes; and a mode-000
+location containing a skill. The permission probe actually attempts enumeration.
+If that succeeds (including under root), the scenario is **unsupported**, with
+an explanation, and its ordinary permissions are restored. Link creation
+failures are also explicit unsupported cases; copies never substitute for links.
+Windows ACL denial and general terminal compatibility are not proven by Unix
+mode bits. The missing resource is authored fixture evidence; ordinary inventory
+does not validate Markdown links.
+
+The `performance` workload has 200 unique physical copies distributed round-robin
+across 50 explicit roots. A separate 1,000-copy workload exercises local browsing.
+Default nonexistent provider locations remain configured observations; report
+both configured and actually scanned roots rather than asserting those counts
+are equal. These complete workloads are separate from the deliberately partial
+messy story so failed coverage cannot masquerade as a display-cache hit.
+
+`tools/measure_inventory.py` runs the actual built executable against those
+workloads on Linux/macOS. It uses real local gh version/help/list commands and a
+small executable adapter that returns unauthenticated for `auth status` and
+refuses every other gh command. Child PATH contains only that adapter and Git;
+HOME/config/state/CWD/temp/plugin homes are private, credentials and inherited
+Git/client overrides are absent, Git global/system config is disabled, and
+proxies point to a closed loopback port. This is an offline local baseline, not
+an authenticated, remote-latency or OS network-sandbox proof. Adapter overhead
+is included. No install, update, remove, or skill execution is requested.
+
+The report records HEAD, dirty status, tool/binary hashes (including managed
+assemblies and runtime files), gh version/hash, runtime configuration, environment,
+workload, raw samples, existing `inventory.timing` phases, and logged child argv.
+
+Schema 2 also hashes each CLI JSON/stderr/timing artifact, workload/environment
+manifests and before/after native input observations. Each `.timing.json` records
+the direct host argv/PID, integer `perf_counter_ns` endpoints, clock resolution,
+exit status and parent-notification time. `processWallMs` spans immediately before
+direct `Popen` through blocking `waitpid` return on a dedicated observer thread.
+An event supplies the deadline; successful timing never uses `Popen.wait(timeout)`
+polling or a Python argv wrapper. Output-file setup, parent notification and
+cleanup are outside that interval. Host launch, serialization, scheduler latency
+and observer-thread wake-up remain inside it. Counter resolution is not timing
+accuracy; decimal milliseconds are a display conversion. Forced timeout exits
+receive no `processWallMs` value. The original schema-1 wrapper/polling wall column
+was quantized and is superseded; its raw receipts remain retained.
+
+Build the current source first; the harness identifies a supplied binary by its
+bytes and does not infer build provenance from its filename. It records:
+
+- One **first-process** CLI sample on newly generated files, followed by four
+  **warm-process** samples by default. These are fresh processes, not display
+  cache lookups. Fixture creation and binary hashing already touch filesystem
+  caches. OS-cache-cold inventory is explicitly unmeasured.
+  Messy and large CLI workloads each have one observation, not a distribution.
+- First shell paint and launch-to-F1-help-response, once per PTY workload. The
+  help response establishes causal input handling and is an upper bound on
+  readiness. Exact input readiness independent of inventory/auth is unmeasured;
+  no internal log message or fixed sleep stands in for it.
+- Thirty alternating Installed/Issues header clicks after both views have loaded.
+  Endpoints require the target's rendered content/footer. The report calls them
+  cached transitions only when the existing logs show one capture before and
+  after the sequence.
+- Thirty Down inputs at 1,000 physical inventory rows, observing the expected
+  source group or exact copy path (including scrollbar-wrapped lines), then
+  thirty replacements of the local filter with distinct exact
+  names, observing the matching rendered row and `1 of 1000` footer. Source and
+  copy rows mean this workload can project 2,000 table entries. Filtering keeps
+  the product's hidden-selection behavior; the harness does not change it.
+
+p95 uses the nearest rank (`ceil(.95 * n)`, the 29th of 30 sorted samples).
+The 30-transition series includes the first returns after initial view loading;
+warm-up decay can dominate its p95. Retain ordered samples and distinguish this
+inclusive endpoint from a warmed steady-state distribution in comparisons.
+PTY endpoints include receipt/decoding of the required redraw cells and Python
+observer overhead, not physical terminal presentation or proof that every cell
+in a frame has finished drawing. The small VT observer answers the probes used
+by the existing PTY tests and rejects unsupported cursor/edit sequences.
+Unobservable metrics receive **unmeasured** and a reason, with raw ANSI, final
+cell snapshot and product logs retained. Child counts cover existing
+`ProcessRunner` instrumentation; grandchildren and draw-handler filesystem I/O
+are not measured. Proposed budgets above remain calibration targets; no metric
+is a release gate or permission to rewrite product behavior.
+
+Each CLI sample has a default 60-second deadline (configurable 5–120 seconds;
+2–10 typical samples). Each PTY session has a 120-second total deadline,
+30-second condition deadlines and a 32 MiB transcript cap. Success sends Ctrl+Q
+and allows five seconds to exit; failure closes the PTY and kills/waits for the
+owned process group. The one-off runner's cooperative termination gives the
+harness time to close nested PTY sessions before its final kill. A CLI timeout or
+interruption ends the run; a PTY timeout ends that session and marks its remaining
+metrics unmeasured. Both retain diagnostics. Fixtures are retained for
+inspection; cleanup, if desired, must target only the exact generated directory.
+On Unix, the story retains a mode-000 `inaccessible` directory and mode-555
+`home/.codex/skills/.system/managed` directory. Restore owner access on those two
+exact paths inside the verified private fixture before manual cleanup; do not
+apply recursive permission changes to an unverified parent.
+There is no product removal or recursive-deletion fallback in this tooling.
+
+See [development commands](../CONTRIBUTING.md#offline-inventory-measurements) and
+the [recorded Linux baseline](inventory-performance-linux-baseline.md). Do not run
+builds, tests or other CPU-heavy work alongside a timing cohort. The baseline is
+implementation evidence; human UX and release acceptance remain separate.
