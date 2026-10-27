@@ -39,7 +39,8 @@ internal sealed class InstallConfirmModal
         Failed,
     }
 
-    internal sealed record Result(Outcome Outcome, InstallResult? Install, InstalledInstallHandoff? Handoff = null);
+    internal sealed record Result(Outcome Outcome, InstallResult? Install, InstalledInstallHandoff? Handoff = null,
+        IReadOnlyList<InstallAttemptReceipt>? Attempts = null);
 
     // Fixed visible height of the scrollable agent-checkbox grid; the
     // catalog is long enough now (gh skill install --agent lists ~47) that
@@ -54,6 +55,7 @@ internal sealed class InstallConfirmModal
     private readonly InstallRequest _request;
     private readonly bool _installAll;
     private readonly ProcessRunner _runner;
+    private readonly InstallAttemptRun _attempts;
     private readonly Func<InstallNavigationEvidence, CancellationToken, Task<InstalledInstallHandoff>>? _findInstalled;
     private readonly Func<InstalledInstallHandoff, bool>? _canPublish;
 
@@ -65,8 +67,10 @@ internal sealed class InstallConfirmModal
         InstallRequest request,
         bool installAll = false,
         Func<InstallNavigationEvidence, CancellationToken, Task<InstalledInstallHandoff>>? findInstalled = null,
-        Func<InstalledInstallHandoff, bool>? canPublish = null)
+        Func<InstalledInstallHandoff, bool>? canPublish = null,
+        InstallAttemptRun? attempts = null)
     {
+        _attempts = attempts ?? new();
         _app = app;
         _runner = install.CaptureContext();
         _install = new GhSkillInstallService(_runner, logger);
@@ -366,14 +370,24 @@ internal sealed class InstallConfirmModal
                     options,
                     cancellationToken).ConfigureAwait(false);
 
-                cancellationToken.ThrowIfCancellationRequested();
-                var detail = installResult.Succeeded ? null : InstallFailureDetails.Render(installResult);
+                var receipt = await _attempts.CompleteAsync(InstallAttemptSummary.Single(installResult), pending =>
+                    operation.InvokeIfActive(() =>
+                    {
+                        if (!installResult.MayHaveChangedFiles) return;
+                        dialog.Height = 20;
+                        dialog.Y = Pos.Center();
+                        status.Y = Pos.AnchorEnd(5);
+                        status.Height = 3;
+                        status.Text = pending.Guidance;
+                    })).ConfigureAwait(false);
+                var detail = installResult.Succeeded ? null : InstallFailureDetails.Render(receipt);
                 operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
                     if (installResult.Succeeded)
                     {
+                        if (installResult.ReadOnlyDiscovery) { outcome = Outcome.Cancelled; _app.RequestStop(); return; }
                         outcome = Outcome.Installed;
                         if (_installAll) { _app.RequestStop(); return; }
                         operation.Release();
@@ -394,24 +408,42 @@ internal sealed class InstallConfirmModal
                         status.Y = 3;
                         status.Height = 3;
                         spinner.Y = 3;
-                        status.Text = " Install completed";
+                        status.Text = receipt.Refresh is InstallRefreshState.Completed or InstallRefreshState.NotRequested
+                            ? " Install completed" : "Install child completed. " + receipt.Guidance;
+                        if (receipt.Refresh is not (InstallRefreshState.Completed or InstallRefreshState.NotRequested or InstallRefreshState.NotNeeded))
+                        {
+                            dialog.Height = 12;
+                            status.Height = 6;
+                        }
                         installButton.Text = "View installed skill";
                         installButton.Enabled = true;
                         advancedButton.Visible = false;
                         cancelButton.X = Pos.Right(installButton) + 2;
                         cancelButton.Text = "Back to Discover";
                         cancelButton.Enabled = true;
+                        if (receipt.Refresh is not (InstallRefreshState.Completed or InstallRefreshState.NotRequested or InstallRefreshState.NotNeeded))
+                        {
+                            failureDetails = InstallFailureDetails.Render(receipt);
+                            detailsButton.X = Pos.Right(installButton) + 2;
+                            detailsButton.Visible = detailsButton.Enabled = true;
+                            cancelButton.X = Pos.Right(detailsButton) + 2;
+                        }
                         installButton.SetFocus();
                     }
                     else
                     {
                         operation.Release();
-                        outcome = Outcome.Failed;
+                        outcome = installResult.Canceled ? Outcome.Cancelled : Outcome.Failed;
                         ShowFailure(detail!, installResult.ExitCode);
+                        dialog.Height = 20;
+                        dialog.Y = Pos.Center();
+                        status.Y = Pos.AnchorEnd(5);
+                        status.Height = 3;
+                        status.Text = (installResult.Canceled ? "install canceled. " : "install failed. ") + receipt.Guidance + " Details for full error.";
                         scopeSelector.Enabled = true;
                         agentsView.Enabled = true;
                         customPathField.Enabled = true;
-                        installButton.Enabled = CurrentValidationError() is null;
+                        installButton.Enabled = !installResult.Canceled && CurrentValidationError() is null;
                         advancedButton.Enabled = !_installAll;
                         cancelButton.Enabled = true;
                     }
@@ -626,7 +658,8 @@ internal sealed class InstallConfirmModal
             operation.Cancel();
         }
 
-        return new Result(outcome, installResult, handoff);
+        operation.Dispose(); // Drain before evaluating result fields.
+        return new Result(outcome, installResult, handoff, _attempts.Receipts.ToArray());
     }
 
     private static string FormatBasePath(string path)

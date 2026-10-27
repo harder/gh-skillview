@@ -954,3 +954,39 @@ the existing `update-inspect`, `restore-inspect`, `unpin-inspect`,
 `reimport-inspect` or `source-switch-inspect` command with the exact saved ID and
 any required global scan locations. The CLI `history` command continues to
 verify backup archives and keeps its existing output format.
+
+Install failures and cancellation can leave files behind. SkillView retains
+whether an install child actually started, both output streams, and each known
+subset result. After a possible write and verified child exit, Installed refreshes
+once before the result is delivered, including when you close the review. If the
+child does not stop within the termination grace, SkillView returns with an
+unverified-writer warning instead of waiting indefinitely or scanning while it
+may still write. Wait for that child to stop, then explicitly refresh Installed
+before retrying. Details shows completed,
+failed or canceled selections and those never attempted. A repository-wide
+`--all` result does not identify which individual skills were written on failure.
+Review Installed before retrying; nothing is retried automatically. Incomplete
+or failed refreshes leave the result unknown and require an explicit refresh.
+A preflight refusal says “No install started” and does not scan inventory merely
+because you opened the review. Successful compact installs keep the exact
+“View installed skill” action and your Discover query.
+
+`install --json` also reports `attempt`, `mayHaveChangedFiles`, `childDrained`,
+`stdout`, `stderr`, `refresh` and the post-attempt `observed` entries.
+
+Compatibility change for JSON clients: when no before snapshot exists, install
+reports `"added": null` and `"addedKnown": false`, including on success. This
+replaces the old `added` array representation: an empty array would incorrectly
+mean that no additions were found. Clients must check `addedKnown` and handle a
+null `added` value as unknown. Use `observed` for actual post-attempt inventory
+entries; it does not identify which entries were newly added. A known additions
+list has `addedKnown: true`; only then does `added: []` mean no additions were
+observed. SkillView does not capture inventory merely to compute this difference.
+Cancellation returns exit code 130 while preserving the attempt and refresh
+report.
+
+A successful install with a complete fresh observation prints
+`installed: OWNER/REPO/SKILL[@VERSION]`, gh's output, and
+`rescan: N skill(s) observed`. Failure, cancellation, incomplete refresh and
+unverified child exit retain warning guidance; incomplete/failed refreshes do
+not print a successful rescan line.

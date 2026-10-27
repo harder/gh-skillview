@@ -174,3 +174,33 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   around capture. These lookups never enter the final-admission-to-launch gap;
   User-scope lookups launch no children. This evidence grants browsing only;
   later mutations require fresh admission.
+
+- Install outcomes retain typed attempt accounting independently of success and
+  exit code. Only preflight refusal, canceled admission and a proven start
+  failure establish no mutating child. Old result constructors default to
+  unknown; transport/lifecycle faults never imply unchanged files. Retain both
+  streams on failure/cancellation. Install execution retains the bounded
+  parent-exit grace and independent bounded output retention. Cancel both initial
+  pipe readers on cancellation or retained transport failure before observing
+  them. A started child can return ChildDrained=false when exit is unconfirmed;
+  never extend cancellation/shutdown with an unlimited wait or a reaper.
+  Invalidate observations without inventory capture and require manual refresh
+  after that child stops. Ordinary RunAsync exception semantics stay compatible. This is observation only;
+  all placement, ownership, native and final-launch admission checks remain.
+- Subset install accounting retains each child result and the exact unsubmitted
+  suffix. Stop after the first failed/canceled child; never retry previous
+  successes or widen to --all. One --all result is a repository-wide child
+  outcome, not per-skill success evidence. The low-level update coordinator
+  retains its private staging install attempts separately from mutation of the
+  user's installation. Staging cleanup still uses its owned native lease, but
+  an unverified staging writer retains the private directory and reports its
+  location rather than cleaning up while that writer may still run.
+- CLI install avoids an eager before-inventory capture. After a possible write,
+  invalidate and, only after verified child exit, take one uncached capture under
+  an independent bounded deadline even after cancellation/failure. JSON exposes attempt, streams, refresh status
+  and observed entries. Without a before snapshot, encode added:null and
+  addedKnown:false, including on success; an empty array would falsely claim no
+  additions. JSON clients must migrate to that explicit unknown representation.
+  Never call every observed installation newly added. Text clean success keeps
+  the selected repo/skill/version confirmation and complete observation count;
+  warning/retry guidance belongs to failed, canceled or unverified outcomes.

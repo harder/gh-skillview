@@ -31,13 +31,15 @@ internal sealed class RepoSkillPickerModal
         Failed,
     }
 
-    internal sealed record Result(Outcome Outcome, int InstalledCount, int FailedCount, string? FirstError);
+    internal sealed record Result(Outcome Outcome, int InstalledCount, int FailedCount, string? FirstError,
+        InstallAttemptSummary? Attempts = null);
 
     // Fixed visible height of the scrollable agent-checkbox grid — matches
     // the 3-row budget the previous fixed AnchorEnd(6)..(4) layout had before
     // colliding with the status row at AnchorEnd(3).
     private const int AgentsVisibleRows = 3;
 
+    private readonly InstallAttemptRun _attempts;
     private readonly IApplication _app;
     private readonly GhSkillInstallService _install;
     private readonly Logger _logger;
@@ -51,8 +53,10 @@ internal sealed class RepoSkillPickerModal
         Logger logger,
         string ghPath,
         InstallRequest request,
-        ImmutableArray<RepoSkill> skills)
+        ImmutableArray<RepoSkill> skills,
+        InstallAttemptRun? attempts = null)
     {
+        _attempts = attempts ?? new();
         _app = app;
         _install = install;
         _logger = logger;
@@ -142,7 +146,7 @@ internal sealed class RepoSkillPickerModal
         };
         TuiHelpers.ConfigureTextInput(customPathField, SkillViewStyling.DialogSchemeName);
 
-        var agentsLabel = new Label { X = 1, Y = Pos.AnchorEnd(6), Text = "Agents:" };
+        var agentsLabel = new Label { X = 1, Y = Pos.AnchorEnd(7), Text = "Agents:" };
         var home = Environment.GetEnvironmentVariable("HOME")
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var preChecked = InstallAgentCatalog.DetectInstalledGhIds(
@@ -152,7 +156,7 @@ internal sealed class RepoSkillPickerModal
         var agentsView = new View
         {
             X = 9,
-            Y = Pos.AnchorEnd(6),
+            Y = Pos.AnchorEnd(7),
             Width = Dim.Fill(2),
             Height = AgentsVisibleRows,
         };
@@ -165,7 +169,8 @@ internal sealed class RepoSkillPickerModal
         var status = new Label
         {
             X = 3,
-            Y = Pos.AnchorEnd(3),
+            Y = Pos.AnchorEnd(4),
+            Height = 3,
             Width = Dim.Fill(2),
             Text = " ready",
         };
@@ -186,6 +191,13 @@ internal sealed class RepoSkillPickerModal
             Y = Pos.AnchorEnd(1),
             Text = "Install",
             IsDefault = true,
+        };
+        var detailsButton = new Button { X = 1, Y = Pos.AnchorEnd(1), Text = "Details", Visible = false };
+        detailsButton.Accepting += (_, ev) =>
+        {
+            ev.Handled = true;
+            if (operation.CurrentOwnership == ModalOperationTracker.Ownership.None && _attempts.Last is { } receipt)
+                InstallFailureDetails.Show(_app, InstallFailureDetails.Render(receipt));
         };
         var cancelButton = new Button
         {
@@ -255,61 +267,49 @@ internal sealed class RepoSkillPickerModal
         {
             try
             {
-                if (plan.UseAll)
-                {
-                    var r = await _install.InstallAsync(
-                        _ghPath, _request.Repo, null, baseOptions, cancellationToken).ConfigureAwait(false);
-                    if (r.Succeeded) installedCount = _skills.Length;
-                    else { failedCount = _skills.Length; firstError ??= r.ErrorMessage; }
-                }
-                else
-                {
-                    for (var i = 0; i < plan.SkillNames.Length; i++)
+                var summary = await _install.InstallBatchAsync(_ghPath, _request.Repo, plan,
+                    baseOptions, cancellationToken).ConfigureAwait(false);
+                installedCount = summary.Results.Count(result => result.Succeeded);
+                failedCount = summary.Results.Count(result => !result.Succeeded);
+                firstError = summary.Results.FirstOrDefault(result => !result.Succeeded)?.ErrorMessage;
+                var receipt = await _attempts.CompleteAsync(summary, pending =>
+                    operation.InvokeIfActive(() =>
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var name = plan.SkillNames[i];
-                        var idx = i;
-                        operation.InvokeIfActive(() =>
-                            status.Text = $" installing {idx + 1}/{plan.SkillNames.Length}: {name}…");
-                        var r = await _install.InstallAsync(
-                            _ghPath, _request.Repo, name, baseOptions, cancellationToken).ConfigureAwait(false);
-                        if (r.Succeeded) installedCount++;
-                        else { failedCount++; firstError ??= r.ErrorMessage; }
-                    }
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
+                        listFrame.Visible = scopeLabel.Visible = scopeSelector.Visible = customPathLabel.Visible = customPathField.Visible = false;
+                        agentsLabel.Visible = agentsView.Visible = false;
+                        dialog.Height = 14;
+                        dialog.Y = Pos.Center();
+                        status.Y = 3;
+                        status.Height = 6;
+                        status.Text = pending.Guidance;
+                    })).ConfigureAwait(false);
                 operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
-                    if (failedCount == 0)
+                    if (summary.Succeeded)
                     {
                         outcome = Outcome.Installed;
                         _app.RequestStop();
                     }
-                    else if (installedCount > 0)
-                    {
-                        // Partial success — report and let the user close.
-                        operation.Release();
-                        outcome = Outcome.Installed;
-                        status.Text = $" installed {installedCount}, {failedCount} failed — see logs (l)";
-                        installButton.Enabled = false;
-                        cancelButton.Enabled = true;
-                    }
                     else
                     {
                         operation.Release();
-                        outcome = Outcome.Failed;
-                        var snippet = TuiHelpers.ErrorSnippet(firstError);
-                        status.Text = snippet.Length > 0
-                            ? $" install failed: {snippet}"
-                            : " install failed — see logs (l)";
-                        RefreshValidity();
-                        SetOperationControlsEnabled(true);
+                        outcome = summary.Canceled ? Outcome.Cancelled : Outcome.Failed;
+                        header.Text = $"{installedCount} child succeeded; {failedCount} failed/canceled; {summary.NotAttempted.Count} not attempted.";
+                        status.Text = receipt.Guidance + " Details for selection outcomes.";
+                        installButton.Visible = false;
+                        cancelButton.X = Pos.Right(detailsButton) + 2;
+                        detailsButton.Visible = true;
+                        detailsButton.Enabled = true;
+                        // Keep the completed selection visible. A fresh dialog
+                        // is required to choose a new submission after a batch.
+                        installButton.Enabled = false;
+                        cancelButton.Enabled = true;
                     }
                 });
             }
+
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 _logger.Debug("install.picker", "install canceled because the dialog closed");
@@ -449,7 +449,7 @@ internal sealed class RepoSkillPickerModal
 
         dialog.Add(header, listFrame, scopeLabel, scopeSelector, customPathLabel, customPathField,
             agentsLabel, agentsView);
-        dialog.Add(status, spinner, installButton, cancelButton);
+        dialog.Add(status, spinner, installButton, detailsButton, cancelButton);
 
         TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
             dialog, header, listFrame, scopeLabel, scopeSelector,
@@ -468,6 +468,7 @@ internal sealed class RepoSkillPickerModal
             operation.Cancel();
         }
 
-        return new Result(outcome, installedCount, failedCount, firstError);
+        operation.Dispose();
+        return new Result(outcome, installedCount, failedCount, firstError, _attempts.Last?.Summary);
     }
 }

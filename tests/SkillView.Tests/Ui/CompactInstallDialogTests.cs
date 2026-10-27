@@ -198,6 +198,14 @@ public sealed class CompactInstallDialogTests
                 Assert.True(dialog.IsRunning);
                 checkedActive = true;
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                app.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
+                {
+                    var details = dialog.SubViews.OfType<Button>().Single(button => button.Text == "Details");
+                    if (!details.Visible || !details.Enabled) return true;
+                    Assert.Contains(dialog.SubViews.OfType<Label>(), label => label.Text.Contains("may have changed files", StringComparison.Ordinal));
+                    dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel").InvokeCommand(Command.Accept);
+                    return false;
+                });
                 return false;
             });
         }, stall);
@@ -613,7 +621,9 @@ public sealed class CompactInstallDialogTests
                 for (var i = 1; i < buttons.Length; i++) Assert.True(buttons[i - 1].Frame.Right < buttons[i].Frame.Left);
                 var status = dialog.SubViews.OfType<Label>().Single(label => label.Text.Contains("install failed", StringComparison.Ordinal));
                 Assert.Contains("Details for full error", status.Text);
-                Assert.True(status.Text.Length <= status.Frame.Width);
+                Assert.Equal(3, status.Frame.Height);
+                Assert.True(status.Text.Length <= status.Frame.Width * status.Frame.Height);
+                AssertFits(status, dialog);
                 details.SetFocus();
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
                 return;

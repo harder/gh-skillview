@@ -49,17 +49,26 @@ public sealed class InstallScreen
     private readonly string _ghPath;
     private readonly InstallRequest _request;
 
+    private readonly InstallAttemptRun _attempts;
+
+    internal IReadOnlyList<InstallAttemptReceipt> Attempts => _attempts.Receipts;
+
     public InstallResult? LastResult { get; private set; }
 
-    public InstallScreen(
+    public InstallScreen(IApplication app, GhSkillInstallService install, Logger logger, string ghPath, InstallRequest request)
+        : this(app, install, logger, ghPath, request, new InstallAttemptRun()) { }
+
+    internal InstallScreen(
         IApplication app,
         GhSkillInstallService install,
         Logger logger,
         string ghPath,
-        InstallRequest request)
+        InstallRequest request,
+        InstallAttemptRun attempts)
     {
+        _attempts = attempts;
         _app = app;
-        _install = install;
+        _install = new GhSkillInstallService(install.CaptureContext(), logger);
         _logger = logger;
         _ghPath = ghPath;
         _request = request;
@@ -253,14 +262,15 @@ public sealed class InstallScreen
         var status = new Label
         {
             X = 2,
-            Y = Pos.AnchorEnd(3),
+            Y = Pos.AnchorEnd(5),
             Width = Dim.Fill(2),
+            Height = 3,
             Text = " ready — review the options, then press Install",
         };
         var spinner = new SpinnerView
         {
             X = 0,
-            Y = Pos.AnchorEnd(3),
+            Y = Pos.AnchorEnd(5),
             Width = 1,
             Height = 1,
             Visible = false,
@@ -274,6 +284,13 @@ public sealed class InstallScreen
             X = Pos.Center() - 12,
             Y = Pos.AnchorEnd(1),
             IsDefault = true,
+        };
+        var detailsButton = new Button { Text = "_Details", X = 1, Y = Pos.AnchorEnd(1), Visible = false };
+        detailsButton.Accepting += (_, ev) =>
+        {
+            ev.Handled = true;
+            if (operation.CurrentOwnership == ModalOperationTracker.Ownership.None && _attempts.Last is { } receipt)
+                InstallFailureDetails.Show(_app, InstallFailureDetails.Render(receipt));
         };
         var cancelButton = new Button
         {
@@ -379,10 +396,20 @@ public sealed class InstallScreen
                     skillName,
                     options,
                     cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
+                LastResult = result;
+                var receipt = await _attempts.CompleteAsync(InstallAttemptSummary.Single(result), pending =>
+                    operation.InvokeIfActive(() =>
+                    {
+                        sourceFrame.Visible = whereFrame.Visible = behaviorFrame.Visible = previewLabel.Visible = false;
+                        dialog.Height = 12;
+                        dialog.Y = Pos.Center();
+                        status.Y = 1;
+                        status.Height = 6;
+                        spinner.Y = 1;
+                        status.Text = pending.Guidance;
+                    })).ConfigureAwait(false);
                 operation.InvokeTerminalIfActive(() =>
                 {
-                    LastResult = result;
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
                     if (result.Succeeded)
@@ -393,11 +420,11 @@ public sealed class InstallScreen
                     else
                     {
                         operation.Release();
-                        var snippet = TuiHelpers.ErrorSnippet(result.ErrorMessage);
-                        status.Text = snippet.Length > 0
-                            ? $" install failed (exit {result.ExitCode}): {snippet}"
-                            : $" install failed (exit {result.ExitCode}) — see logs";
-                        installButton.Enabled = true;
+                        status.Text = (result.Canceled ? "Install canceled. " : "Install failed. ") + receipt.Guidance;
+                        detailsButton.Visible = true;
+                        detailsButton.Enabled = true;
+                        installButton.Enabled = !result.Canceled;
+                        cancelButton.Enabled = true;
                     }
                 });
             }
@@ -465,7 +492,7 @@ public sealed class InstallScreen
 
         dialog.Add(sourceFrame, whereFrame, behaviorFrame,
             previewLabel, status, spinner,
-            installButton, cancelButton);
+            installButton, detailsButton, cancelButton);
 
         dialog.KeyDown += (_, key) =>
         {

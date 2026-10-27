@@ -29,7 +29,25 @@ internal static class InstallFailureDetails
     }
 
     internal static string Render(InstallResult result) =>
-        $"Install failed (exit {result.ExitCode})\n\n{Literal(result.ErrorMessage)}\n\nStandard error:\n{Literal(result.StdErr)}\n\nStandard output:\n{Literal(result.StdOut)}";
+        $"Install {(result.Succeeded ? "completed" : result.Canceled ? "canceled" : "failed")} (exit {result.ExitCode})\n\n{Literal(result.ErrorMessage)}\n\nStandard error:\n{Literal(result.StdErr)}{(result.StdErrTruncated ? "\n[stderr truncated]" : "")}\n\nStandard output:\n{Literal(result.StdOut)}{(result.StdOutTruncated ? "\n[stdout truncated]" : "")}";
+
+    internal static string Render(InstallAttemptReceipt receipt)
+    {
+        var text = new StringBuilder(receipt.Guidance);
+        if (receipt.Error is { } error) text.Append("\nRefresh: ").Append(Literal(error));
+        text.Append("\n\nSelection outcomes (repository-wide children do not prove per-skill outcomes):");
+        foreach (var result in receipt.Summary.Results.Take(128))
+            text.Append("\n").Append(Literal(result.SkillName ?? "ALL / repository discovery"))
+                .Append(": ").Append(result.Attempt).Append(" (exit ").Append(result.ExitCode).Append(')');
+        if (receipt.Summary.Results.Count > 128) text.Append("\n[additional child outcomes omitted]");
+        text.Append("\n\nNot attempted:\n").Append(Literal(string.Join("\n", receipt.Summary.NotAttempted)));
+        // Put the partial selection before verbose child output so a noisy
+        // first child cannot hide the later failure or unsubmitted selectors.
+        foreach (var result in receipt.Summary.Results.Take(128))
+            text.Append("\n\n").Append(Literal(result.Repo)).Append(" / ")
+                .Append(Literal(result.SkillName ?? "ALL / repository discovery")).Append("\n").Append(Render(result));
+        return Literal(text.ToString());
+    }
 
     internal static Editor CreatePane(string text) => new()
     {

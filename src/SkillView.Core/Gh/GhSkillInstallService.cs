@@ -50,11 +50,13 @@ public sealed class GhSkillInstallService
         CancellationToken cancellationToken = default)
     {
         options ??= new Options();
-        options = options with { WorkingDirectory = System.IO.Path.GetFullPath(options.WorkingDirectory ?? _runner.EffectiveWorkingDirectory) };
-        var args = BuildArgs(repo, skillName, options);
+        IReadOnlyList<string> args = [];
         InstallNavigationEvidence? navigation = null;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            options = options with { WorkingDirectory = System.IO.Path.GetFullPath(options.WorkingDirectory ?? _runner.EffectiveWorkingDirectory) };
+            args = BuildArgs(repo, skillName, options);
             var mutates = options.All || !string.IsNullOrEmpty(skillName);
             var destinations = mutates ? await GhPlacementCatalog.DestinationsAsync(options, _runner, cancellationToken).ConfigureAwait(false) : [];
             var context = mutates ? GhInstallOwnershipGuard.Capture(destinations, _runner, options, _logger, cancellationToken) : null;
@@ -124,33 +126,83 @@ public sealed class GhSkillInstallService
                 navigation = InstallNavigationEvidence.Capture(options, destinations, _runner);
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { return InstallResult.Failure(repo, skillName, options.Version, 2, ex.Message, args); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return InstallResult.Failure(repo, skillName, options.Version, 130, "Canceled before install admission.", args)
+            with
+            { Attempt = InstallAttemptOutcome.CanceledBeforeStart };
+        }
+        catch (Exception ex)
+        {
+            return InstallResult.Failure(repo, skillName, options.Version, 2, ex.Message, args)
+            with
+            { Attempt = InstallAttemptOutcome.RefusedPreflight };
+        }
         // Vacancy admits only ordinary fresh-install authority. Do not let a
         // target appearing after the final observation receive --force.
         // CLI force intent stays in ParsedInstallArgs; CommandLine is effective.
         if (options.Overwrite) args = BuildArgs(repo, skillName, options with { Overwrite = false });
-        var result = await _runner.RunAsync(ghPath, args, cancellationToken: cancellationToken,
-            environment: options.ProcessEnvironment, workingDirectory: options.WorkingDirectory).ConfigureAwait(false);
-        if (!result.Succeeded)
+        SkillView.Subprocess.ProcessResult result;
+        try
         {
-            _logger.Warn("gh.skill.install", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
-            return InstallResult.Failure(repo, skillName, options.Version, result.ExitCode, result.StdErr.Trim(), args);
+            result = await _runner.RunInstallAsync(ghPath, args, options.WorkingDirectory,
+                cancellationToken, options.ProcessEnvironment).ConfigureAwait(false);
         }
-
+        catch (Exception ex)
+        {
+            // Transport/lifecycle faults are not evidence that no child ran.
+            return InstallResult.Failure(repo, skillName, options.Version, -1, ex.Message, args)
+                with
+            { CancellationRequested = cancellationToken.IsCancellationRequested };
+        }
+        var attempt = result.StartState switch
+        {
+            ProcessStartState.NotStarted => result.Cancelled ? InstallAttemptOutcome.CanceledBeforeStart : InstallAttemptOutcome.StartFailed,
+            ProcessStartState.Started => result.Cancelled ? InstallAttemptOutcome.ChildCanceled
+                : result.Succeeded ? InstallAttemptOutcome.Succeeded : InstallAttemptOutcome.ChildFailed,
+            _ => InstallAttemptOutcome.Unknown,
+        };
+        if (!result.Succeeded)
+            _logger.Warn("gh.skill.install", $"exit={result.ExitCode} err={Logger.ErrorSnippet(result.StdErr)}");
         return new InstallResult
         {
             Repo = repo,
             SkillName = skillName,
             Version = options.Version,
-            Succeeded = true,
-            ExitCode = 0,
+            Succeeded = result.Succeeded,
+            Attempt = attempt,
+            ChildDrained = result.ChildDrained,
+            StdOutTruncated = result.StdOutTruncated,
+            StdErrTruncated = result.StdErrTruncated,
+            ReadOnlyDiscovery = !options.All && string.IsNullOrEmpty(skillName),
+            ExitCode = result.ExitCode,
             StdOut = result.StdOut,
             StdErr = result.StdErr,
-            ErrorMessage = null,
+            ErrorMessage = result.Succeeded ? null : result.StdErr.Trim(),
             CommandLine = args,
-            Navigation = navigation,
+            Navigation = result.Succeeded ? navigation : null,
         };
+    }
+
+    public async Task<InstallAttemptSummary> InstallBatchAsync(string ghPath, string repo,
+        InstallPlan plan, Options options, CancellationToken token = default)
+    {
+        if (plan.UseAll)
+            return InstallAttemptSummary.Single(await InstallAsync(ghPath, repo, null,
+                options with { All = true }, token).ConfigureAwait(false));
+        var results = new List<InstallResult>();
+        var remainingOutput = InstallAttemptSummary.MaxBatchOutputCharacters;
+        for (var index = 0; index < plan.SkillNames.Length; index++)
+        {
+            if (token.IsCancellationRequested)
+                return new(results.ToArray(), plan.SkillNames.Skip(index).ToArray(), CancellationRequested: true);
+            var result = await InstallAsync(ghPath, repo, plan.SkillNames[index], options with { All = false }, token).ConfigureAwait(false);
+            results.Add(InstallAttemptSummary.Retain(result, ref remainingOutput));
+            // Never resubmit an earlier success or widen a failed selection.
+            if (!result.Succeeded)
+                return new(results.ToArray(), plan.SkillNames.Skip(index + 1).ToArray());
+        }
+        return new(results.ToArray(), []);
     }
 
     /// Discover the skills a repository offers without installing anything.

@@ -394,3 +394,27 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   refresh, leaving and shutdown cancel stale requests and clear old inspections.
   Refresh retains the selected operation ID when it is still present. History
   work remains owned by the app task tracker after a canceled modal closes.
+
+- Install dialogs record attempt receipts before cancelable UI delivery. Their
+  ModalOperationTracker owns and drains the execution/reconciliation worker
+  task, including forced modal close/shutdown; evaluate returned result fields
+  only after that worker settles. Child exit and both pipe drains remain bounded.
+  If termination is refused/unconfirmed, preserve positive start and cancellation
+  or transport failure with ChildDrained=false; invalidate facts without inventory
+  capture, return WriterUnverified/manual-refresh-after-stop guidance, and do not
+  start a reaper or wait indefinitely during teardown. For verified child exit,
+  reconciliation uses its own bounded deadline, never the canceled review token,
+  and does not await UI dispatch. Publish one uncached inventory snapshot per
+  submitted possible-write batch with context and catalog generation guards. Pure preflight refusal or opening
+  and canceling a review must not invalidate/capture inventory. Generation
+  invalidation also retires display, Issues, package and availability facts.
+- Show immediate possible-file-change guidance while Installed refreshes, then
+  distinguish complete, partial, failed and unverified-writer outcomes with
+  literal bounded Details. Child failure/cancellation is not atomic rollback.
+  Retain completed/failed/not-attempted subset selectors and never present a
+  mixed batch as all installed. Compact success handoff reuses the reconciled
+  snapshot with its original context/generation and exact-source checks; it
+  cannot recapture or name-match its way around unavailable evidence. Failure
+  does not navigate or resubmit Discover. Explicit Refresh remains a user action;
+  do not call it to publish reconciliation because it invalidates again and
+  repeats the active search.
