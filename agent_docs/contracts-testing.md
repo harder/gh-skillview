@@ -36,3 +36,13 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
 - CI's standalone AOT smoke publish now promotes `IL2026`, `IL3050`, and
   `IL3053` to errors for `SkillView.App`; keep the gh extension's project-level
   suppression local until that host gets its separate re-evaluation.
+
+- Terminal.Gui 2.5.0 `Application.InstanceCreated`/`InstanceDisposed` subscribers
+  are thread-local. Async app-owned task draining can resume teardown on another
+  thread, so facade notifications cannot prove disposal after an awaited run.
+  Observe the exact instance's `InitializedChanged(false)` notification (emitted
+  by Dispose after state/driver cleanup), keep the identity assertion, and verify
+  uninitialized state plus released Driver/MainThreadId at RunAsync return.
+  Unsubscribe instance/session handlers in finally; do not leave facade handlers
+  on an abandoned creation thread. Use held-work gates and a dedicated UI thread
+  for deterministic drain handoffs rather than sleeps or repeated runs.

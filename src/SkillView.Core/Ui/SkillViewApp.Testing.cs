@@ -135,6 +135,9 @@ public sealed partial class SkillViewApp
 
     internal void LeaveDoctorForTests() => LeaveDoctor();
 
+    internal void SetHistoryLoaderForTests(Func<CancellationToken, Task<SkillView.Maintenance.ReplacementHistory>> load) =>
+        _historyLoaderForTests = load;
+
     internal void RunBackgroundForTests(Func<CancellationToken, Task> work, string operation) =>
         RunBackground(work, operation);
 }
