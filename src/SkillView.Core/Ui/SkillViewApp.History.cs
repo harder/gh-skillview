@@ -1,3 +1,4 @@
+using SkillView.Inventory.Models;
 using SkillView.Inventory;
 using SkillView.Maintenance;
 using Terminal.Gui.Drivers;
@@ -51,17 +52,42 @@ public sealed partial class SkillViewApp
     {
         if (_app is not { } app || GetRunLifetimeToken().IsCancellationRequested) return;
         NoteUserInteraction();
-        Interlocked.Increment(ref _historyHintGeneration);
+        var generation = Interlocked.Increment(ref _historyHintGeneration);
+        void PublishOwnedHint(ReplacementHistory history)
+        {
+            if (generation == Interlocked.Read(ref _historyHintGeneration)) PublishHistoryHint(history);
+        }
         RetainedHistoryScreen.Show(app, _services.Logger, LoadHistoryAsync, async (id, token) =>
         {
-            // Explicit user request only: fresh native inventory and the store's
-            // existing full Observe path, never cached row metadata as authority.
-            var snapshot = await _services.InventoryService.CaptureAsync(_ghPath ?? _services.GhLocator.FindOnPath(token),
-                new LocalInventoryService.Options(_options.ScanRoots, true,
-                    WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles)
-                { BypassGhCache = true }, token).ConfigureAwait(false);
-            return await Task.Run(() => HistoryStore().Inspect(id, snapshot, token), token).ConfigureAwait(false);
-        }, (work, name) => RunOwnedTask(work, name, runOnThreadPool: false), GetRunLifetimeToken(), PublishHistoryHint);
+            var active = await ActiveHistoryPlanIdsAsync(token).ConfigureAwait(false);
+            return await HistoryStore().InspectHistoryAsync(id, CaptureHistoryInventoryAsync, active, token).ConfigureAwait(false);
+        }, (work, name) => RunOwnedTask(work, name, runOnThreadPool: false), GetRunLifetimeToken(), PublishOwnedHint,
+            retire: async (review, token) =>
+            {
+                var active = await ActiveHistoryPlanIdsAsync(token).ConfigureAwait(false);
+                try { await HistoryStore().RetireAsync(review, review.Kind, CaptureHistoryInventoryAsync, active, token).ConfigureAwait(false); }
+                finally
+                {
+                    // Badge reconciliation survives modal cancellation. App task
+                    // ownership remains held until refresh/publication quiesces.
+                    var lifetime = GetRunLifetimeToken();
+                    var history = await LoadHistoryAsync(lifetime).ConfigureAwait(false);
+                    await InvokeAsync(() => PublishOwnedHint(history), lifetime).ConfigureAwait(false);
+                }
+            });
+    }
+
+    private Task<InventorySnapshot> CaptureHistoryInventoryAsync(CancellationToken token) =>
+        _services.InventoryService.CaptureAsync(_ghPath ?? _services.GhLocator.FindOnPath(token),
+            new LocalInventoryService.Options(_options.ScanRoots, true,
+                WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles)
+            { BypassGhCache = true }, token);
+
+    private async Task<System.Collections.Immutable.ImmutableArray<string>> ActiveHistoryPlanIdsAsync(CancellationToken token)
+    {
+        System.Collections.Immutable.ImmutableArray<string> ids = [];
+        await InvokeAsync(() => ids = _updatesTab?.CaptureActivePlanIds() ?? [], token).ConfigureAwait(false);
+        return ids;
     }
 
     private bool IsHistoryShortcut(Key key) => key.KeyCode == KeyCode.F4;

@@ -35,7 +35,7 @@ public sealed class RetainedHistoryScreenTests
         var rendered = RetainedHistoryScreen.RenderEntry(entry);
         Assert.Contains("literal\ufffd\ufffd\ufffd\ufffd\ufffd\nnext\nlast\ttab red", rendered);
         Assert.Contains("\nID: " + First + "\nSkill:", rendered);
-        Assert.EndsWith("Inspect to verify. This read-only view cannot resume, undo or retire operations.", rendered);
+        Assert.EndsWith("Inspect to verify. Retirement is offered only after fresh verification; recovery and Undo use their specialist workflows.", rendered);
         Assert.All(rendered, character => Assert.False(char.IsControl(character) && character is not ('\n' or '\t')));
         Assert.Equal(source, entry.Source); Assert.Equal(source, entry.OriginalPath); Assert.Equal(source, entry.Detail);
         var exception = new IOException(source);
@@ -201,5 +201,91 @@ public sealed class RetainedHistoryScreenTests
         using var app = Application.Create().Init("ansi");
         RetainedHistoryScreen.Show(app, new Logger(), _ => throw new InvalidOperationException(),
             (_, _) => throw new InvalidOperationException(), (_, _) => throw new InvalidOperationException(), new CancellationToken(true));
+    }
+
+    [Theory]
+    [InlineData(80, 24, "abandon-review", false)]
+    [InlineData(120, 36, "abandon-review", true)]
+    [InlineData(80, 24, "discard-undo", true)]
+    [InlineData(120, 36, "discard-undo", false)]
+    public void RetirementApprovalIsReadableAndDefaultsToCancel(int width, int height, string kind, bool approve)
+    {
+        using var app = Application.Create().Init("ansi");
+        app.Driver!.SetScreenSize(width, height);
+        Dialog? dialog = null;
+        var timedOut = false;
+        var review = new RetirementReview(First, kind, new string('f', 64), false, MissingInstalledCapture: kind == "abandon-review");
+        app.AddTimeout(TimeSpan.FromSeconds(10), () => { timedOut = true; app.RequestStop(); return false; });
+        app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+        {
+            if (dialog is null) return true;
+            dialog.Draw(new DrawContext());
+            var text = dialog.SubViews.OfType<Editor>().Single();
+            Assert.Contains(review.Consequence, text.Text);
+            if (kind == "abandon-review") Assert.Contains("It may be the only remaining copy.", text.Text);
+            Assert.Contains(First, text.Text); Assert.Contains(review.Fingerprint, text.Text);
+            var buttons = dialog.Buttons.ToArray();
+            Assert.True(buttons.Single(button => button.Text == "_Cancel").IsDefault);
+            var confirmation = buttons.Single(button => button.Text == review.Action);
+            Assert.False(confirmation.IsDefault);
+            if (approve) confirmation.SetFocus();
+            app.Keyboard.RaiseKeyDownEvent(Key.Enter);
+            return false;
+        });
+        var accepted = RetainedHistoryScreen.ConfirmRetirement(app, review, value => dialog = value);
+        Assert.False(timedOut); Assert.Equal(approve, accepted);
+    }
+
+    [Fact]
+    public async Task LateInspectionCannotEnableRetirementForAnotherSelectedIdAndRefreshClearsIt()
+    {
+        var queue = new ConcurrentQueue<Action>(); var tasks = new List<Task>();
+        Dialog? dialog = null; var stage = 0; var timedOut = false;
+        await Task.Run(() =>
+        {
+            using var app = Application.Create().Init("ansi");
+            app.Driver!.SetScreenSize(80, 24);
+            app.AddTimeout(TimeSpan.FromSeconds(10), () => { timedOut = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (dialog is null || !queue.TryDequeue(out var completion)) return true;
+                var inspect = dialog.SubViews.OfType<Button>().Single(button => button.Text == "_Inspect");
+                var action = dialog.SubViews.OfType<Button>().Last();
+                if (stage == 0)
+                {
+                    completion(); inspect.SetFocus(); app.Keyboard.RaiseKeyDownEvent(Key.Enter);
+                }
+                else if (stage == 1)
+                {
+                    var list = dialog.SubViews.OfType<ListView>().Single();
+                    list.SetFocus(); app.Keyboard.RaiseKeyDownEvent(Key.CursorDown);
+                    completion(); Assert.False(action.Visible); Assert.False(action.Enabled);
+                    Assert.Contains(Second, dialog.SubViews.OfType<Editor>().Single().Text);
+                    inspect.SetFocus(); app.Keyboard.RaiseKeyDownEvent(Key.Enter);
+                }
+                else if (stage == 2)
+                {
+                    completion(); Assert.True(action.Visible); Assert.True(action.Enabled);
+                    Assert.Contains(Second, dialog.SubViews.OfType<Editor>().Single().Text);
+                    dialog.SubViews.OfType<Button>().Single(button => button.Text == "_Refresh").SetFocus();
+                    app.Keyboard.RaiseKeyDownEvent(Key.Enter);
+                    Assert.False(action.Visible); Assert.False(action.Enabled);
+                }
+                else
+                {
+                    completion(); Assert.False(action.Visible); app.Keyboard.RaiseKeyDownEvent(Key.Esc);
+                }
+                stage++; return stage < 4;
+            });
+            RetainedHistoryScreen.Show(app, new Logger(), _ => Task.FromResult(Sample()), (id, _) =>
+                Task.FromResult(new ReplacementResult(id, "ready", true, false, false, "/fixture/target", "/state/original", "/state/candidate", "/state/displaced",
+                    new('c', 64), new('d', 64), [], "verified fixture", new("installation", "fixture", Scope.Custom, [], SkillFrontMatter.Empty, []), "/state/plan.json", 448, 448)
+                { Retirement = new(id, "abandon-review", new('f', 64), false) }),
+                (work, _) => { tasks.Add(Task.Run(work)); return true; }, TestContext.Current.CancellationToken,
+                readyForTests: value => dialog = value, dispatchForTests: value => queue.Enqueue(value),
+                retire: (_, _) => throw new InvalidOperationException("No retirement was approved"));
+        }, TestContext.Current.CancellationToken);
+        await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(timedOut); Assert.Equal(4, stage);
     }
 }

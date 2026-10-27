@@ -13,6 +13,7 @@ or release verdict.
   [local dispositions](maintenance-local-dispositions.md), and
   [standalone unpin](maintenance-standalone-unpin.md).
 - [Managed discovery](maintenance-managed-discovery.md).
+- [Explicit retained-operation retirement](maintenance-operation-retirement.md).
 - [Static package checks](maintenance-static-package-check.md),
   [source review](maintenance-update-source-review.md), and
   [maintenance queue](maintenance-queue.md).

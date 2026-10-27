@@ -394,3 +394,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   refresh, leaving and shutdown cancel stale requests and clear old inspections.
   Refresh retains the selected operation ID when it is still present. History
   work remains owned by the app task tracker after a canceled modal closes.
+
+- History retirement exposes only actions admitted by its current inspection.
+  Clear approval on selection/Refresh/Inspect/confirmation/attempt, guard ID and
+  request ownership through dispatch, and default each action's confirmation to
+  Cancel. Copy active Updates review/Undo IDs on the UI thread; reject pending
+  Updates publication. Keep mutation work app-owned through cancellation and
+  history/badge reconciliation. See [retirement](maintenance-operation-retirement.md).

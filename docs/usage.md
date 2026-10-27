@@ -935,11 +935,37 @@ filenames exist; only Inspect can verify its evidence. Extra entries beyond the
 listing cap are reported as omissions, with unknown states. Lock/access failures
 are reported as unavailable rather than an empty history.
 
-History is read-only: it cannot resume, undo, retire or delete operations. At the
-16-operation limit, new reviews stop before staging or source resolution. This
-version cannot free that capacity. Preserve the retained evidence; there is no
-supported manual filesystem cleanup procedure. Existing specialist inspection,
-recovery and Undo commands retain their separate reviews and approvals.
+After **Inspect**, History offers only the retirement action admitted for that
+exact saved operation:
+
+- **Abandon unapplied review** deletes its saved candidate and review after
+  verifying that this operation never moved a payload and its private evidence is
+  intact. The live location may have changed or be missing.
+- **Discard Undo data** permanently deletes retained payloads for an applied or
+  restored operation. Its separate approval explicitly says you will lose Undo
+  for this update. A current live copy must exist; its content may have advanced.
+  The live copy, registry records and consumers stay unchanged.
+
+Superseded operations disclose: “The live copy changed since this operation; Undo
+was already unavailable.” History’s retirement inspection is separate from ordinary
+specialist inspection, which still correctly refuses obsolete live/context states.
+
+Both confirmations default to **Cancel** and show the exact ID and inspection
+fingerprint. Selection changes, Refresh, another Inspect and every attempt clear
+old approval. Operations currently held in Updates for review or Undo remain
+protected; finish/skip the review or refresh its result before inspecting History.
+
+At the 16-operation limit, new reviews stop before staging or source resolution.
+Capacity is released only after the operation directory is actually removed;
+there is no automatic eviction. A started retirement is listed as protected and
+may need recovery. It never resumes automatically. Inspect it again for a fresh
+explicit retirement approval. Changed or partially removed native trees, unknown
+entries, incomplete owner transitions and unsupported markers remain protected
+with a reason. Preserve that evidence and its exact path for specialist inspection;
+there is no supported manual filesystem cleanup procedure. Interrupted cleanup
+within the final small files may also require specialist inspection. Existing
+specialist recovery and Undo commands retain their separate reviews and approvals
+for operations whose retirement has not started.
 
 For an offline bounded listing:
 
@@ -954,3 +980,12 @@ the existing `update-inspect`, `restore-inspect`, `unpin-inspect`,
 `reimport-inspect` or `source-switch-inspect` command with the exact saved ID and
 any required global scan locations. The CLI `history` command continues to
 verify backup archives and keeps its existing output format.
+
+History keeps an operation protected when its payload moved but its own registry
+publication is still pending. Use ordinary Inspect and Recover to finish it before
+retiring Undo data. Later updates or registry changes do not by themselves prevent
+retirement once this operation's completion is verified.
+
+When abandoning a local-reimport review whose live copy is missing, the
+confirmation also warns if deleting its saved installed capture may discard the
+only remaining copy. Cancel is the default.

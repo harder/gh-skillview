@@ -200,6 +200,31 @@ internal sealed partial class ReplacementPlanStore
         private static bool Prefix(byte[] current, byte[] attempted) => current.Length <= attempted.Length
             && current.AsSpan().SequenceEqual(attempted.AsSpan(0, current.Length));
 
+        internal void RequireRetirementTerminal(bool neverStarted = false)
+        {
+            if (neverStarted && names.Count != 0 || directions.Keys.Any(id => !intents.ContainsKey(id)
+                || (restores.ContainsKey(id) ? !restoredCompletions.ContainsKey(id) : !completions.ContainsKey(id)))
+                || names.Count != intents.Count + restores.Count + completions.Count + restoredCompletions.Count)
+                throw new IOException("Unfinished owner journal remains protected; inspect specialist recovery before retirement.");
+        }
+
+        internal bool ProvesRetirementCompletion(ReplacementStep intentStep, ReplacementStep completeStep, bool undo)
+        {
+            var id = completeStep.OwnerWriteId;
+            var transition = EffectiveOwner(plan)!;
+            return id is not null && intentStep.OwnerWriteId == id
+                && intents.TryGetValue(id, out var intent) && completions.TryGetValue(id, out var complete)
+                && !restores.ContainsKey(id) && directions[id] == (undo ? "undo" : "forward")
+                && intent.Binding?.Direction == (undo ? "undo" : "forward")
+                && intent.BeforeEntryFingerprint == (undo ? transition.DesiredFingerprint : transition.BeforeFingerprint)
+                && intent.DesiredEntryFingerprint == (undo ? transition.BeforeFingerprint : transition.DesiredFingerprint)
+                && intentStep.Observation.Owner is { } before && before.State == (undo ? "desired" : "before")
+                && before.Hash == intent.Before.ContentHash && before.Identity == intent.Before.Identity
+                && completeStep.Observation.Topology == (undo ? "restored" : "installed")
+                && completeStep.Observation.Owner is { } after && after.State == (undo ? "before" : "desired")
+                && after.Hash == complete.Current.ContentHash && after.Identity == complete.Current.Identity;
+        }
+
         private bool Terminal(string id) => names.Contains($"registry-{id}-restore-complete.json")
             || names.Contains($"registry-{id}-complete.json") && !names.Contains($"registry-{id}-restore-intent.json");
         internal void Reserve(bool undo)
