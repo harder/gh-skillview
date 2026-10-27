@@ -249,3 +249,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   destructive calls. Missing live data permits only a provably never-started
   review's abandonment. Version-2 markers retain that current evidence; supported
   version-1 markers keep their exact legacy resume evidence.
+
+- Registry parent and owned-directory fingerprints have different Windows capture
+  domains. A registry lease validates its namespace-only witness; an owned lease
+  validates its full policy witness before/after inspection. Compare all native
+  identity/generation/address fields across those leases, but do not compare the
+  two fingerprint hashes to each other. Retain both independent repeated witness
+  checks, same-file raw reads and the real registry data-file lock.

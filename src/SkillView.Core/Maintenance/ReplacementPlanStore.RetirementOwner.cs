@@ -61,7 +61,13 @@ internal sealed partial class ReplacementPlanStore
             // validation only. No owner context, client or registry write.
             using var held = NativeRegistryFileLease.Open(transition.RegistryPath, token);
             var snapshot = held.Read(token);
-            if (held.ParentIdentity != before.Identity) throw new IOException("Registry parent changed during retirement inspection.");
+            // The registry lease brackets its namespace-only fingerprint;
+            // OwnedDirectoryLease brackets its full policy fingerprint below.
+            // Compare every native parent field here, but never equate hashes
+            // from those different domains (Windows full hashes include child
+            // ChangeTime/reparse bytes; registry namespace hashes omit them).
+            if (held.ParentIdentity with { DirectoryFingerprint = null } != before.Identity with { DirectoryFingerprint = null })
+                throw new IOException("Registry parent changed during retirement inspection.");
             var state = RetirementRegistryState(snapshot.Bytes, transition, token);
             var after = held.Read(token);
             if (after.Identity != snapshot.Identity || after.ContentHash != snapshot.ContentHash)

@@ -38,7 +38,8 @@ public sealed partial class SharedReplacementRevisionTests
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var result = await Store().InspectHistoryAsync(plan.Id, CurrentRetirementInventory, [], Token);
-            Assert.Null(result.Retirement); Assert.Contains("owner transition is still pending", result.Message);
+            Assert.True(result.Retirement is null, result.Message);
+            Assert.True(result.Message.Contains("owner transition is still pending", StringComparison.Ordinal), result.Message);
         }
         Assert.Equal(registry, File.ReadAllBytes(Registry));
         Assert.Equal(live.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
@@ -50,6 +51,61 @@ public sealed partial class SharedReplacementRevisionTests
         var recovered = Store().Recover(plan.Id, reviewed.ReviewFingerprint, Inventory(), undo, Token);
         Assert.True(recovered.Succeeded, recovered.Message);
         Assert.NotNull((await Store().InspectHistoryAsync(plan.Id, CurrentRetirementInventory, [], Token)).Retirement);
+    }
+
+    [Fact]
+    public void RegistryAndOwnedParentWitnessesKeepSeparateCaptureDomains()
+    {
+        using var parent = OwnedDirectoryLease.Open(Path.GetDirectoryName(Registry)!);
+        var before = parent.Capture(Token).Identity;
+        using (var registry = NativeRegistryFileLease.Open(Registry, Token))
+        {
+            var snapshot = registry.Read(Token);
+            Assert.Equal(System.Text.Encoding.UTF8.GetBytes(OriginalRegistry), snapshot.Bytes);
+            Assert.Equal(before with { DirectoryFingerprint = null }, registry.ParentIdentity with { DirectoryFingerprint = null });
+            if (OperatingSystem.IsWindows())
+            {
+                Assert.NotNull(before.DirectoryFingerprint);
+                Assert.NotNull(registry.ParentIdentity.DirectoryFingerprint);
+                Assert.NotEqual(before.DirectoryFingerprint, registry.ParentIdentity.DirectoryFingerprint);
+            }
+            Assert.Equal(before, parent.Capture(Token).Identity);
+            Assert.Equal(snapshot.Identity, registry.Read(Token).Identity);
+            Assert.Throws<IOException>(() => NativeRegistryFileLease.Open(Registry, Token));
+        }
+        Assert.Equal(before, parent.Capture(Token).Identity);
+        using var reopened = NativeRegistryFileLease.Open(Registry, Token);
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(OriginalRegistry), reopened.Read(Token).Bytes);
+    }
+
+    [Fact]
+    public async Task PendingOwnerFallbackRetainsEvidenceWhileTheRealRegistryLockIsHeld()
+    {
+        var plan = await Plan();
+        Assert.False(Store(point => { if (point == "install-moved") throw new IOException("Before owner intent"); })
+            .Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token).Succeeded);
+        var inventory = Inventory();
+        Task<SkillView.Inventory.Models.InventorySnapshot> Capture(CancellationToken _) => Task.FromResult(inventory);
+        var live = PayloadSnapshot.Capture(Payload, Token); var retained = PayloadSnapshot.Capture(plan.RetainedPath, Token);
+        using (var externalOwner = NativeRegistryFileLease.Open(Registry, Token))
+        {
+            var registry = externalOwner.Read(Token);
+            var blocked = await Store().InspectHistoryAsync(plan.Id, Capture, [], Token);
+            Assert.True(blocked.Retirement is null, blocked.Message);
+            Assert.True(blocked.Message.Contains("locked", StringComparison.OrdinalIgnoreCase), blocked.Message);
+            Assert.Equal(registry.Identity, externalOwner.Read(Token).Identity);
+            Assert.Equal(registry.Bytes, externalOwner.Read(Token).Bytes);
+            Assert.Equal(live.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
+            Assert.Equal(retained.ObjectStateFingerprint, PayloadSnapshot.Capture(plan.RetainedPath, Token).ObjectStateFingerprint);
+        }
+        var pending = await Store().InspectHistoryAsync(plan.Id, CurrentRetirementInventory, [], Token);
+        Assert.True(pending.Retirement is null, pending.Message);
+        Assert.True(pending.Message.Contains("owner transition is still pending", StringComparison.Ordinal), pending.Message);
+        var inspected = Store().Inspect(plan.Id, Inventory(), Token);
+        var recovered = Store().Recover(plan.Id, inspected.ReviewFingerprint, Inventory(), false, Token);
+        Assert.True(recovered.Succeeded, recovered.Message);
+        var terminal = await Store().InspectHistoryAsync(plan.Id, CurrentRetirementInventory, [], Token);
+        Assert.True(terminal.Retirement is not null, terminal.Message);
     }
 
     [Theory]
@@ -64,7 +120,7 @@ public sealed partial class SharedReplacementRevisionTests
         var pending = File.ReadAllBytes(Registry);
         File.WriteAllText(Registry, OriginalRegistry.Replace(OldTree, new string('d', 40)));
         var result = await Store().InspectHistoryAsync(plan.Id, CurrentRetirementInventory, [], Token);
-        Assert.NotNull(result.Retirement);
+        Assert.True(result.Retirement is not null, result.Message);
         if (stop == "resume")
             await Assert.ThrowsAsync<IOException>(() => Store(point => { if (point == "retirement-marker-written") throw new IOException("Stop at marker"); })
                 .RetireAsync(result.Retirement, result.Retirement.Kind, CurrentRetirementInventory, [], Token));
@@ -91,7 +147,7 @@ public sealed partial class SharedReplacementRevisionTests
         File.WriteAllBytes(Registry, undo ? desired : System.Text.Encoding.UTF8.GetBytes(OriginalRegistry));
         var registry = File.ReadAllBytes(Registry); var live = PayloadSnapshot.Capture(Payload, Token);
         var result = await Store().InspectHistoryAsync(plan.Id, CurrentRetirementInventory, [], Token);
-        Assert.NotNull(result.Retirement);
+        Assert.True(result.Retirement is not null, result.Message);
         await Store().RetireAsync(result.Retirement, result.Retirement.Kind, CurrentRetirementInventory, [], Token);
         Assert.False(Directory.Exists(Path.Combine(State, plan.Id)));
         Assert.Equal(registry, File.ReadAllBytes(Registry));
@@ -126,7 +182,12 @@ public sealed partial class SharedReplacementRevisionTests
         var snapshot = Inventory() with { OwnershipReadDiagnostics = [], OwnershipRecords = [], Providers = [] };
         Task<SkillView.Inventory.Models.InventorySnapshot> Capture(CancellationToken _) => Task.FromResult(snapshot);
         var result = await Store().InspectHistoryAsync(plan.Id, Capture, [], Token);
-        Assert.Equal(eligible, result.Retirement is not null);
+        Assert.True(eligible == (result.Retirement is not null), $"{state}: expected retirement={eligible}. {result.Message}");
+        if (!eligible)
+        {
+            var reason = state switch { "torn" => "Unreadable or torn owner registry", "duplicate" => "Ambiguous owner registry", _ => "Unsupported owner registry" };
+            Assert.True(result.Message.Contains(reason, StringComparison.Ordinal), result.Message);
+        }
         Assert.Equal(registry, File.Exists(Registry) ? File.ReadAllBytes(Registry) : null);
         Assert.Equal(live.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
         Assert.Equal(retained.ObjectStateFingerprint, PayloadSnapshot.Capture(plan.RetainedPath, Token).ObjectStateFingerprint);
@@ -143,7 +204,7 @@ public sealed partial class SharedReplacementRevisionTests
         var reviewed = Store().Inspect(plan.Id, Inventory(), Token);
         Assert.True(Store().Recover(plan.Id, reviewed.ReviewFingerprint, Inventory(), false, Token).Succeeded);
         var result = await Store().InspectHistoryAsync(plan.Id, CurrentRetirementInventory, [], Token);
-        Assert.NotNull(result.Retirement);
+        Assert.True(result.Retirement is not null, result.Message);
         var registry = File.ReadAllBytes(Registry);
         await Store().RetireAsync(result.Retirement, result.Retirement.Kind, CurrentRetirementInventory, [], Token);
         Assert.Equal(registry, File.ReadAllBytes(Registry));
