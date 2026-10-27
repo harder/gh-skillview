@@ -146,9 +146,11 @@ public sealed partial class ReplacementPlanStoreTests
         var staged = false;
         var exception = await Assert.ThrowsAsync<IOException>(() => Store().PlanAsync(target, inventory, (_, _) => { staged = true; return Task.CompletedTask; }, Token));
         Assert.False(staged); Assert.Contains("limit of 16", exception.Message);
+        Assert.Contains("quota", exception.Message); Assert.Contains("History (F4)", exception.Message);
+        Assert.Contains("Abandon unapplied review", exception.Message); Assert.Contains("Discard Undo data", exception.Message);
         var network = await Assert.ThrowsAsync<IOException>(() => Store().PlanLatestAsync("must-never-be-executed", target, inventory, false, Token));
         Assert.Contains("limit of 16", network.Message);
-        var local = await Assert.ThrowsAsync<IOException>(() => Store().PlanLocalReimportAsync("must-never-be-executed", target, inventory, Token));
+        var local = await Assert.ThrowsAsync<IOException>(() => Store().PlanLocalSourceSwitchAsync("must-never-be-executed", target, Path.Combine(temporary.FullName, "new-source"), inventory, Token));
         Assert.Contains("limit of 16", local.Message);
         Assert.False(Directory.Exists(State + "-local-previews"));
         Directory.CreateDirectory(Path.Combine(State, new string('f', 32)));

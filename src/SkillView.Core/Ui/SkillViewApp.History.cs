@@ -11,11 +11,14 @@ public sealed partial class SkillViewApp
 {
     private SingleRowButton? _historyButton;
     private long _historyHintGeneration;
+    private Func<CancellationToken, Task<ReplacementHistory>>? _historyLoaderForTests;
 
     private ReplacementPlanStore HistoryStore() => new(ReplacementPlanStore.ResolveRoot(_services.Runner), _services.Logger, runner: _services.Runner);
 
     private async Task<ReplacementHistory> LoadHistoryAsync(CancellationToken token) =>
-        await Task.Run(() => HistoryStore().ReadHistory(token, _options.ScanRoots), token).ConfigureAwait(false);
+        _historyLoaderForTests is { } load
+            ? await load(token).ConfigureAwait(false)
+            : await Task.Run(() => HistoryStore().ReadHistory(token, _options.ScanRoots), token).ConfigureAwait(false);
 
     private void PublishHistoryHint(ReplacementHistory history)
     {

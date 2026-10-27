@@ -955,8 +955,12 @@ fingerprint. Selection changes, Refresh, another Inspect and every attempt clear
 old approval. Operations currently held in Updates for review or Undo remain
 protected; finish/skip the review or refresh its result before inspecting History.
 
-At the 16-operation limit, new reviews stop before staging or source resolution.
-Capacity is released only after the operation directory is actually removed;
+At the 16-operation quota, new reviews stop before staging or source resolution,
+except same-source local reimport: it still needs a bounded private capture and gh
+preview to verify that nothing changed. A verified unchanged result needs no
+retained operation; a changed result refuses allocation with quota/History
+guidance. Source switching keeps its early quota check. Capacity is released only
+after the operation directory is actually removed;
 there is no automatic eviction. A started retirement is listed as protected and
 may need recovery. It never resumes automatically. Inspect it again for a fresh
 explicit retirement approval. Changed or partially removed native trees, unknown

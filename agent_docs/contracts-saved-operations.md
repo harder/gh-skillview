@@ -292,9 +292,13 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   offers only the separately inspected and explicitly approved actions described
   in [retirement](maintenance-operation-retirement.md). Listing/ordinary Inspect
   fingerprints never grant retirement approval. Preflight new
-  reviews before source resolution/private staging and retain the writer-held
-  allocation quota check. CLI `replacement-history` lists hints; `history` keeps
-  its existing backup verification semantics and wire format.
+  reviews before source resolution/private staging, except same-source local
+  reimport: its allocation-free no-op requires the existing bounded held capture,
+  metadata checks and actual private gh preview even at full capacity. Source
+  switching keeps early admission. Changed reimports must pass the writer-held
+  allocation quota check before creating any final operation. Quota refusals
+  retain the literal `quota` and History guidance. CLI `replacement-history` lists
+  hints; `history` keeps its existing backup verification semantics and wire format.
 
 Retirement must separately prove completion of its own real owner transition:
 private terminal payload topology or an empty journal is insufficient because
