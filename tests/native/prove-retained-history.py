@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Offline read-only History PTY proof; creates and retains fresh private fixtures only."""
-import argparse, codecs, fcntl, hashlib, json, os, pathlib, pty, re, select, signal, stat, struct, subprocess, tempfile, termios, time, unicodedata
+import argparse, codecs, fcntl, hashlib, json, os, pathlib, pty, re, select, signal, stat, struct, subprocess, sys, tempfile, termios, time, unicodedata
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--app', required=True)
 parser.add_argument('--proof', required=True)
 parser.add_argument('--output', required=True)
+parser.add_argument('--retirement', action='store_true', help='Also prove Cancel and explicit retirement with native audits')
+parser.add_argument('--superseded', action='store_true', help='Retire an obsolete applied update at 80 columns and a stale review at 120 columns')
 args = parser.parse_args()
+if args.superseded: args.retirement = True
 app = str(pathlib.Path(args.app).resolve())
 proof = str(pathlib.Path(args.proof).resolve())
 output = pathlib.Path(args.output).resolve()
@@ -150,6 +153,13 @@ def settle(seconds=.3):
         read(.05)
 
 
+def click_label(label, last=False, occurrence=0):
+    matches = [(row, ''.join(value).find(label)) for row, value in enumerate(screen) if label in ''.join(value)]
+    assert matches, 'Visible control missing: ' + label + '\n' + text()
+    row, column = matches[-1] if last else matches[occurrence]
+    send(f'\x1b[<0;{column + 2};{row + 1}M\x1b[<0;{column + 2};{row + 1}m')
+
+
 def run_size(width, height):
     global WIDTH, HEIGHT, screen, x, y, pending, transcript, decoder, master, proc
     WIDTH, HEIGHT = width, height
@@ -158,6 +168,16 @@ def run_size(width, height):
     (root / 'disposable-proof-marker').write_text('SkillView disposable process proof\n')
     for name in ('tmp', 'bin'):
         (root / name).mkdir()
+    if args.retirement:
+        # A read-only offline provider fixture supplies complete empty gh
+        # coverage; it cannot authenticate, stage, mutate, or use a network.
+        fixture_gh = root / 'bin' / 'gh'
+        fixture_gh.write_text('#!' + sys.executable + '\nimport sys\n'
+            'args = sys.argv[1:]\n'
+            'if args in (["version"], ["--version"]): print("gh version 2.97.0 (offline fixture)")\n'
+            'elif args[:2] == ["skill", "list"]: print("[]")\n'
+            'else: sys.exit(2)\n')
+        fixture_gh.chmod(0o700)
     env = {key: value for key, value in os.environ.items()
            if not key.startswith(('GIT_', 'GH_', 'GITHUB_', 'SKILLVIEW_', 'CLAUDE_', 'CODEX_'))}
     env.update(HOME=str(root / 'home'), USERPROFILE=str(root / 'home'), SKILLVIEW_STATE_HOME=str(root / 'state'),
@@ -177,15 +197,31 @@ def run_size(width, height):
     assert all('native-history-inspect: ' + status in fixture.stdout for status in ('ready', 'installed', 'original-retained')), fixture.stdout
     protected = [root / 'custom', root / 'state', root / 'home/.agents/.skill-lock.json']
     before = snapshot(protected)
+    live_paths = [root / 'custom', root / 'home/.agents/.skill-lock.json']
+    live_before = snapshot(live_paths)
     listing = subprocess.run([app, 'replacement-history', '--json'], cwd=root, env=env,
         text=True, capture_output=True, timeout=30)
     assert listing.returncode == 0, listing.stderr
     listed = json.loads(listing.stdout)
     assert len(listed['entries']) == 3 and listed['readOnly']
     assert any(row['mayNeedRecovery'] for row in listed['entries'])
+    target_skill = 'applied' if args.superseded and width == 80 else 'ready'
+    target_id = next(row['id'] for row in listed['entries'] if row['skill'] == target_skill)
+    if args.superseded:
+        advance = subprocess.run([proof, '--retained-retirement', str(root),
+            'supersede' if target_skill == 'applied' else 'edit-live', target_id],
+            cwd=root, env=env, text=True, capture_output=True, timeout=60)
+        assert advance.returncode == 0, advance.stdout + advance.stderr
+        listing = subprocess.run([app, 'replacement-history', '--json'], cwd=root, env=env,
+            text=True, capture_output=True, timeout=30)
+        assert listing.returncode == 0, listing.stderr
+        listed = json.loads(listing.stdout)
+        before = snapshot(protected); live_before = snapshot(live_paths)
+    count = listed['observedCount']
     (output / f'{width}-listing.json').write_text(json.dumps(listed, indent=2))
     assert before == snapshot(protected), 'CLI listing changed retained/live objects'
-    for restart in range(2):
+    retired_id = None
+    for restart in range(1 if args.retirement else 2):
         screen = [[' '] * width for _ in range(height)]; x = y = 0; pending = ''; transcript = bytearray()
         decoder = codecs.getincrementaldecoder('utf-8')('replace')
         master, slave = pty.openpty()
@@ -198,7 +234,7 @@ def run_size(width, height):
             frame(f'{width}x{height}-{restart}-startup')
             send(b'\x1bOS')  # Visible F4 route also works from text inputs.
             wait(lambda: 'retained operations' in text() and 'Inspect' in text(), 20)
-            wait(lambda: '3 retained operations' in text(), 20)
+            wait(lambda: f'{count} retained operations' in text(), 20)
             wait(lambda: 'ID:' in text() and 'Inspect to verify' in text(), 10)
             settle(.3)
             frame(f'{width}x{height}-{restart}-history')
@@ -208,9 +244,51 @@ def run_size(width, height):
             settle(.3)
             frame(f'{width}x{height}-{restart}-inspect')
             send(b'\x1br')
-            wait(lambda: '3 retained operations' in text() and 'ID:' in text() and 'Explicit inspection' not in text() and 'could not verify' not in text(), 20)
+            wait(lambda: f'{count} retained operations' in text() and 'ID:' in text() and 'Explicit inspection' not in text() and 'could not verify' not in text(), 20)
             settle(.3)
             frame(f'{width}x{height}-{restart}-refresh')
+            if args.retirement:
+                ready_entry = next(row for row in listed['entries'] if row['id'] == target_id)
+                action_label = 'Discard Undo data' if target_skill == 'applied' else 'Abandon unapplied review'
+                retired_id = ready_entry['id']
+                peer_paths = [pathlib.Path(row['operationPath']) for row in listed['entries'] if row['id'] != retired_id]
+                peers_before = snapshot(peer_paths)
+                occurrence = sum(row['skill'] == target_skill for row in listed['entries'][:next(i for i, row in enumerate(listed['entries']) if row['id'] == target_id)])
+                click_label(target_skill + ' ·', occurrence=occurrence)
+                wait(lambda: retired_id in text(), 10)
+                send(b'\x1bi')
+                settle(.3)
+                wait(lambda: '⟦ ' + action_label in text(), 30)
+                settle(.3)
+                frame(f'{width}-retirement-inspected')
+                click_label(action_label, last=True)
+                wait(lambda: 'Inspection:' in text() and 'Cancel' in text(), 10)
+                settle(.3)
+                frame(f'{width}-retirement-confirm-cancel')
+                send(b'\r')  # Cancel is the default, even with no explicit focus change.
+                wait(lambda: 'retained operations' in text(), 10)
+                settle(.3)
+                assert '⟦ ' + action_label not in text(), 'Cancel must consume the old approval'
+                assert before == snapshot(protected), 'Default Cancel changed native evidence'
+                send(b'\x1bi')
+                settle(.3)
+                wait(lambda: '⟦ ' + action_label in text(), 30)
+                settle(.3)
+                click_label(action_label, last=True)
+                wait(lambda: 'Inspection:' in text() and 'Cancel' in text(), 10)
+                settle(.3)
+                send(b'\t\r')  # Move from Cancel to the explicit action, then approve.
+                wait(lambda: 'Capacity released' in text(), 30)
+                frame(f'{width}-retirement-result')
+                assert live_before == snapshot(live_paths)
+                assert peers_before == snapshot(peer_paths)
+                assert not pathlib.Path(ready_entry['operationPath']).exists()
+                after_listing = subprocess.run([app, 'replacement-history', '--json'], cwd=root, env=env,
+                    text=True, capture_output=True, timeout=30)
+                assert after_listing.returncode == 0, after_listing.stderr
+                after = json.loads(after_listing.stdout)
+                assert after['observedCount'] == count - 1 and all(row['id'] != retired_id for row in after['entries'])
+                (output / f'{width}-retirement-listing.json').write_text(json.dumps(after, indent=2))
             send(b'\x1b'); settle(.8)
             wait(lambda: 'recovery hints' in text() and 'retained operations' not in text(), 10)
             send(b'\x11')
@@ -220,13 +298,15 @@ def run_size(width, height):
             if proc.poll() is None:
                 os.killpg(proc.pid, signal.SIGKILL); proc.wait(timeout=5)
             os.close(master)
-        assert before == snapshot(protected), 'PTY browsing/Inspect changed retained/live objects'
+        if not args.retirement:
+            assert before == snapshot(protected), 'PTY browsing/Inspect changed retained/live objects'
     (output / f'{width}-native-before.json').write_text(json.dumps(before, indent=2))
     (output / f'{width}-native-after.json').write_text(json.dumps(snapshot(protected), indent=2))
     return str(root)
 
 roots = [run_size(80, 24), run_size(120, 36)]
 (output / 'result.json').write_text(json.dumps(dict(passed=True, fixtures=roots,
+    retirement=args.retirement, superseded=args.superseded,
     checks=['offline CLI listing', 'startup interrupted hint twice', 'keyboard History/Inspect/Refresh/Back',
             '80x24 and 120x36', 'all retained/live bytes, modes, native IDs and generations unchanged']), indent=2))
 print(json.dumps(dict(passed=True, fixtures=roots)))

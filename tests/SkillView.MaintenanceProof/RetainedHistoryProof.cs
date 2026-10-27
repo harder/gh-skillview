@@ -10,7 +10,7 @@ using SkillView.Ui;
 // marked, fresh, private proof root and never opens a user's installed payload.
 internal static class RetainedHistoryProof
 {
-    internal static async Task<int> CreateAsync(string path)
+    internal static async Task<int> CreateAsync(string path, bool revision = false)
     {
         var root = Path.GetFullPath(path);
         var home = Environment.GetEnvironmentVariable("HOME");
@@ -25,7 +25,7 @@ internal static class RetainedHistoryProof
         Directory.CreateDirectory(home);
         Directory.CreateDirectory(state);
         Directory.CreateDirectory(Path.Combine(root, "custom"));
-        foreach (var name in new[] { "ready", "applied", "interrupted" })
+        foreach (var name in revision ? new[] { "ready", "applied", "interrupted", "restored" } : new[] { "ready", "applied", "interrupted" })
         {
             var skill = Path.Combine(root, "custom", name);
             Directory.CreateDirectory(skill);
@@ -44,19 +44,33 @@ internal static class RetainedHistoryProof
             ScannedRoots = roots,
             ConfiguredRoots = configuration.Roots
         };
-        var store = new ReplacementPlanStore(ReplacementPlanStore.ResolveRoot(services.Runner), services.Logger, runner: services.Runner);
-        foreach (var target in inventory.Skills.OrderBy(skill => skill.Name, StringComparer.Ordinal))
+        var store = new ReplacementPlanStore(ReplacementPlanStore.ResolveRoot(services.Runner), services.Logger, runner: services.Runner, sourceReviewRequired: revision);
+        // Prepare ready last: later sibling moves intentionally invalidate its
+        // captured scan-root generation and would close abandonment admission.
+        foreach (var target in inventory.Skills.OrderBy(skill => skill.Name == "ready").ThenBy(skill => skill.Name, StringComparer.Ordinal))
         {
-            var plan = await store.PlanAsync(target, inventory, (destination, token) =>
+            Task Stage(NativeStateDirectory destination, CancellationToken token)
             {
                 token.ThrowIfCancellationRequested();
-                File.WriteAllText(Path.Combine(destination.CanonicalPath, "SKILL.md"), Metadata(target.Name) + "candidate\n");
+                var metadata = Metadata(target.Name);
+                if (revision) metadata = metadata.Replace(new string('a', 40), new string('b', 40)).Replace("refs/heads/main", "refs/tags/v2");
+                File.WriteAllText(Path.Combine(destination.CanonicalPath, "SKILL.md"), metadata + "candidate\n");
                 return Task.CompletedTask;
-            }, CancellationToken.None);
-            if (target.Name == "applied")
+            }
+            var plan = revision
+                ? await store.PlanUpdateAsync(target, inventory, new("https://github.com/harder/fixture", "refs/tags/v2", new('c', 40), new('b', 40), "skills/" + target.Name), Stage,
+                    (destination, token) => { token.ThrowIfCancellationRequested(); File.WriteAllText(Path.Combine(destination.CanonicalPath, "SKILL.md"), Metadata(target.Name) + "base\n"); return Task.CompletedTask; }, false, CancellationToken.None)
+                : await store.PlanAsync(target, inventory, Stage, CancellationToken.None);
+            if (revision && target.Name != "ready") store.AcknowledgeSourceReview(plan.Id, plan.PlanFingerprint, plan.SourceReview!.Fingerprint, inventory, CancellationToken.None);
+            if (target.Name is "applied" or "restored")
             {
                 var result = store.Apply(plan.Id, plan.PlanFingerprint, inventory, CancellationToken.None);
                 if (!result.Succeeded) throw new IOException(result.Message);
+                if (target.Name == "restored")
+                {
+                    result = store.Recover(plan.Id, store.Inspect(plan.Id, inventory, CancellationToken.None).ReviewFingerprint, inventory, true, CancellationToken.None);
+                    if (!result.Succeeded) throw new IOException(result.Message);
+                }
             }
             else if (target.Name == "interrupted")
             {
@@ -74,5 +88,5 @@ internal static class RetainedHistoryProof
         return 0;
     }
 
-    private static string Metadata(string name) => $"---\nname: {name}\ndescription: Offline retained history fixture\nmetadata:\n  github-repo: https://github.com/harder/fixture\n  github-ref: refs/heads/main\n  github-tree-sha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n---\n";
+    private static string Metadata(string name) => $"---\nname: {name}\ndescription: Offline retained history fixture\nmetadata:\n  github-repo: https://github.com/harder/fixture\n  github-ref: refs/heads/main\n  github-path: skills/{name}\n  github-tree-sha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n---\n";
 }

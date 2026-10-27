@@ -189,9 +189,29 @@ TMPDIR=/var/tmp python3 tests/native/prove-retained-history.py \
   --output /tmp/skillview-history-proof
 ```
 
-Use the corresponding built host paths on other native platforms. The tool
-creates fresh marked private fixtures, retains them for review, and verifies
-80×24/120×36 keyboard browsing, restart hints, explicit Inspect and unchanged
-payload/state bytes, modes and native identities. It is a local regression proof,
-not new human release acceptance. Avoid `/tmp` fixture ancestry in sandboxes
-that mount a Git marker there; keep the native placement guard intact.
+Use the corresponding built host paths on other native platforms. Without
+`--retirement`, the PTY tool creates fresh marked private fixtures, retains them
+for review, and verifies 80×24/120×36 keyboard browsing, restart hints, explicit
+Inspect and unchanged payload/state bytes, modes and native identities. These
+are local regression proofs, not human release acceptance. Avoid `/tmp` fixture
+ancestry in sandboxes that mount a Git marker there; keep the placement guard intact.
+
+Pass `--retirement` to that PTY command to additionally test fresh inspection,
+Cancel by default, explicit retirement and History refresh at both terminal sizes.
+It uses a read-only offline gh provider stub and audits live and peer objects.
+Use `--superseded` to exercise an actual later saved update at 80 columns and a
+stale unapplied review at 120 columns, including the already-unavailable Undo
+disclosure. Either product host can be supplied through `--app`.
+For native process-kill/restart retirement evidence on any supported platform:
+
+```sh
+python3 tests/native/prove-retained-retirement.py \
+  --app /absolute/path/to/skillview \
+  --proof /absolute/path/to/SkillView.MaintenanceProof \
+  --output /tmp/retirement-proof.json
+```
+
+Use a private `TMPDIR` under `/var/tmp` on POSIX. `--old-app` optionally checks an
+actual H1 baseline binary's protected listing and inspection refusal with markers.
+Mid-tree and final-small-file remnants remain protected; this is not a manual
+cleanup tool. See [the retirement contract](agent_docs/maintenance-operation-retirement.md).
