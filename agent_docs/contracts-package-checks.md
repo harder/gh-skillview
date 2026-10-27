@@ -29,6 +29,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
 - Only ordinal category `reference`, code `reference-missing`, document `SKILL.md`
   is a package Problem. Other findings and review-state observations are Reviews;
   declaration Info/unknown meanings and incomplete/omitted coverage stay separate.
+  New, Check again and retained dialogs start at the summary top after text/layout
+  publication. Reuse this classification directly over reports, including unbound
+  diagnostics; do not construct a bound fact for presentation. Keep the full
+  bounded evidence and display-limit notices below the summary.
   Issues adds at most one UI-only Problem row for the exact checked copy; Enter
   opens the retained report with no repair action. Metadata never adds a duplicate
   Malformed Problem. Keep queue evidence/schema and check schema unchanged.

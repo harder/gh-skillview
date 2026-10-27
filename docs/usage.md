@@ -134,6 +134,8 @@ state with `?`; details explain the state before review.
 
 Source headings count distinct observed physical copies, with separate counts for update states. Two known differing recorded Git refs can say **refs differ**; missing refs remain incomplete evidence. Authored, Git and distributor versions stay separate. Unknown, incomplete or conflicting source identities remain separate, location-labeled groups. A shared payload with two recorded consumers counts as one physical copy and two recorded placements. Managed copies say **Read-only** and retain owning-tool guidance.
 
+Row summaries label update availability as **Updates:**; **Not checked** refers to updates. When no installed copies were observed, **Search skills (1)** returns to Discover and **Coverage** explains the scan. Configured locations and scanned locations are separate counts; incomplete coverage can leave other copies unknown. When search or filters hide observed copies, the view instead offers **Clear**. Missing filter choices remain selected until explicitly cleared.
+
 The view retains selection by installation ID and exact path, expansion, search, four explicit filters, P/G filters, sort, focus and the top visible row key across refresh, checks, resize and operation return. Missing, ambiguous, filtered-out or collapsed selections disable copy actions until an exact visible copy is selected. The list shows at most 8,192 rows including source headings and an omission row; footer counts distinguish observed, filtered, shown and omitted rows. Coverage describes only captured configured/scanned roots and discovery limitations; it does not enumerate unknown projects.
 
 The four visible selectors use **captured choices** and combine independently. With Agent and Project/location both Any, G retains its legacy rule: match the copy's own scope or any recorded placement's scope, like CLI `--scope`. When either membership selector is constrained, Agent, Project/location and G must match the **same recorded placement**; selecting one consumer keeps the entire physical copy and all other consumers in detail. Locations use captured context, or the recorded discovery root/placement when context is absent. A copy without recorded consumers offers only Unknown agent and its declared scope/root; it does not imply agent availability. Source/owner matches the primary source **or any contextual owner claim**, including unknown source evidence, conflicts and managed/read-only owners. Filtering does not change the conservative primary source grouping. Groups show, for example, **1 of 2 observed copies**; the footer retains total observed copies and recorded placements.
@@ -534,6 +536,10 @@ same displayed list, time alone does not block K; switching tabs can clear even
 a just-completed check when that list was already over a minute old. Unknown
 identity or failed whole-payload capture keeps diagnostics in the dialog and asks
 for Refresh without attaching findings to Installed or Issues.
+
+New checks, **Check again**, and retained reports open at the top with a plain
+Problems/Reviews summary and incomplete-check context. The full bounded evidence
+remains below the summary for scrolling and review.
 
 Installed shows Problems and Reviews with their document, resource and available
 line, plus incomplete/omitted coverage. Only an exact missing-file reference from

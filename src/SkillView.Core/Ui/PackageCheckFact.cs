@@ -47,13 +47,24 @@ internal sealed record PackageCheckFact(PackageCheckRequest Request, PackageChec
 
     internal static bool IsProblem(PackageCheckFinding finding) => finding.Category == "reference"
         && finding.Code == "reference-missing" && finding.Path == "SKILL.md";
-    internal int Problems => Report.Findings.Count(IsProblem);
-    internal int Reviews => Report.Findings.Count(f => !IsProblem(f)) + Report.Observations.Count(o => o.State == "review");
-    internal int Infos => Report.Observations.Count(o => o.State != "review");
+    internal int Problems => ProblemCount(Report);
+    internal int Reviews => ReviewCount(Report);
+    internal int Infos => InfoCount(Report);
     internal bool HasFindings => Problems > 0 || Reviews > 0;
-    internal bool Incomplete => Report.Coverage.Payload != "complete" || Report.Coverage.References != "limited"
-        || Report.Coverage.Reasons.Length > 0 || Report.DeclarationCoverage != "limited" || Report.DeclarationReasons.Length > 0
-        || Report.OmittedFindingCount > 0 || Report.OmittedObservationCount > 0;
+    internal bool Incomplete => ChecksIncomplete(Report);
+    internal static int ProblemCount(PackageCheckReport report) => report.Findings.Count(IsProblem);
+    internal static int ReviewCount(PackageCheckReport report) => report.Findings.Count(f => !IsProblem(f)) + report.Observations.Count(o => o.State == "review");
+    internal static int InfoCount(PackageCheckReport report) => report.Observations.Count(o => o.State != "review");
+    internal static bool ChecksIncomplete(PackageCheckReport report) => report.Coverage.Payload != "complete" || report.Coverage.References != "limited"
+        || report.Coverage.Reasons.Length > 0 || report.DeclarationCoverage != "limited" || report.DeclarationReasons.Length > 0
+        || report.OmittedFindingCount > 0 || report.OmittedObservationCount > 0;
+    internal static string ProblemReviewLabel(PackageCheckReport report)
+    {
+        var problems = ProblemCount(report);
+        var reviews = ReviewCount(report);
+        return $"{problems} {(problems == 1 ? "Problem" : "Problems")} · {reviews} {(reviews == 1 ? "Review" : "Reviews")}";
+    }
+    internal static string CountsLabel(PackageCheckReport report) => ProblemReviewLabel(report) + $" · {InfoCount(report)} Info";
     internal bool Matches(InventorySnapshot snapshot, long generation, string id, string path) =>
         ReferenceEquals(Request.Snapshot, snapshot) && Request.Generation == generation
         && Request.Id == id && Request.Target.ResolvedPath == path;
@@ -65,7 +76,7 @@ internal sealed record PackageCheckFact(PackageCheckRequest Request, PackageChec
     {
         get
         {
-            var lines = new List<string> { $"## Last explicit package check\n\n{Problems} Problems · {Reviews} Reviews · {Infos} Info · {CheckedAt:O}",
+            var lines = new List<string> { $"## Last explicit package check\n\n{CountsLabel(Report)} · {CheckedAt:O}",
                 "Copy: " + Code(Request.Target.ResolvedPath),
                 InventoryLifetimeNotice,
                 "Scope: captured local package only; source integrity, availability and effective agent compatibility remain unknown.",
