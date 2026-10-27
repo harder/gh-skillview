@@ -15,7 +15,7 @@ public sealed class SkillViewFailureTests
     public async Task RunAsync_DisposesApplicationAfterUiFailure(bool failDuringDisposal)
     {
         IApplication? terminal = null;
-        var disposed = false;
+        IApplication? disposed = null;
         var failureReached = false;
         var failure = new InvalidOperationException("injected UI failure");
         var logger = new Logger(LogLevel.Debug);
@@ -24,6 +24,7 @@ public sealed class SkillViewFailureTests
             () =>
             {
                 terminal = Application.Create().Init();
+                terminal.InitializedChanged += OnDisposed;
                 terminal.Driver!.SetScreenSize(120, 36);
                 terminal.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
                 {
@@ -39,12 +40,11 @@ public sealed class SkillViewFailureTests
                 return terminal;
             }, probeOnRun: false);
 
-        void OnDisposed(object? sender, EventArgs<IApplication> args)
+        void OnDisposed(object? sender, EventArgs<bool> args)
         {
-            if (ReferenceEquals(terminal, args.Value)) disposed = true;
+            if (!args.Value && ReferenceEquals(terminal, sender)) disposed = (IApplication)sender!;
         }
 
-        Application.InstanceDisposed += OnDisposed;
         try
         {
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -52,13 +52,16 @@ public sealed class SkillViewFailureTests
             Assert.True(failureReached);
             Assert.False(deadline.IsCancellationRequested);
             Assert.Same(failure, exception);
-            Assert.True(disposed);
+            Assert.Same(terminal, disposed);
+            Assert.False(terminal!.Initialized);
+            Assert.Null(terminal.Driver);
+            Assert.Null(terminal.MainThreadId);
             Assert.Contains(logger.Snapshot(), entry => entry.Message.Contains("injected UI failure", StringComparison.Ordinal));
         }
         finally
         {
-            Application.InstanceDisposed -= OnDisposed;
-            if (!disposed) terminal?.Dispose();
+            if (terminal is not null) terminal.InitializedChanged -= OnDisposed;
+            if (disposed is null) terminal?.Dispose();
         }
     }
 }

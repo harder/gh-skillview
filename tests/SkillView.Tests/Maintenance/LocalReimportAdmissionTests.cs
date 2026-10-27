@@ -52,6 +52,69 @@ public sealed class LocalReimportAdmissionTests : IDisposable
         Assert.DoesNotContain(logger.Snapshot(), entry => entry.Category == "subprocess" && entry.Message.Contains(forbiddenGh, StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FullQuotaStillRequiresHeldSourceCaptureWithoutSpeculativeUnchanged(bool metadataOnlyChange)
+    {
+        var skills = Directory.CreateDirectory(Path.Combine(temp.FullName, "skills")).FullName;
+        var payload = Directory.CreateDirectory(Path.Combine(skills, "local")).FullName;
+        var source = Directory.CreateDirectory(Path.Combine(temp.FullName, "source")).FullName;
+        var content = "---\nname: local\ndescription: local\nmetadata:\n  local-path: " + JsonSerializer.Serialize(source) + "\n---\nbody\n";
+        File.WriteAllText(Path.Combine(payload, "SKILL.md"), content);
+        File.WriteAllText(Path.Combine(source, "SKILL.md"), content);
+        if (OperatingSystem.IsWindows())
+        {
+            foreach (var path in new[] { payload, source, Path.Combine(payload, "SKILL.md"), Path.Combine(source, "SKILL.md") })
+                WindowsPayloadMetadataTests.SetFixtureOwner(path);
+            if (metadataOnlyChange) File.WriteAllText(Path.Combine(source, "SKILL.md") + ":capacity-witness", "source metadata only");
+        }
+        else if (metadataOnlyChange)
+            File.SetUnixFileMode(Path.Combine(source, "SKILL.md"), UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        ScanRoot[] roots = [new(skills, Scope.Custom, null)];
+        var inventory = InventorySnapshot.Empty with
+        {
+            Skills = new LocalSkillScanner(new Logger()).Scan(roots).ToImmutableArray(),
+            ConfiguredRoots = roots.ToImmutableArray(),
+            ScannedRoots = roots.ToImmutableArray()
+        };
+        var state = Path.Combine(temp.FullName, "private", "plans");
+        using (var root = NativeStateDirectory.OpenOrCreate(state, [payload, source], Token))
+        {
+            using var writer = root.OpenFile("writer.lock", true, Token);
+            for (var index = 0; index < 16; index++)
+                using (root.CreateStagingDirectory(Guid.NewGuid().ToString("N"), Token)) { }
+        }
+        var beforeState = PayloadSnapshot.Capture(state, Token);
+        var beforePayload = PayloadSnapshot.Capture(payload, Token);
+        var beforeSource = PayloadSnapshot.Capture(source, Token);
+        var logger = new Logger(LogLevel.Debug);
+        var reachedCapture = false;
+        var store = new ReplacementPlanStore(state, logger, checkpoint: step =>
+        {
+            if (step != "local-source-captured") return;
+            reachedCapture = true;
+            // Stop at the real capture boundary: no synthetic gh witness or
+            // incomplete metadata comparison may establish an unchanged result.
+            throw new IOException("fixture stopped after held source capture");
+        }, runner: new ProcessRunner(logger, environment: new Dictionary<string, string>
+        { ["HOME"] = temp.FullName, ["USERPROFILE"] = temp.FullName }, defaultWorkingDirectory: temp.FullName));
+        var error = await Assert.ThrowsAsync<IOException>(() => store.PlanLocalReimportAsync("must-never-be-executed", Assert.Single(inventory.Skills), inventory, Token));
+        Assert.True(reachedCapture);
+        Assert.Contains("fixture stopped after held source capture", error.Message);
+        Assert.Contains("final operation: not allocated", error.Message);
+        Assert.Equal(beforeState.ObjectStateFingerprint, PayloadSnapshot.Capture(state, Token).ObjectStateFingerprint);
+        Assert.Equal(beforeState.Fingerprint, PayloadSnapshot.Capture(state, Token).Fingerprint);
+        Assert.Equal(beforePayload.ObjectStateFingerprint, PayloadSnapshot.Capture(payload, Token).ObjectStateFingerprint);
+        Assert.Equal(beforePayload.Fingerprint, PayloadSnapshot.Capture(payload, Token).Fingerprint);
+        Assert.Equal(beforeSource.ObjectStateFingerprint, PayloadSnapshot.Capture(source, Token).ObjectStateFingerprint);
+        Assert.Equal(beforeSource.Fingerprint, PayloadSnapshot.Capture(source, Token).Fingerprint);
+        if (OperatingSystem.IsWindows() && metadataOnlyChange)
+            Assert.Equal("source metadata only", File.ReadAllText(Path.Combine(source, "SKILL.md") + ":capacity-witness"));
+        Assert.Equal(["writer.lock"], Directory.EnumerateFileSystemEntries(state + "-local-previews").Select(Path.GetFileName).ToArray());
+        Assert.DoesNotContain(logger.Snapshot(), entry => entry.Category == "subprocess");
+    }
+
     [Fact]
     public void ChildEnvironmentIsPrivateAndNeutralizesAuthGitAndProxyBypasses()
     {

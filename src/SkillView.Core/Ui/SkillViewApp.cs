@@ -210,6 +210,13 @@ public sealed partial class SkillViewApp
             _app = app;
             ActivateDiscoverWorkspace();
             window = BuildUi();
+            var historyStarted = false;
+            window.DrawComplete += (_, _) =>
+            {
+                if (historyStarted) return;
+                historyStarted = true;
+                StartHistoryHint();
+            };
 
             // TableView routes Enter (View base default), p/v/CursorRight (rebound in
             // ConfigureTableKeyBindings), and Warp's Ctrl+J directly through

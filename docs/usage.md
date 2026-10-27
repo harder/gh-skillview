@@ -912,3 +912,48 @@ Saved source-changing updates also provide a [frozen source review](saved-update
 with captured diffs and a separate explicit acknowledgement. This user declaration
 supplies no authenticity, compatibility or safety assurance; local `check` remains
 unreviewed without a matching explicit review workflow.
+
+### Retained operation History
+
+Use the visible **History (F4)** control from Discover, Installed or Issues.
+F4 also works while typing in a field. After the shell appears, a bounded
+background read shows recovery hints beside History when retained operations may
+need attention. Nothing resumes automatically.
+
+History lists up to 16 retained replacement operations from the existing saved
+store, including unapplied reviews, retained Undo data and interrupted work.
+Skill, action, date, source and target are **saved metadata**, and slot locations
+and byte estimates are **hints**, not verified current installation state.
+**Inspect to verify** performs fresh local inventory and the existing full saved
+operation/native payload checks. Refresh clears previous inspection results and
+keeps your selected operation ID if it is still listed. Back/Esc cancels pending
+work and returns to the previous view.
+
+Unknown entries, unreadable plans and historical merge evidence stay protected.
+An owner journal conservatively produces a recovery hint even when completion
+filenames exist; only Inspect can verify its evidence. Extra entries beyond the
+listing cap are reported as omissions, with unknown states. Lock/access failures
+are reported as unavailable rather than an empty history.
+
+History is read-only: it cannot resume, undo, retire or delete operations. At the
+16-operation quota, new reviews stop before staging or source resolution, except
+same-source local reimport: it still needs a bounded private capture and gh
+preview to verify that nothing changed. A verified unchanged result needs no
+retained operation; a changed result refuses allocation with quota/History
+guidance. This version cannot free that capacity. Preserve the retained evidence;
+there is no supported manual filesystem cleanup procedure. Existing specialist
+inspection, recovery and Undo commands retain their separate reviews and approvals.
+
+For an offline bounded listing:
+
+```sh
+skillview replacement-history
+skillview replacement-history --json
+```
+
+This command reads saved metadata and entry-name/type hints only. It supplies no
+execution approval fingerprint. For full verification use History's Inspect or
+the existing `update-inspect`, `restore-inspect`, `unpin-inspect`,
+`reimport-inspect` or `source-switch-inspect` command with the exact saved ID and
+any required global scan locations. The CLI `history` command continues to
+verify backup archives and keeps its existing output format.

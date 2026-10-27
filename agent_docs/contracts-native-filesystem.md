@@ -227,3 +227,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   ContainsGitDirectory wire label while describing repository/worktree metadata
   in UI text. Parent-repository warnings accepted with --yes are insufficient
   protection for the repository/worktree root itself.
+
+- Native state History enumeration adds immediate directory-type hints through
+  the existing held native cursor/stat path. It does not follow links, descend
+  payloads, capture identities for execution or relax file-only EnumerateEntries
+  errors. Unsafe entries remain individual protected observations. Use native
+  existing-only opens and existing locks for coherent History reads; contention,
+  missing locks, access failures and unknown state remain unverified.

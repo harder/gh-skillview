@@ -178,3 +178,20 @@ Merge lifecycle fixtures use the source-reviewed last creator at `27efe94`,
 while `prove-old-native-plans.py` keeps the separate `0dba59be` pre-source-review
 shape. CI binds both exact producers through the existing native-input receipts;
 reviewed merge proofs require source acknowledgement before any current apply.
+
+The read-only retained-operation History proof needs no gh authentication or
+network. After building, run the native proof host and TUI together through:
+
+```sh
+TMPDIR=/var/tmp python3 tests/native/prove-retained-history.py \
+  --app src/SkillView.App/bin/Debug/net10.0/linux-x64/skillview \
+  --proof tests/SkillView.MaintenanceProof/bin/Debug/net10.0/SkillView.MaintenanceProof \
+  --output /tmp/skillview-history-proof
+```
+
+Use the corresponding built host paths on other native platforms. The tool
+creates fresh marked private fixtures, retains them for review, and verifies
+80×24/120×36 keyboard browsing, restart hints, explicit Inspect and unchanged
+payload/state bytes, modes and native identities. It is a local regression proof,
+not new human release acceptance. Avoid `/tmp` fixture ancestry in sandboxes
+that mount a Git marker there; keep the native placement guard intact.

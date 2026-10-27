@@ -588,12 +588,9 @@ public sealed class SkillViewAppTests
         IApplication? created = null;
         IApplication? disposed = null;
 
-        void HandleDisposed(object? _, EventArgs<IApplication> e)
+        void HandleDisposed(object? sender, EventArgs<bool> e)
         {
-            if (ReferenceEquals(e.Value, created))
-            {
-                disposed = e.Value;
-            }
+            if (!e.Value && ReferenceEquals(sender, created)) disposed = (IApplication)sender!;
         }
 
         var app = new SkillViewApp(
@@ -602,12 +599,12 @@ public sealed class SkillViewAppTests
             () =>
             {
                 created = Application.Create().Init();
+                created.InitializedChanged += HandleDisposed;
                 cancellation.Cancel();
                 return created;
             },
             probeOnRun: false);
 
-        Application.InstanceDisposed += HandleDisposed;
         try
         {
             var exitCode = await app.RunAsync(cancellation.Token);
@@ -615,10 +612,13 @@ public sealed class SkillViewAppTests
             Assert.Equal(ExitCodes.Cancelled, exitCode);
             Assert.NotNull(created);
             Assert.Same(created, disposed);
+            Assert.False(created.Initialized);
+            Assert.Null(created.Driver);
+            Assert.Null(created.MainThreadId);
         }
         finally
         {
-            Application.InstanceDisposed -= HandleDisposed;
+            if (created is not null) created.InitializedChanged -= HandleDisposed;
         }
     }
 
@@ -1351,33 +1351,33 @@ public sealed class SkillViewAppTests
         IApplication? created = null;
         IApplication? disposed = null;
 
-        void HandleCreated(object? _, EventArgs<IApplication> e)
+        void HandleDisposed(object? sender, EventArgs<bool> e)
         {
-            created = e.Value;
-            e.Value.StopAfterFirstIteration = true;
+            if (!e.Value && ReferenceEquals(sender, created)) disposed = (IApplication)sender!;
         }
 
-        void HandleDisposed(object? _, EventArgs<IApplication> e)
-        {
-            disposed = e.Value;
-        }
-
-        Application.InstanceCreated += HandleCreated;
-        Application.InstanceDisposed += HandleDisposed;
         try
         {
-            var app = CreateApp(probeOnRun: false);
+            var app = new SkillViewApp(TuiServices.Build(new Logger(LogLevel.Debug)), CreateOptions(), () =>
+            {
+                created = Application.Create().Init();
+                created.InitializedChanged += HandleDisposed;
+                created.StopAfterFirstIteration = true;
+                return created;
+            }, probeOnRun: false);
 
             var exitCode = app.Run();
 
             Assert.Equal(ExitCodes.Success, exitCode);
             Assert.NotNull(created);
             Assert.Same(created, disposed);
+            Assert.False(created.Initialized);
+            Assert.Null(created.Driver);
+            Assert.Null(created.MainThreadId);
         }
         finally
         {
-            Application.InstanceCreated -= HandleCreated;
-            Application.InstanceDisposed -= HandleDisposed;
+            if (created is not null) created.InitializedChanged -= HandleDisposed;
         }
     }
 
@@ -1387,33 +1387,33 @@ public sealed class SkillViewAppTests
         IApplication? created = null;
         IApplication? disposed = null;
 
-        void HandleCreated(object? _, EventArgs<IApplication> e)
+        void HandleDisposed(object? sender, EventArgs<bool> e)
         {
-            created = e.Value;
-            e.Value.StopAfterFirstIteration = true;
+            if (!e.Value && ReferenceEquals(sender, created)) disposed = (IApplication)sender!;
         }
 
-        void HandleDisposed(object? _, EventArgs<IApplication> e)
-        {
-            disposed = e.Value;
-        }
-
-        Application.InstanceCreated += HandleCreated;
-        Application.InstanceDisposed += HandleDisposed;
         try
         {
-            var app = CreateApp(probeOnRun: false);
+            var app = new SkillViewApp(TuiServices.Build(new Logger(LogLevel.Debug)), CreateOptions(), () =>
+            {
+                created = Application.Create().Init();
+                created.InitializedChanged += HandleDisposed;
+                created.StopAfterFirstIteration = true;
+                return created;
+            }, probeOnRun: false);
 
             var exitCode = await app.RunAsync(TestContext.Current.CancellationToken);
 
             Assert.Equal(ExitCodes.Success, exitCode);
             Assert.NotNull(created);
             Assert.Same(created, disposed);
+            Assert.False(created.Initialized);
+            Assert.Null(created.Driver);
+            Assert.Null(created.MainThreadId);
         }
         finally
         {
-            Application.InstanceCreated -= HandleCreated;
-            Application.InstanceDisposed -= HandleDisposed;
+            if (created is not null) created.InitializedChanged -= HandleDisposed;
         }
     }
 

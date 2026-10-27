@@ -30,6 +30,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         Func<NativeStateDirectory, CancellationToken, Task>? stageBase, CancellationToken token, bool allowUnchanged = false)
     {
         token.ThrowIfCancellationRequested();
+        RequireHistoryCapacity(inventory, token);
         var canonicalPath = Canonical(target.ResolvedPath);
         var containingRoot = inventory.ScannedRoots.Select(scan => Canonical(scan.Path))
             .Where(path => !PathIdentity.Equals(path, canonicalPath) && PathIdentity.IsInside(canonicalPath, path))
@@ -58,9 +59,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
         using var writer = state.OpenFile("writer.lock", true, token);
         CheckWriter(writer);
-        var entries = state.EnumerateEntries(token).Take(MaxPlans + 2).ToArray();
-        if (entries.Length > MaxPlans || entries.Any(entry => entry.Name != "writer.lock" && !QuarantineStore.ValidId(entry.Name)))
-            throw new IOException("Replacement plan quota or state entry policy refused; inspect retained plans.");
+        CheckPlanCapacity(state, token);
         var id = Guid.NewGuid().ToString("N");
         var operationPath = Path.Combine(state.CanonicalPath, id);
         OwnedDirectoryLease? ownedOperation = null;

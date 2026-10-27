@@ -432,7 +432,11 @@ internal sealed partial class UnixSecureRemovalBackend
                 throw;
             }
         }
-        internal override IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token)
+        internal override IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token) =>
+            EnumerateHistoryEntries(token).Select(entry => (entry.Name, entry.Bytes,
+                entry.Directory ? "Unexpected state entry type or identity change." : entry.Error));
+
+        internal override IEnumerable<(string Name, long Bytes, string? Error, bool Directory)> EnumerateHistoryEntries(CancellationToken token)
         {
             ValidateLocation(token);
             using var frame = new DirectoryFrame(root, root, "state", canonical, 0, false, false);
@@ -444,14 +448,15 @@ internal sealed partial class UnixSecureRemovalBackend
                 { if (error is not null) throw new IOException(error); yield break; }
                 if (entry is null) continue;
                 if (!TryReadStatAt(root, entry.Value.Name, buffer.Pointer, out var stat, out var statError))
-                { yield return (entry.Value.Name, 0, statError ?? "State entry disappeared."); continue; }
-                if (stat.FileType != 0x8000 || entry.Value.Inode != 0 && entry.Value.Inode != stat.Inode)
-                { yield return (entry.Value.Name, 0, "Unexpected state entry type or identity change."); continue; }
+                { yield return (entry.Value.Name, 0, statError ?? "State entry disappeared.", false); continue; }
+                if (entry.Value.Inode != 0 && entry.Value.Inode != stat.Inode || stat.FileType is not (0x8000 or 0x4000))
+                { yield return (entry.Value.Name, 0, "Unexpected state entry type or identity change.", false); continue; }
+                if (stat.FileType == 0x4000) { yield return (entry.Value.Name, 0, null, true); continue; }
                 // Both verified Linux stat layouts put st_size at 48; native
                 // ARM64 Darwin puts it at 96 (SDK sys/stat.h).
                 var length = Marshal.ReadInt64(buffer.Pointer, OperatingSystem.IsMacOS() ? 96 : 48);
-                if (length < 0) { yield return (entry.Value.Name, 0, "Invalid state entry length."); continue; }
-                yield return (entry.Value.Name, length, null);
+                if (length < 0) { yield return (entry.Value.Name, 0, "Invalid state entry length.", false); continue; }
+                yield return (entry.Value.Name, length, null, false);
             }
         }
         internal override void FlushPublication(CancellationToken token)
