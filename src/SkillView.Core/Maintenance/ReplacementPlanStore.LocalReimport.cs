@@ -30,7 +30,10 @@ internal sealed partial class ReplacementPlanStore
         InventorySnapshot inventory, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        RequireHistoryCapacity(inventory, token);
+        // Same-source reimport can be allocation-free, but only the complete
+        // held capture and private gh preview below can establish equality.
+        // Source switching always needs a plan; keep its early admission.
+        if (newSourcePath is not null) RequireHistoryCapacity(inventory, token);
         RequireLocalSourceMetadata(target.FrontMatter, requirePath: true);
         if (target.AllOwnershipClaims.Any()) throw new IOException("Local reimport currently requires an ownerless installation; native owner transitions remain pending.");
         var canonical = Canonical(target.ResolvedPath);

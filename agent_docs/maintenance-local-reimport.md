@@ -60,8 +60,11 @@ Complete payload, tracking and effective metadata equality is required for a
 no-op. Initialize admitted private namespaces before freezing I/C parent
 generations; revalidate native leases before archive capture. A no-op may create
 an empty final-root directory and preview coordinator, but allocates no retained
-operation, opens no final writer and enumerates no retained-plan quota. A bounded held preview runs before retained-plan quota admission; equal
-results allocate no retained operation. Changed results copy sealed immutable
+operation, opens no final writer and enumerates no retained-plan quota. A bounded
+held capture and actual private gh preview run before retained-plan quota
+admission, including when all 16 retained slots are occupied; only fully verified
+equal results return unchanged. Source switching always needs a plan and keeps
+early quota admission. Changed results copy sealed immutable
 evidence into a fresh final operation using held readers and exact raw manifests,
 reload the same archive fingerprints, then materialize/recapture the final
 candidate. Never rename an active state directory or weaken payload-only native
