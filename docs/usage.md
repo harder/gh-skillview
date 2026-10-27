@@ -45,7 +45,12 @@ In the compact review, **Project** uses the displayed project base; **User**
 uses your home across projects. The default is Project when this Git project
 already has a known skills folder, otherwise User. Review the scope and base,
 then press Enter on **Install**. Tab reaches **Advanced…** and **Cancel**;
-Escape cancels, including while an install is running.
+Escape cancels, including while an install is running. If installation is refused,
+choose **Details** to read the full bounded explanation and captured output.
+
+Press **A** on a Discover result to list repository skills and choose a subset.
+If listing fails, the dialog retains the explanation with **Retry** and **Cancel**.
+Cancel is the default; retrying lists skills again without installing them.
 
 Agent checkboxes select gh's installation folders. With none checked,
 **Universal** installs into the shared `.agents/skills` folder under the

@@ -86,6 +86,7 @@ internal sealed class InstallConfirmModal
         var operationName = "project lookup";
         var preparing = true;
         var preparationCancelled = false;
+        string? failureDetails = null;
 
         using var dialog = new Dialog
         {
@@ -230,12 +231,39 @@ internal sealed class InstallConfirmModal
             Visible = !_installAll,
             Enabled = !_installAll,
         };
+        var detailsButton = new SingleRowButton
+        {
+            X = _installAll ? Pos.Right(installButton) + 2 : Pos.Right(advancedButton) + 2,
+            Y = Pos.AnchorEnd(1),
+            Text = "Details",
+            Visible = false,
+            Enabled = false,
+        };
         var cancelButton = new SingleRowButton
         {
             X = _installAll ? Pos.Right(installButton) + 2 : Pos.Right(advancedButton) + 2,
             Y = Pos.AnchorEnd(1),
             Text = "Cancel",
         };
+
+        detailsButton.Accepting += (_, ev) =>
+        {
+            ev.Handled = true;
+            if (operation.CurrentOwnership != ModalOperationTracker.Ownership.None || failureDetails is null) return;
+            InstallFailureDetails.Show(_app, failureDetails);
+            detailsButton.SetFocus();
+        };
+
+        void ShowFailure(string detail, int? exitCode = null)
+        {
+            failureDetails = detail;
+            detailsButton.Visible = true;
+            detailsButton.Enabled = true;
+            cancelButton.X = Pos.Right(detailsButton) + 2;
+            status.Text = exitCode is { } code
+                ? $" install failed (exit {code}) — Details for full error"
+                : " install failed — Details for full error";
+        }
 
         // Keep Enter local to the editor. Selector/checkbox Accept commands
         // otherwise bubble into Dialog's implicit close behavior.
@@ -339,6 +367,7 @@ internal sealed class InstallConfirmModal
                     cancellationToken).ConfigureAwait(false);
 
                 cancellationToken.ThrowIfCancellationRequested();
+                var detail = installResult.Succeeded ? null : InstallFailureDetails.Render(installResult);
                 operation.InvokeTerminalIfActive(() =>
                 {
                     spinner.AutoSpin = false;
@@ -378,10 +407,7 @@ internal sealed class InstallConfirmModal
                     {
                         operation.Release();
                         outcome = Outcome.Failed;
-                        var snippet = TuiHelpers.ErrorSnippet(installResult.ErrorMessage);
-                        status.Text = snippet.Length > 0
-                            ? $" install failed (exit {installResult.ExitCode}): {snippet}"
-                            : $" install failed (exit {installResult.ExitCode}) — see logs";
+                        ShowFailure(detail!, installResult.ExitCode);
                         scopeSelector.Enabled = true;
                         agentsView.Enabled = true;
                         customPathField.Enabled = true;
@@ -405,13 +431,14 @@ internal sealed class InstallConfirmModal
             catch (Exception ex)
             {
                 _logger.Error("install.compact", ex.Message);
+                var detail = "Install failed\n\n" + InstallFailureDetails.Literal(ex.Message);
                 operation.InvokeTerminalIfActive(() =>
                 {
                     operation.Release();
                     spinner.AutoSpin = false;
                     spinner.Visible = false;
                     outcome = Outcome.Failed;
-                    status.Text = $" install failed: {TuiHelpers.ErrorSnippet(ex.Message)}";
+                    ShowFailure(detail);
                     scopeSelector.Enabled = true;
                     agentsView.Enabled = true;
                     customPathField.Enabled = true;
@@ -497,6 +524,10 @@ internal sealed class InstallConfirmModal
                 entries,
                 _installAll) with
             { NavigationSource = InstallNavigationEvidence.SourceAnchor(_request.Repo, _request.SourcePath) };
+            failureDetails = null;
+            detailsButton.Visible = false;
+            detailsButton.Enabled = false;
+            cancelButton.X = _installAll ? Pos.Right(installButton) + 2 : Pos.Right(advancedButton) + 2;
             operationName = "install";
             scopeSelector.Enabled = false;
             agentsView.Enabled = false;
@@ -572,13 +603,13 @@ internal sealed class InstallConfirmModal
 
         dialog.Add(status, repoLabel, scopeLabel, scopeSelector, scopeDescription, baseLabel, basePath, customPathLabel, customPathField,
                    agentsLabel, agentsView);
-        dialog.Add(placementHint, spinner, installButton, advancedButton, cancelButton);
+        dialog.Add(placementHint, spinner, installButton, advancedButton, detailsButton, cancelButton);
 
         TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
             dialog, repoLabel, scopeLabel, scopeSelector, scopeDescription, baseLabel, basePath,
             customPathLabel, customPathField,
             agentsLabel, agentsView, placementHint, status, spinner,
-            installButton, advancedButton, cancelButton);
+            installButton, advancedButton, detailsButton, cancelButton);
         foreach (var box in agentBoxes)
         {
             TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName, box);

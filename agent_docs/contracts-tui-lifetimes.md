@@ -376,3 +376,12 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   context before null, normalized agent/profile ordinally, then every original
   membership field in declaration order (ordinal/null-first strings, ascending
   enums and false before true). Raw evidence, authority and filters are unchanged.
+
+- Repository subset listing owns a synchronous modal and its background work.
+  Failure/empty results retain bounded literal detail with explicit Retry/Cancel;
+  Cancel is the default. Never widen a failed or canceled subset request to
+  install-all. Retry and queued completion recheck Discover lifetime and captured
+  child context before handing the successful listing to the existing picker.
+  Compact install failures expose Details with bounded, sanitized plain text for
+  the full refusal and retained stdout/stderr. Keep the original result intact;
+  output cannot create Markdown, active links or terminal controls.

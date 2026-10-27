@@ -253,81 +253,42 @@ internal sealed partial class SkillViewWorkflowCoordinator
         }
     }
 
-    /// Discover the skills a repo offers (gh ≥ 2.97.0, cli/cli#13548) and let
-    /// the user pick a subset to install via <see cref="RepoSkillPickerModal"/>.
-    /// Discovery is a read-only `gh skill install <repo>` (no skill, no --all)
-    /// run off the UI thread; on success the populated picker opens. If
-    /// discovery fails or the repo lists no skills, falls back to the blunt
-    /// install-all modal so the `A` shortcut never dead-ends.
-    public void OpenRepoDiscoveryDialog(InstallRequest request)
+    /// List repository skills in an owned, retryable modal before opening the
+    /// subset picker. Listing failures never widen the request to install-all.
+    public void OpenRepoDiscoveryDialog(InstallRequest request, Func<bool>? isOwnerActive = null,
+        CancellationToken lifetimeToken = default)
     {
         var app = _getApp();
         var ghPath = _getGhPath();
         var report = _getLastReport();
-        if (app is null || ghPath is null || report is null)
+        if (app is null || ghPath is null || report is null) return;
+        var context = _services.InstallService.CaptureContext();
+        var contextKey = SkillView.Gh.InstallNavigationEvidence.Context(context);
+        bool IsCurrent() => !lifetimeToken.IsCancellationRequested && isOwnerActive?.Invoke() != false
+            && ReferenceEquals(app, _getApp()) && ghPath == _getGhPath()
+            && contextKey == SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner);
+        var install = new SkillView.Gh.GhSkillInstallService(context, _services.Logger);
+        var listing = RepoDiscoveryModal.Show(app, _services.Logger, request.Repo,
+            token => install.ListRepoSkillsAsync(ghPath, request.Repo, version: null, request.AllowHiddenDirs, token),
+            IsCurrent, lifetimeToken);
+        if (listing is null || !IsCurrent()) return;
+
+        var picker = new RepoSkillPickerModal(app, install, _services.Logger, ghPath, request, listing.Skills);
+        _services.ListAdapter.Invalidate();
+        var result = picker.Show();
+        if (result.Outcome == RepoSkillPickerModal.Outcome.Installed && result.InstalledCount > 0)
         {
-            return;
+            _services.ListAdapter.Invalidate();
+            var suffix = result.FailedCount > 0 ? $" ({result.FailedCount} failed)" : string.Empty;
+            _setStatusWithLevel(
+                $"installed {result.InstalledCount} skill(s) from {request.Repo}{suffix} — rescanning…",
+                result.FailedCount > 0 ? TuiHelpers.NotificationLevel.Warn : TuiHelpers.NotificationLevel.Success);
+            QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
         }
-
-        _setBusy($"discovering skills in {request.Repo}…");
-        _runBackground(async cancellationToken =>
-        {
-            var listing = await _services.InstallService
-                .ListRepoSkillsAsync(ghPath, request.Repo, version: null, request.AllowHiddenDirs, cancellationToken)
-                .ConfigureAwait(false);
-            await _invokeAsync(
-                () =>
-                {
-                    _clearBusy();
-                    if (!listing.Succeeded)
-                    {
-                        _setStatusWithLevel(
-                            $"could not list skills in {request.Repo} (exit {listing.ExitCode}) — opening install-all",
-                            TuiHelpers.NotificationLevel.Warn);
-                        OpenInstallAllDialog(request);
-                        return;
-                    }
-                    if (listing.Skills.IsDefaultOrEmpty)
-                    {
-                        _setStatusWithLevel(
-                            $"no skills discovered in {request.Repo}",
-                            TuiHelpers.NotificationLevel.Warn);
-                        return;
-                    }
-
-                    var picker = new RepoSkillPickerModal(
-                        app,
-                        _services.InstallService,
-                        _services.Logger,
-                        ghPath,
-                        request,
-                        listing.Skills);
-                    _services.ListAdapter.Invalidate();
-                    var result = picker.Show();
-                    if (result.Outcome == RepoSkillPickerModal.Outcome.Installed && result.InstalledCount > 0)
-                    {
-                        _services.ListAdapter.Invalidate();
-                        var suffix = result.FailedCount > 0 ? $" ({result.FailedCount} failed)" : string.Empty;
-                        _setStatusWithLevel(
-                            $"installed {result.InstalledCount} skill(s) from {request.Repo}{suffix} — rescanning…",
-                            result.FailedCount > 0 ? TuiHelpers.NotificationLevel.Warn : TuiHelpers.NotificationLevel.Success);
-                        QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
-                    }
-                    else if (result.Outcome == RepoSkillPickerModal.Outcome.Failed)
-                    {
-                        _setStatusWithLevel(
-                            $"install failed — {TuiHelpers.ErrorSnippet(result.FirstError)}".TrimEnd(),
-                            TuiHelpers.NotificationLevel.Error);
-                    }
-                    else
-                    {
-                        // Cancelled (or nothing selected): clear the lingering
-                        // "discovering skills in …" busy status the spinner left.
-                        _setStatus($"{request.Repo}: no skills installed");
-                    }
-                },
-                cancellationToken).ConfigureAwait(false);
-        }, "discover");
+        else if (result.Outcome == RepoSkillPickerModal.Outcome.Failed)
+            _setStatusWithLevel($"install failed — {TuiHelpers.ErrorSnippet(result.FirstError)}".TrimEnd(), TuiHelpers.NotificationLevel.Error);
+        else
+            _setStatus($"{request.Repo}: no skills installed");
     }
 
     public void ShowCleanupScreen()
