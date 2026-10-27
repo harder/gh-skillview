@@ -75,11 +75,19 @@ def isolated_environment(original, output):
     return env
 
 
-def stop_tree(process, log):
+def stop_tree(process, log, cooperative=False):
     if os.name == 'nt':
         subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
                        stdout=log, stderr=subprocess.STDOUT, timeout=15, check=False)
     else:
+        if cooperative:
+            # The opt-in measurement runner owns nested PTY sessions. Let its
+            # signal handler close those before the final group kill.
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+                process.wait(timeout=15)
+            except (ProcessLookupError, subprocess.TimeoutExpired):
+                pass
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
@@ -101,7 +109,7 @@ def symlink_limitation(output):
         return 'Fixture symlink creation unavailable: ' + str(error)
 
 
-def execute(argv, *, cwd, env, log, timeout):
+def execute(argv, *, cwd, env, log, timeout, cooperative_stop=False):
     started = time.monotonic()
     result = dict(argv=[str(value) for value in argv], log=str(log), status='failed', exitCode=None)
     with log.open('w', encoding='utf-8') as stream:
@@ -114,12 +122,12 @@ def execute(argv, *, cwd, env, log, timeout):
                 result['status'] = 'passed' if result['exitCode'] == 0 else 'failed'
             except subprocess.TimeoutExpired:
                 result['status'] = 'timeout'
-                stop_tree(process, stream)
+                stop_tree(process, stream, cooperative=cooperative_stop)
             except KeyboardInterrupt:
                 result['status'] = 'interrupted'
-                stop_tree(process, stream)
+                stop_tree(process, stream, cooperative=cooperative_stop)
             except BaseException:
-                stop_tree(process, stream)
+                stop_tree(process, stream, cooperative=cooperative_stop)
                 raise
         except (OSError, subprocess.TimeoutExpired) as error:
             result['error'] = str(error)
@@ -150,6 +158,7 @@ def main(argv=None):
     parser.add_argument('--live', action='store_true', help='Also run actual-gh remote update/restore/undo proofs in private fixtures')
     parser.add_argument('--aot', action='store_true', help='Publish both native hosts sequentially; requires an installed native toolchain')
     parser.add_argument('--diagnostic-tests', action='store_true', help='Log long-running tests and MTP diagnostics for a bounded failure investigation')
+    parser.add_argument('--inventory-performance', action='store_true', help='Also run offline inventory fixtures/PTY measurements on the built app; observations, not release acceptance')
     args = parser.parse_args(argv)
     if not re.fullmatch('[0-9a-fA-F]{40}', args.expect_commit):
         parser.error('--expect-commit requires a full commit SHA')
@@ -167,7 +176,8 @@ def main(argv=None):
     def run(name, command, timeout=1200, child_env=None):
         print(f'{name}: starting', flush=True)
         step = execute(command, cwd=ROOT, env=child_env or env,
-                       log=output / (name + '.log'), timeout=timeout)
+                       log=output / (name + '.log'), timeout=timeout,
+                       cooperative_stop=name == 'inventory-performance')
         step['name'] = name
         report['steps'].append(step)
         write_report(output, report)
@@ -253,6 +263,13 @@ def main(argv=None):
                 if proof != 'static-package-check':
                     command.extend(['--gh', gh])
                 run(name + '-' + proof, command)
+        if args.inventory_performance:
+            if 'app' in hosts:
+                run('inventory-performance', [sys.executable, str(ROOT / 'tools/measure_inventory.py'),
+                    '--app', str(hosts['app']), '--gh', gh, '--expect-head', report['commit'],
+                    '--output', str(output / 'inventory-performance')], timeout=900)
+            else:
+                not_run('inventory-performance', 'App restore/build failed')
         if args.live:
             token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
             if not token:
