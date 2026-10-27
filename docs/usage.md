@@ -957,3 +957,33 @@ the existing `update-inspect`, `restore-inspect`, `unpin-inspect`,
 `reimport-inspect` or `source-switch-inspect` command with the exact saved ID and
 any required global scan locations. The CLI `history` command continues to
 verify backup archives and keeps its existing output format.
+
+For one ordinary copy with missing or corrupt `SKILL.md`, Installed → More actions
+→ **Review registry-recorded replacement** can prepare a separate saved review.
+It requires one already-attached compatible gh registry record and complete fresh
+inventory; unsupported or ambiguous copies are refused. The registry does not
+record which folder it belongs to. This action selects that recorded source tree,
+with explicit placement uncertainty; it does not establish what was installed
+here. Surviving files must exactly corroborate the candidate's bytes and modes.
+An empty or single-file copy has no surviving content corroboration.
+
+Review the frozen source changes and affected consumers, then separately approve
+replacement with retention. The raw damaged original is retained for exact Undo.
+Linux hosts without complete native metadata visibility refuse this operation.
+Native apply and subsequent inventory verification are reported separately.
+
+The CLI family is `registry-restore-plan --path PATH`, followed by
+`registry-restore-inspect --id ID`, `registry-restore-ack-source --id ID --expect
+PLAN_FINGERPRINT --review SOURCE_REVIEW_FINGERPRINT --yes`, and
+`registry-restore-apply --id ID --expect PLAN_FINGERPRINT --yes --disposition
+retain-original`. Recovery and Undo use `registry-restore-recover` or
+`registry-restore-undo --id ID --expect CURRENT_INSPECTION_FINGERPRINT --yes`.
+Global scan flags precede the command. Keep the saved ID and both fingerprints;
+source review does not approve retention.
+
+A pinned record must resolve to its exact recorded tree. For an unpinned record,
+the historical ref is unknown and remains absent. SkillView subsequently reports
+update availability as unsupported and refuses ordinary update/version choice.
+Use the existing exact-copy remove and reinstall flows where admitted. Repair
+never runs a later gh update or invents a ref. Other unscanned copies and running
+sessions remain unknown.

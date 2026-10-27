@@ -583,6 +583,47 @@ jobs:
               --legacy-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
               --output "dist/local-reimport-privileged-$proof_name-proof" --platform linux/amd64
           done
+      - name: Prepare exact registry-restore gh compatibility target
+        if: matrix.shard == 'sources'
+        shell: bash
+        run: python tests/native/prepare-gh-proof-tool.py --version 2.103.2 --rid '${{ matrix.rid }}' --output '.ci-native/gh-registry-current'
+      - name: Prove bounded registry-recorded restore and raw damaged Undo on both hosts
+        if: matrix.shard == 'sources'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prove_registry() {
+            if [ '${{ matrix.rid }}' = linux-x64 ]; then
+              python tests/native/prove-registry-recorded-restore.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+            else
+              python tests/native/prove-registry-recorded-restore.py "$@"
+            fi
+          }
+          for host in app/skillview ext/gh-skillview; do
+            proof_name="${host%%/*}"
+            prove_registry --app "dist/$host${{ matrix.ext }}" \
+              --gh ".ci-native/gh-minimum/gh${{ matrix.ext }}" --gh ".ci-native/gh-registry-current/gh${{ matrix.ext }}" \
+              --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' \
+              --old-app "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT/dist/app/skillview${{ matrix.ext }}" \
+              --output "dist/registry-restore-$proof_name-proof.json"
+          done
+      - name: Prove privileged Linux registry restore and restart recovery
+        if: matrix.shard == 'sources' && matrix.rid == 'linux-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for host in app/skillview ext/gh-skillview; do
+            proof_name="${host%%/*}"
+            python tests/native/run-registry-recorded-restore-docker.py --app "dist/$host" \
+              --gh '.ci-native/gh-minimum/gh' --gh '.ci-native/gh-registry-current/gh' \
+              --proof-host tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof \
+              --old-app "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT/dist/app/skillview" \
+              --output "dist/registry-restore-privileged-$proof_name-proof"
+          done
       - name: Prove local source switching and actual schema5/6 recovery on both native hosts
         if: matrix.shard == 'sources'
         shell: bash

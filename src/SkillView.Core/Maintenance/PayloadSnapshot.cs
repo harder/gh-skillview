@@ -40,6 +40,13 @@ public sealed record PayloadSnapshot(string Path, string Fingerprint,
         Func<int, Func<NativePayloadItem, PayloadFileEvidence?>, CancellationToken, NativePayloadRoot> walk,
         CancellationToken token) => CaptureCore(path, token, null, sink, strictMetadata: true, walk: walk, captureLinkModes: true);
 
+    // Dedicated damaged-original evidence. Historical parsed captures and hash
+    // domains retain their existing behavior; this never parses or normalizes.
+    internal static PayloadSnapshot CaptureRawBoundWithEntrySink(string path,
+        Action<NativePayloadItem, PayloadEntry> sink,
+        Func<int, Func<NativePayloadItem, PayloadFileEvidence?>, CancellationToken, NativePayloadRoot> walk,
+        CancellationToken token) => CaptureCore(path, token, null, sink, strictMetadata: false, walk: walk, captureLinkModes: true);
+
     internal static PayloadSnapshot CaptureEvidence(string path, CancellationToken token) =>
         CaptureCore(path, token, null, strictMetadata: false);
 

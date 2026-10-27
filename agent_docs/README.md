@@ -47,3 +47,5 @@ published in this repository. Current refs and worktrees do not reproduce the
 historical inventory. Unique failure/proof receipts remain available locally.
 
 - [Inventory and tab performance](inventory-performance.md): measured flow, complexity, cache ownership, freshness boundaries, and reproduction.
+
+- [Registry-recorded restore](maintenance-registry-recorded-restore.md): bounded missing/corrupt original retention, independent source selection and exact Undo.

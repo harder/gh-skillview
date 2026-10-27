@@ -36,7 +36,7 @@ internal static class LocalReimportScreen
         $"### Operation outcome: {(plan.Canceled ? "Canceled" : plan.Succeeded ? "Succeeded" : "Failed/refused")}\n\n"
         + MarkdownTableFormatter.FormatCodeSpan(DisplayDiagnostic(plan.Message)) + "\n\n" + UpdateScreen.RenderPlan(plan);
 
-    private static string RenderPreparation(UpdateResult prepared, string selectedName, bool sourceSwitch)
+    private static string RenderPreparation(UpdateResult prepared, string selectedName, bool sourceSwitch, bool registryRestore = false)
     {
         var bounded = prepared with
         {
@@ -48,7 +48,7 @@ internal static class LocalReimportScreen
         };
         var message = prepared.SavedPlan is { } saved
             ? "\n\nSaved operation message: " + MarkdownTableFormatter.FormatCodeSpan(DisplayDiagnostic(saved.Message)) : "";
-        return TerminalEscapeSanitizer.Sanitize(UpdateScreen.RenderResult(bounded, selectedName, localReimport: !sourceSwitch, localSourceSwitch: sourceSwitch) + message) ?? "";
+        return TerminalEscapeSanitizer.Sanitize(UpdateScreen.RenderResult(bounded, selectedName, localReimport: !sourceSwitch && !registryRestore, localSourceSwitch: sourceSwitch, registryRestore: registryRestore) + message) ?? "";
     }
 
     internal static bool IsLocalReimport(ReplacementResult plan) => plan.LocalSourceSwitch is null && plan.LocalImport is not null && plan.LocalImport.Disposition == ReplacementPlanStore.LocalReimportDisposition
@@ -60,12 +60,12 @@ internal static class LocalReimportScreen
 
     internal static void Show(IApplication app, Logger logger, InstalledSkill selected,
         Func<LocalReimportRequest, CancellationToken, Task<LocalReimportResponse>> execute,
-        CancellationToken lifetimeToken = default, Action<Dialog>? readyForTests = null, Action<Action>? invokeForTests = null, bool sourceSwitch = false)
+        CancellationToken lifetimeToken = default, Action<Dialog>? readyForTests = null, Action<Action>? invokeForTests = null, bool sourceSwitch = false, bool registryRestore = false)
     {
         if (lifetimeToken.IsCancellationRequested) return;
-        var family = sourceSwitch ? "local source switch" : "local reimport";
-        bool CorrectFamily(ReplacementResult plan) => sourceSwitch ? IsLocalSourceSwitch(plan) : IsLocalReimport(plan);
-        using var dialog = new Dialog { Title = sourceSwitch ? " Local source switch " : " Local reimport ", Width = Dim.Percent(96), Height = Dim.Percent(94), SchemeName = SchemeNames.Dialog };
+        var family = registryRestore ? "registry-recorded restore" : sourceSwitch ? "local source switch" : "local reimport";
+        bool CorrectFamily(ReplacementResult plan) => registryRestore ? plan.RegistryRestore is not null && plan.Purpose == ReplacementPlanStore.RegistryRestorePurpose : sourceSwitch ? IsLocalSourceSwitch(plan) : IsLocalReimport(plan);
+        using var dialog = new Dialog { Title = registryRestore ? " Registry-recorded restore " : sourceSwitch ? " Local source switch " : " Local reimport ", Width = Dim.Percent(96), Height = Dim.Percent(94), SchemeName = SchemeNames.Dialog };
         var id = new TextField { X = 16, Y = 0, Width = Dim.Fill(), Text = "" };
         using var newSource = new TextField { X = 16, Y = 1, Width = Dim.Fill(), Text = "" };
         using var operation = new ModalOperationTracker(invokeForTests ?? app.Invoke, logger, "reimport.ui");
@@ -79,11 +79,11 @@ internal static class LocalReimportScreen
             Height = Dim.Fill(7),
             ReadOnly = true,
             WordWrap = true,
-            Text = sourceSwitch ? $"Selected installation: {TerminalEscapeSanitizer.Sanitize(selected.ResolvedPath)}\n\nChoose a different existing durable ordinary local source. Baseline-less replacement retains the exact installed original for every consumer. The old source is placement-only and may be missing; it is never a historical base. Git-managed sources remain unsupported.\n\nInspect a saved ID to recover or undo from frozen evidence after the first retain. No automatic merge or fork ancestry is claimed." : $"Selected installation: {TerminalEscapeSanitizer.Sanitize(selected.ResolvedPath)}\n\nPrepare replaces this installation from its same recorded local source. Review all changed paths and consumers; the exact original is retained. No recorded base or automatic merge exists.\n\nTo reopen retained history, enter a saved plan ID and Inspect. Inspection does not prepare another candidate. Source freshness gates the first retain; later recovery and undo use frozen evidence even if that source disappears."
+            Text = registryRestore ? $"Selected installation: {TerminalEscapeSanitizer.Sanitize(selected.ResolvedPath)}\n\n{TerminalEscapeSanitizer.Sanitize(ReplacementPlanStore.RegistryRestoreNotice(selected.Name, false))}\n\nPrepare saves one exact candidate. Inspect a saved ID to recover or Undo; source and retention approvals are independent." : sourceSwitch ? $"Selected installation: {TerminalEscapeSanitizer.Sanitize(selected.ResolvedPath)}\n\nChoose a different existing durable ordinary local source. Baseline-less replacement retains the exact installed original for every consumer. The old source is placement-only and may be missing; it is never a historical base. Git-managed sources remain unsupported.\n\nInspect a saved ID to recover or undo from frozen evidence after the first retain. No automatic merge or fork ancestry is claimed." : $"Selected installation: {TerminalEscapeSanitizer.Sanitize(selected.ResolvedPath)}\n\nPrepare replaces this installation from its same recorded local source. Review all changed paths and consumers; the exact original is retained. No recorded base or automatic merge exists.\n\nTo reopen retained history, enter a saved plan ID and Inspect. Inspection does not prepare another candidate. Source freshness gates the first retain; later recovery and undo use frozen evidence even if that source disappears."
         };
         var status = new Label { X = 0, Y = 3 + rowOffset, Width = Dim.Fill(), Text = $"Prepare, or inspect a saved {family} ID." };
         var sourceReview = new CheckBox { X = 0, Y = Pos.AnchorEnd(6), Width = Dim.Fill(), Text = "I reviewed frozen source changes/omissions; no authenticity or safety claim", Enabled = false };
-        var retain = new CheckBox { X = 0, Y = Pos.AnchorEnd(5), Width = Dim.Fill(), Text = "Replace from local source; retain exact original for every consumer", Enabled = false };
+        var retain = new CheckBox { X = 0, Y = Pos.AnchorEnd(5), Width = Dim.Fill(), Text = registryRestore ? "Replace from registry-recorded tree; retain raw damaged original for every consumer" : "Replace from local source; retain exact original for every consumer", Enabled = false };
         var prepare = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(4), Text = "_Prepare" };
         var inspect = new SingleRowButton { X = Pos.Right(prepare) + 2, Y = Pos.AnchorEnd(4), Text = "_Inspect saved ID" };
         var apply = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(3), Text = "_Apply reviewed", Enabled = false };
@@ -185,7 +185,7 @@ internal static class LocalReimportScreen
                             // Never reuse post-mutation observations without a new Inspect.
                             review = !canceled && !failed && (action is LocalReimportAction.Prepare or LocalReimportAction.Inspect) ? result : null;
                             inspected = action == LocalReimportAction.Inspect && review is not null;
-                            output.Text = response.Preparation is { } prepared ? RenderPreparation(prepared, selected.Name, sourceSwitch)
+                            output.Text = response.Preparation is { } prepared ? RenderPreparation(prepared, selected.Name, sourceSwitch, registryRestore)
                                 : result is not null ? RenderText(result) : "No saved evidence returned.";
                             status.Text = canceled ? "Canceled; inspect the retained saved ID before resuming."
                                 : failed ? "Failed/refused; inspect saved evidence before recovery or retry."
@@ -240,6 +240,11 @@ internal static class LocalReimportScreen
         }
         TuiHelpers.ConfigureTextInput(id, SchemeNames.Dialog);
         TuiHelpers.ConfigureReadOnlyPane(output, SchemeNames.Dialog);
+        // This review pane has no indentation workflow. Let the application's
+        // normal focus traversal handle Tab, including reverse/wrapped traversal
+        // and disabled controls, without changing either approval value.
+        output.KeyBindings.Remove(KeyCode.Tab);
+        output.KeyBindings.Remove(KeyCode.Tab | KeyCode.ShiftMask);
         TuiHelpers.ApplyScheme(SchemeNames.Dialog, dialog, id, hidden, status, output, sourceReview, retain, prepare, inspect, apply, recover, undo, close);
         readyForTests?.Invoke(dialog);
         app.Run(dialog);

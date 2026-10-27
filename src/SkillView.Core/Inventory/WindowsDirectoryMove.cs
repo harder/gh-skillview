@@ -8,7 +8,7 @@ namespace SkillView.Inventory;
 
 internal sealed partial class WindowsSecureRemovalBackend
 {
-    internal static NativeDirectoryMoveLease OpenDirectoryMove(string rootPath, string path, CancellationToken token)
+    internal static NativeDirectoryMoveLease OpenDirectoryMove(string rootPath, string path, CancellationToken token, bool registryDamaged = false)
     {
         token.ThrowIfCancellationRequested();
         var components = GetRelativeComponents(rootPath, path);
@@ -31,7 +31,7 @@ internal sealed partial class WindowsSecureRemovalBackend
                 || !PathIdentity.IsInside(parentPath, rootIdentity.CanonicalPath) && !PathIdentity.Equals(parentPath, rootIdentity.CanonicalPath))
                 throw new IOException("Relocation authority escapes its scan root or volume.");
             var lease = new WindowsDirectoryMove(root, parent, target, components[^1], rootIdentity,
-                ToSecureIdentity(parentBefore, parentPath), policy);
+                ToSecureIdentity(parentBefore, parentPath), policy, registryDamaged);
             lease.Revalidate(token);
             root = parent = target = null;
             return lease;
@@ -41,7 +41,7 @@ internal sealed partial class WindowsSecureRemovalBackend
 
     private sealed class WindowsDirectoryMove(SafeFileHandle root, SafeFileHandle? ownedParent, SafeFileHandle target,
         string originalName, SecureFileIdentity rootIdentity, SecureFileIdentity parentIdentity,
-        SecureDirectoryValidationSnapshot policy) : NativeDirectoryMoveLease
+        SecureDirectoryValidationSnapshot policy, bool registryDamaged) : NativeDirectoryMoveLease
     {
         private SafeFileHandle Parent => ownedParent ?? root;
         internal override SecureFileIdentity RootIdentity => rootIdentity;
@@ -59,6 +59,12 @@ internal sealed partial class WindowsSecureRemovalBackend
                 (depth, observe, ct) => WalkOpenedPayload(target, depth, observe, ct,
                     observeRoot is null ? null : item => observeRoot(item with { NativeParentHandle = Parent, NativeName = originalName })), token);
 
+        internal override PayloadSnapshot CaptureRawInto(Action<NativePayloadItem, PayloadEntry> sink,
+            Action<NativePayloadItem>? observeRoot, CancellationToken token) =>
+            PayloadSnapshot.CaptureRawBoundWithEntrySink(CurrentPath, sink,
+                (depth, observe, ct) => WalkOpenedPayload(target, depth, observe, ct,
+                    observeRoot is null ? null : item => observeRoot(item with { NativeParentHandle = Parent, NativeName = originalName })), token);
+
         internal override void Revalidate(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -72,7 +78,7 @@ internal sealed partial class WindowsSecureRemovalBackend
             if (!Matches(policy.Identity, ReadIdentity(named))) throw new IOException("Relocation selection changed.");
             var current = new WindowsSecureRemovalBackend().CaptureDirectoryValidation(target, CurrentPath, token);
             if (current != policy) throw new IOException("Relocation directory policy changed.");
-            if (!current.HasSkillFile || current.HasGitDirectory)
+            if ((!registryDamaged && !current.HasSkillFile) || current.HasGitDirectory)
                 throw new IOException("Relocation requires a skill directory without Git metadata.");
             if (ScanRootResolver.FindGitRoot(CurrentPath) is not null)
                 throw new IOException("Repository-managed directories require an owner-aware maintenance plan.");

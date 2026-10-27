@@ -36,7 +36,7 @@ try
         return 0;
     }
     var checkpoint = diskFullMode ? args[5]["disk-full:".Length..] : args[5];
-    if (args[4] is not ("apply" or "apply-merged" or "apply-unpin" or "apply-reimport" or "apply-source-switch" or "apply-reimport-reviewed" or "apply-source-switch-reviewed" or "recover-source-switch-reviewed" or "undo" or "undo-unpin" or "undo-reimport" or "undo-source-switch" or "repair" or "repair-unpin")
+    if (args[4] is not ("apply-registry-restore" or "undo-registry-restore" or "apply" or "apply-merged" or "apply-unpin" or "apply-reimport" or "apply-source-switch" or "apply-reimport-reviewed" or "apply-source-switch-reviewed" or "recover-source-switch-reviewed" or "undo" or "undo-unpin" or "undo-reimport" or "undo-source-switch" or "repair" or "repair-unpin")
         || checkpoint is not ("local-retain-intent" or "retain-moved" or "install-moved" or "displace-moved" or "restore-moved"
             or "registry-truncated" or "registry-chunk-written" or "registry-flushed" or "owner-written"
             or "owner-repair-intent" or "owner-repaired" or "compensation-truncated" or "workflow")
@@ -63,6 +63,8 @@ try
             "apply" => store.Apply(args[2], args[3], inventory, lifetime.Token),
             "apply-merged" => store.Apply(args[2], args[3], inventory, lifetime.Token, "merge-reviewed"),
             "apply-unpin" => store.Apply(args[2], args[3], inventory, lifetime.Token, "unpin-only", "unpin-only"),
+            "apply-registry-restore" => store.Apply(args[2], args[3], inventory, lifetime.Token, "retain-original", ReplacementPlanStore.RegistryRestorePurpose),
+            "undo-registry-restore" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, ReplacementPlanStore.RegistryRestorePurpose),
             "apply-reimport" => store.Apply(args[2], args[3], inventory, lifetime.Token, "replace-local-retain-original", "local-reimport"),
             "apply-source-switch" => store.Apply(args[2], args[3], inventory, lifetime.Token, "replace-local-source-retain-original", "switch-local-source"),
             "undo-unpin" => store.Recover(args[2], args[3], inventory, true, lifetime.Token, "unpin-only"),

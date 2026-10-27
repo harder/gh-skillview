@@ -470,6 +470,14 @@ internal sealed partial class SkillViewWorkflowCoordinator
             PackageCheckScreen.ShowRetained(app, fact, lifetimeToken);
     }
 
+    internal void ShowRegistryRestore(InstalledSkill selected, CancellationToken lifetimeToken)
+    {
+        if (_getApp() is not { } app) return;
+        LocalReimportScreen.Show(app, _services.Logger, selected,
+            (request, token) => RunLocalImportAsync(selected, request, false, token, registryRestore: true), lifetimeToken, registryRestore: true);
+        if (!lifetimeToken.IsCancellationRequested) _refreshActiveTab();
+    }
+
     internal void ShowLocalReimport(InstalledSkill selected, CancellationToken lifetimeToken)
     {
         if (_getApp() is not { } app) return;
@@ -493,38 +501,40 @@ internal sealed partial class SkillViewWorkflowCoordinator
         LocalReimportRequest request, CancellationToken token) => RunLocalImportAsync(selected, request, true, token);
 
     private async Task<LocalReimportResponse> RunLocalImportAsync(InstalledSkill selected,
-        LocalReimportRequest request, bool sourceSwitch, CancellationToken token)
+        LocalReimportRequest request, bool sourceSwitch, CancellationToken token, bool registryRestore = false)
     {
-        var purpose = sourceSwitch ? SkillView.Maintenance.ReplacementPlanStore.LocalSourceSwitchPurpose : SkillView.Maintenance.ReplacementPlanStore.LocalReimportPurpose;
-        var disposition = sourceSwitch ? SkillView.Maintenance.ReplacementPlanStore.LocalSourceSwitchDisposition : SkillView.Maintenance.ReplacementPlanStore.LocalReimportDisposition;
+        var purpose = registryRestore ? SkillView.Maintenance.ReplacementPlanStore.RegistryRestorePurpose : sourceSwitch ? SkillView.Maintenance.ReplacementPlanStore.LocalSourceSwitchPurpose : SkillView.Maintenance.ReplacementPlanStore.LocalReimportPurpose;
+        var disposition = registryRestore ? "retain-original" : sourceSwitch ? SkillView.Maintenance.ReplacementPlanStore.LocalSourceSwitchDisposition : SkillView.Maintenance.ReplacementPlanStore.LocalReimportDisposition;
         var ghPath = _getGhPath();
         var inventory = await CaptureUpdateInventoryAsync(ghPath, request.AllowHidden, token).ConfigureAwait(false);
         if (request.Action == LocalReimportAction.Prepare)
         {
-            if (ghPath is null) throw new IOException("Local reimport preparation requires GitHub CLI.");
+            if (ghPath is null) throw new IOException(registryRestore ? "Registry-recorded restore preparation requires GitHub CLI." : "Local reimport preparation requires GitHub CLI.");
             var target = inventory.Skills.SingleOrDefault(skill => skill.InstallationId == selected.InstallationId
                 && PathIdentity.Equals(skill.ResolvedPath, selected.ResolvedPath))
-                ?? throw new IOException("The selected physical installation changed; refresh before preparing local reimport.");
-            return new(Preparation: await Task.Run(() => sourceSwitch
+                ?? throw new IOException(registryRestore ? "The selected physical installation changed; refresh before preparing registry-recorded restore." : "The selected physical installation changed; refresh before preparing local reimport.");
+            return new(Preparation: await Task.Run(() => registryRestore
+                ? _services.SavedUpdates.PrepareRegistryRestoreAsync(ghPath, target, inventory, token)
+                : sourceSwitch
                 ? _services.SavedUpdates.PrepareLocalSourceSwitchAsync(ghPath, target, request.NewSourcePath ?? throw new ArgumentException("Choose the new source."), inventory, token)
                 : _services.SavedUpdates.PrepareLocalReimportAsync(ghPath, target, inventory, token), token).ConfigureAwait(false));
         }
         if (request.Action == LocalReimportAction.Inspect)
         {
             var inspected = await Task.Run(() => _services.SavedUpdatePlans.Inspect(request.Id!, inventory, token, purpose), token).ConfigureAwait(false);
-            RequireSelectedLocalReimport(selected, inspected, sourceSwitch);
+            RequireSelectedLocalReimport(selected, inspected, sourceSwitch, registryRestore);
             return new(Plan: inspected);
         }
-        var review = request.Review ?? throw new ArgumentException("Inspect the saved local reimport before continuing.");
-        RequireSelectedLocalReimport(selected, review, sourceSwitch);
-        if (request.Id != review.Id) throw new ArgumentException("The saved ID differs from the reviewed local reimport.");
+        var review = request.Review ?? throw new ArgumentException(registryRestore ? "Inspect the saved registry-recorded restore before continuing." : "Inspect the saved local reimport before continuing.");
+        RequireSelectedLocalReimport(selected, review, sourceSwitch, registryRestore);
+        if (request.Id != review.Id) throw new ArgumentException(registryRestore ? "The saved ID differs from the reviewed registry-recorded restore." : "The saved ID differs from the reviewed local reimport.");
         _services.ListAdapter.Invalidate();
         if (request.Action == LocalReimportAction.Apply)
             return new(Preparation: await Task.Run(() => _services.SavedUpdates.ApplyAsync(review,
                 disposition, inventory,
                 reconciliation => CaptureUpdateInventoryAsync(ghPath, request.AllowHidden, reconciliation), token), token).ConfigureAwait(false));
         if (request.Action is not (LocalReimportAction.Recover or LocalReimportAction.Undo))
-            throw new ArgumentException("Unsupported local reimport action.");
+            throw new ArgumentException(registryRestore ? "Unsupported registry-recorded restore action." : "Unsupported local reimport action.");
         if (request.Action == LocalReimportAction.Recover && review.AcknowledgeSourceReview && review.SourceReview is { } source)
             await Task.Run(() => _services.SavedUpdatePlans.AcknowledgeSourceReview(review.Id, review.PlanFingerprint,
                 source.Fingerprint, inventory, token, purpose), token).ConfigureAwait(false);
@@ -553,10 +563,10 @@ internal sealed partial class SkillViewWorkflowCoordinator
         return new(Plan: result, ReconciliationWarning: reconciliationWarning);
     }
 
-    private static void RequireSelectedLocalReimport(InstalledSkill selected, SkillView.Maintenance.ReplacementResult review, bool sourceSwitch = false)
+    private static void RequireSelectedLocalReimport(InstalledSkill selected, SkillView.Maintenance.ReplacementResult review, bool sourceSwitch = false, bool registryRestore = false)
     {
-        if (!(sourceSwitch ? LocalReimportScreen.IsLocalSourceSwitch(review) : LocalReimportScreen.IsLocalReimport(review)) || !PathIdentity.Equals(selected.ResolvedPath, review.OriginalPath))
-            throw new IOException("This saved local reimport belongs to another purpose or physical installation address.");
+        if (!(registryRestore ? review.RegistryRestore is not null && review.Purpose == SkillView.Maintenance.ReplacementPlanStore.RegistryRestorePurpose : sourceSwitch ? LocalReimportScreen.IsLocalSourceSwitch(review) : LocalReimportScreen.IsLocalReimport(review)) || !PathIdentity.Equals(selected.ResolvedPath, review.OriginalPath))
+            throw new IOException(registryRestore ? "This saved registry-recorded restore belongs to another purpose or physical installation address." : "This saved local reimport belongs to another purpose or physical installation address.");
     }
 
     public async Task OpenRemoveDialogAsync(

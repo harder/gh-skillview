@@ -234,3 +234,11 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   errors. Unsafe entries remain individual protected observations. Use native
   existing-only opens and existing locks for coherent History reads; contention,
   missing locks, access failures and unknown state remain unverified.
+
+- Only dedicated registry-recorded restore may open a missing-SKILL original via
+  `OpenRegistryDamaged`. Its caller binds the complete raw damaged original and
+  one already-attached compatible record; ordinary relocation still requires
+  SKILL.md. Preserve every held native directory/Git/identity/generation/rename
+  guard. Raw bound capture is separate from historical parsed capture. Require
+  supported full native metadata and revalidate archive-bound live metadata on
+  each transition; no capability refusal may become review-only approval.

@@ -296,3 +296,13 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   allocation quota check before creating any final operation. Quota refusals
   retain the literal `quota` and History guidance. CLI `replacement-history` lists
   hints; `history` keeps its existing backup verification semantics and wire format.
+
+- Dedicated `restore-registry-recorded` plans select a source from exactly one
+  already-attached compatible nonexclusive gh schema3 tree record for an ordinary
+  missing/corrupt copy. Preserve observed damaged Subject separately from desired
+  tracking; no name-based owner attachment or exclusive-placement claim. Its
+  absent-ref branch is purpose-keyed and requires ref absence plus exact record
+  agreement. Ordinary schema1–6 purposes/hashes/admission remain unchanged. Keep
+  independent source/retention approvals, raw damaged native retention, complete
+  supported metadata and exact Undo. See
+  [registry-recorded restore](maintenance-registry-recorded-restore.md).

@@ -5,7 +5,7 @@ namespace SkillView.Inventory;
 
 internal sealed partial class UnixSecureRemovalBackend
 {
-    internal static NativeDirectoryMoveLease OpenDirectoryMove(string rootPath, string path, CancellationToken token)
+    internal static NativeDirectoryMoveLease OpenDirectoryMove(string rootPath, string path, CancellationToken token, bool registryDamaged = false)
     {
         token.ThrowIfCancellationRequested();
         var components = GetRelativeComponents(rootPath, path);
@@ -28,7 +28,7 @@ internal sealed partial class UnixSecureRemovalBackend
                 || !PathIdentity.IsInside(parentPath, rootIdentity.CanonicalPath) && !PathIdentity.Equals(parentPath, rootIdentity.CanonicalPath))
                 throw new IOException("Relocation authority escapes its scan root.");
             var lease = new UnixDirectoryMove(root, parent, target, components[^1], rootIdentity,
-                ToSecureIdentity(parentBefore, parentPath), policy);
+                ToSecureIdentity(parentBefore, parentPath), policy, registryDamaged);
             lease.Revalidate(token);
             root = parent = target = null;
             return lease;
@@ -38,7 +38,7 @@ internal sealed partial class UnixSecureRemovalBackend
 
     private sealed class UnixDirectoryMove(SafeUnixHandle root, SafeUnixHandle? ownedParent, SafeUnixHandle target,
         string originalName, SecureFileIdentity rootIdentity, SecureFileIdentity parentIdentity,
-        SecureDirectoryValidationSnapshot policy) : NativeDirectoryMoveLease
+        SecureDirectoryValidationSnapshot policy, bool registryDamaged) : NativeDirectoryMoveLease
     {
         private SafeUnixHandle Parent => ownedParent ?? root;
         internal override System.Collections.Immutable.ImmutableArray<LinuxLinkMountObservation> CaptureLinuxLinkAuthorities(LinuxLinkProcAuthority authority, CancellationToken token)
@@ -69,6 +69,11 @@ internal sealed partial class UnixSecureRemovalBackend
             PayloadSnapshot.CaptureBoundWithEntrySink(CurrentPath, sink,
                 (depth, observe, ct) => WalkOpenedPayload(target, Parent, originalName, depth, observe, ct, observeRoot: observeRoot), token);
 
+        internal override PayloadSnapshot CaptureRawInto(Action<NativePayloadItem, PayloadEntry> sink,
+            Action<NativePayloadItem>? observeRoot, CancellationToken token) =>
+            PayloadSnapshot.CaptureRawBoundWithEntrySink(CurrentPath, sink,
+                (depth, observe, ct) => WalkOpenedPayload(target, Parent, originalName, depth, observe, ct, observeRoot: observeRoot), token);
+
         internal override PayloadSnapshot FlushPayload(CancellationToken token) =>
             PayloadSnapshot.CaptureEvidence(CurrentPath,
                 (depth, observe, ct) => WalkOpenedPayload(target, Parent, originalName, depth, observe, ct, flushToDisk: true), token);
@@ -87,7 +92,7 @@ internal sealed partial class UnixSecureRemovalBackend
                 || !Matches(policy.Identity, named)) throw new IOException("Relocation selection changed.");
             var current = new UnixSecureRemovalBackend().CaptureDirectoryValidation(target, CurrentPath, buffer);
             if (current != policy) throw new IOException("Relocation directory policy changed.");
-            if (!current.HasSkillFile || current.HasGitDirectory)
+            if ((!registryDamaged && !current.HasSkillFile) || current.HasGitDirectory)
                 throw new IOException("Relocation requires a skill directory without Git metadata.");
             if (ScanRootResolver.FindGitRoot(CurrentPath) is not null)
                 throw new IOException("Repository-managed directories require an owner-aware maintenance plan.");
