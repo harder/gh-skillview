@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
 using SkillView.Gh;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
@@ -6,6 +7,7 @@ using SkillView.Logging;
 using SkillView.Subprocess;
 using SkillView.Ui;
 using Terminal.Gui.App;
+using Terminal.Gui.Editor;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -557,25 +559,71 @@ public sealed class CompactInstallDialogTests
         Assert.Null(result.Handoff);
     }
 
-    [Fact]
-    public async Task FailedInstallHasNoCompletedAction()
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 36)]
+    public async Task FailedInstallHasReadableDetailsAndNoCompletedAction(int width, int height)
     {
         using var fixture = new Fixture(false);
         var checkedFailure = false;
-        var result = await RunModal(fixture, 80, 24, false, (app, dialog) =>
+        var checkedDetails = false;
+        var returned = false;
+        ExceptionDispatchInfo? failure = null;
+        var result = await RunModal(fixture, width, height, false, (app, dialog) =>
         {
             app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
-            app.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
+            void CheckIteration(object? sender, EventArgs args)
             {
-                if (!dialog.SubViews.OfType<Label>().Any(label => label.Text.Contains("install failed", StringComparison.Ordinal))) return true;
+                try { Check(); }
+                catch (Exception exception) { failure = ExceptionDispatchInfo.Capture(exception); app.RequestStop(); }
+            }
+            void Check()
+            {
+                if (failure is not null) { app.RequestStop(); app.Iteration -= CheckIteration; return; }
+                if (app.TopRunnableView is Dialog detail && detail != dialog)
+                {
+                    if (checkedDetails) return;
+                    checkedDetails = true;
+                    Assert.Equal(" Install failure details ", detail.Title);
+                    var output = detail.SubViews.OfType<Editor>().Single();
+                    Assert.True(output.ReadOnly);
+                    Assert.True(output.WordWrap);
+                    Assert.Equal(0, output.CaretOffset);
+                    Assert.Contains("Install failed", output.Text);
+                    Assert.All(detail.SubViews, control => AssertFits(control, detail));
+                    app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                    return;
+                }
+                if (checkedDetails)
+                {
+                    returned = true;
+                    Assert.True(dialog.SubViews.OfType<Button>().Single(button => button.Text == "Details").HasFocus);
+                    dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel").InvokeCommand(Command.Accept);
+                    app.Iteration -= CheckIteration; return;
+                }
+                if (checkedFailure) return;
+                var details = dialog.SubViews.OfType<Button>().Single(button => button.Text == "Details");
+                if (!details.Visible || dialog.NeedsLayout) return;
                 checkedFailure = true;
                 Assert.DoesNotContain(dialog.SubViews.OfType<Button>(), button => button.Text == "View installed skill");
                 Assert.DoesNotContain("Install completed", dialog.Title);
-                dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel").InvokeCommand(Command.Accept);
-                return false;
-            });
+                var buttons = dialog.SubViews.OfType<Button>().Where(button => button.Visible).ToArray();
+                Assert.Equal(["Install", "Advanced…", "Details", "Cancel"], buttons.Select(button => button.Text));
+                Assert.All(buttons, button => AssertFits(button, dialog));
+                for (var i = 1; i < buttons.Length; i++) Assert.True(buttons[i - 1].Frame.Right < buttons[i].Frame.Left);
+                var status = dialog.SubViews.OfType<Label>().Single(label => label.Text.Contains("install failed", StringComparison.Ordinal));
+                Assert.Contains("Details for full error", status.Text);
+                Assert.True(status.Text.Length <= status.Frame.Width);
+                details.SetFocus();
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+                return;
+            }
+            app.Iteration += CheckIteration;
         }, ghPath: "/bin/false");
+        failure?.Throw();
         Assert.True(checkedFailure);
+        Assert.True(checkedDetails);
+        Assert.True(returned);
         Assert.False(result.Install!.Succeeded);
         Assert.Null(result.Handoff);
     }

@@ -483,7 +483,7 @@ public sealed partial class SkillViewApp
 
     /// Discover the skills in the selected result's repo and open the picker
     /// so the user installs a chosen subset (gh ≥ 2.95 non-interactive
-    /// listing, cli/cli#13548). Falls back to install-all if discovery fails.
+    /// listing, cli/cli#13548). Failed listing offers Retry or Cancel.
     private void StageInstallAll()
     {
         if (_discoverTab?.IsLoading == true) return;
@@ -504,10 +504,14 @@ public sealed partial class SkillViewApp
             SetDiscoverStatus("no repo on selected row");
             return;
         }
+        if (!TryCaptureActiveLifetimeToken(_discoverLifetime, out var lifetimeToken)) return;
+        var generation = Interlocked.Read(ref _discoverGeneration);
         _workflows.OpenRepoDiscoveryDialog(
             new InstallRequest(
                 Repo: pick.Repo,
                 SkillName: null,
-                AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)));
+                AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)),
+            () => IsDiscoverWorkspaceActive(generation) && !GetRunLifetimeToken().IsCancellationRequested,
+            lifetimeToken);
     }
 }
