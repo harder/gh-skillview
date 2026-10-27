@@ -11,7 +11,7 @@ using Xunit;
 
 namespace SkillView.IntegrationTests.Ui;
 
-public sealed class SkillViewAppIntegrationTests
+public sealed partial class SkillViewAppIntegrationTests
 {
     [Theory]
     [InlineData(80, 24)]
@@ -171,12 +171,11 @@ public sealed class SkillViewAppIntegrationTests
         IApplication? created = null;
         IApplication? disposed = null;
 
-        void HandleDisposed(object? _, EventArgs<IApplication> e)
+        // Terminal.Gui 2.5's facade event is thread-local. Shutdown can resume
+        // off the creation thread after draining app-owned work.
+        void HandleDisposed(object? sender, EventArgs<bool> e)
         {
-            if (ReferenceEquals(e.Value, created))
-            {
-                disposed = e.Value;
-            }
+            if (!e.Value && ReferenceEquals(sender, created)) disposed = (IApplication)sender!;
         }
 
         var services = TuiServices.Build(new Logger(LogLevel.Debug));
@@ -199,6 +198,7 @@ public sealed class SkillViewAppIntegrationTests
                 var application = Application.Create();
                 application.Init("ansi");
                 created = application;
+                application.InitializedChanged += HandleDisposed;
                 application.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
                 {
                     cancellationCallbackRan = true;
@@ -209,7 +209,6 @@ public sealed class SkillViewAppIntegrationTests
             },
             probeOnRun: false);
 
-        Application.InstanceDisposed += HandleDisposed;
         try
         {
             var exitCode = await app
@@ -221,10 +220,13 @@ public sealed class SkillViewAppIntegrationTests
             Assert.Equal(ExitCodes.Cancelled, exitCode);
             Assert.NotNull(created);
             Assert.Same(created, disposed);
+            Assert.False(created.Initialized);
+            Assert.Null(created.Driver);
+            Assert.Null(created.MainThreadId);
         }
         finally
         {
-            Application.InstanceDisposed -= HandleDisposed;
+            if (created is not null) created.InitializedChanged -= HandleDisposed;
         }
     }
 
