@@ -968,10 +968,13 @@ listing cap are reported as omissions, with unknown states. Lock/access failures
 are reported as unavailable rather than an empty history.
 
 History is read-only: it cannot resume, undo, retire or delete operations. At the
-16-operation limit, new reviews stop before staging or source resolution. This
-version cannot free that capacity. Preserve the retained evidence; there is no
-supported manual filesystem cleanup procedure. Existing specialist inspection,
-recovery and Undo commands retain their separate reviews and approvals.
+16-operation quota, new reviews stop before staging or source resolution, except
+same-source local reimport: it still needs a bounded private capture and gh
+preview to verify that nothing changed. A verified unchanged result needs no
+retained operation; a changed result refuses allocation with quota/History
+guidance. This version cannot free that capacity. Preserve the retained evidence;
+there is no supported manual filesystem cleanup procedure. Existing specialist
+inspection, recovery and Undo commands retain their separate reviews and approvals.
 
 For an offline bounded listing:
 
