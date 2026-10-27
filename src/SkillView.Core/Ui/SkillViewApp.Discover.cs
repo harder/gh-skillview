@@ -38,6 +38,18 @@ public sealed partial class SkillViewApp
         return row >= 0 && row < _results.Count ? _results[row] : null;
     }
 
+    private sealed record SubmittedSearch(string Query, string? Owner, int Limit, string? Agent, bool Hidden);
+    private SubmittedSearch? _submittedSearch;
+    private int _searchPage = 1;
+
+    private void ChangeSearchPage(int direction)
+    {
+        if (_submittedSearch is not { } submitted || _discoverTab?.IsLoading == true) return;
+        var page = (int)Math.Clamp((long)_searchPage + direction, 1, int.MaxValue);
+        RunOwnedTask(() => RunSearchAsync(submitted.Query, submitted.Owner, submitted.Limit,
+            submitted.Agent, submitted.Hidden, page: page), "search.page");
+    }
+
     private void SubmitSearch()
     {
         var query = _queryField?.Text.Trim() ?? string.Empty;
@@ -63,7 +75,8 @@ public sealed partial class SkillViewApp
         int? limit = null,
         string? agent = null,
         bool allowHiddenDirs = false,
-        Func<CancellationToken, Task<SearchResponse>>? search = null)
+        Func<CancellationToken, Task<SearchResponse>>? search = null,
+        int page = 1)
     {
         if (_ghPath is null)
         {
@@ -81,6 +94,7 @@ public sealed partial class SkillViewApp
         var generation = System.Threading.Interlocked.Increment(ref _searchGeneration);
         var busyOperation = BeginBusyOperation($"searching {query}…", discoverOwned: true);
         var cancellationToken = request.Token;
+        string submittedContext() => $"Submitted: {InstallFailureDetails.Literal(query)} · page {page}\nOwner: {InstallFailureDetails.Literal(owner ?? "any")} · agent: {InstallFailureDetails.Literal(agent ?? "any")} · cap: {limit ?? GhSkillSearchService.DefaultLimit}";
         try
         {
             await InvokeAsync(() =>
@@ -88,15 +102,21 @@ public sealed partial class SkillViewApp
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
                 // A submitted search replaces the previous answer immediately.
                 // Failure or navigation must never reveal the old install targets.
+                _submittedSearch = new(query, owner, limit ?? GhSkillSearchService.DefaultLimit, agent, allowHiddenDirs);
+                _searchPage = page;
+                if (_discoverTab is not null)
+                    _discoverTab.SubmittedSummary.Text = "Using: " + InstallFailureDetails.Literal(query, 256).Replace('\n', ' ').Replace('\t', ' ');
+                _discoverTab?.SetPage(page, "loading", false, loading: true);
                 ReplaceSearchResults([]);
-                SetSearchFeedback("Searching skills…");
+                SetSearchFeedback($"Searching {InstallFailureDetails.Literal(query)} · page {page}…");
                 _discoverTab?.SetLoading(true);
             }, discoverToken).ConfigureAwait(false);
             var options = new GhSkillSearchService.Options(
                 Owner: owner,
-                Limit: limit ?? GhSkillSearchService.DefaultLimit);
+                Limit: limit ?? GhSkillSearchService.DefaultLimit, Page: page);
             var response = await (search is null
-                ? _services.SearchService.SearchAsync(_ghPath, query, options, cancellationToken)
+                ? (_searchForTests is null ? _services.SearchService.SearchAsync(_ghPath, query, options, cancellationToken)
+                    : _searchForTests(query, options, cancellationToken))
                 : search(cancellationToken)).ConfigureAwait(false);
             if (!response.Succeeded)
                 throw new IOException(response.ErrorMessage ?? $"gh search exited {response.ExitCode}");
@@ -118,6 +138,7 @@ public sealed partial class SkillViewApp
                     return;
                 }
                 _discoverTab?.SetLoading(false);
+                _discoverTab?.SetPage(page, results.Count == 0 ? "empty" : "", results.Count > 0);
                 ReplaceSearchResults(filteredResults);
                 _resultsTable?.SetFocus();
                 _services.Logger.Info("search", $"results loaded: count={_results.Count} rawCount={results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
@@ -141,7 +162,8 @@ public sealed partial class SkillViewApp
                 {
                     if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
                     {
-                        SetSearchFeedback("Search timed out.\n\nNo results to show. Try the search again or change the query.");
+                        _discoverTab?.SetPage(page, "canceled", true);
+                        SetSearchFeedback($"Search canceled or timed out.\n\n{submittedContext()}\n\nNo results to show. Previous returns to an earlier page; submit to retry.");
                         SetDiscoverStatus("search timed out", TuiHelpers.NotificationLevel.Error);
                     }
                 }, discoverToken).ConfigureAwait(false);
@@ -154,7 +176,8 @@ public sealed partial class SkillViewApp
             await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
-                SetSearchFeedback($"Search failed.\n\nNo results to show. Try the search again or change the query.\n\n{snippet}");
+                _discoverTab?.SetPage(page, "failed", true);
+                SetSearchFeedback($"Search failed.\n\n{submittedContext()}\n\nNo results to show. Previous returns to an earlier page; submit to retry.\n\n{snippet}");
                 SetDiscoverStatus(snippet.Length > 0
                     ? $"search failed: {snippet}"
                     : "search failed — see logs (l)",
@@ -256,7 +279,7 @@ public sealed partial class SkillViewApp
         var repoMin = Math.Clamp(longestRepo, 14, 32);
         var widths = TuiHelpers.DistributeWidths(available, new (int, double)[]
         {
-            (5,       0.0), // ★
+            (9,       0.0), // observed install + ★
             (nameMin, 1.0), // Name
             (repoMin, 1.0), // Repo
         });
@@ -264,7 +287,7 @@ public sealed partial class SkillViewApp
 
         // Suffix the active sort column with a direction glyph so the user
         // can see at a glance what `S` last did. Inactive columns stay clean.
-        var starsHeader = _searchSort == SearchSort.StarsDesc ? "★ ↓" : "★";
+        var starsHeader = _searchSort == SearchSort.StarsDesc ? "Seen ★ ↓" : "Seen ★";
         var nameHeader = _searchSort switch
         {
             SearchSort.NameAsc => "Name ↑",
@@ -276,7 +299,7 @@ public sealed partial class SkillViewApp
             _results,
             new Dictionary<string, Func<SearchResultSkill, object>>
             {
-                [starsHeader] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                [starsHeader] = s => (_workflows.DiscoverObservation?.IsObserved(s) == true ? "✓ " : "? ") + (s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
                 [nameHeader] = s => TuiHelpers.Truncate(s.SkillName, nameW),
                 [repoHeader] = s => TuiHelpers.Truncate(s.Repo, repoW),
             });
@@ -310,7 +333,7 @@ public sealed partial class SkillViewApp
         if (_discoverTab is null) return;
         var selected = GetSelectedResult();
         var text = selected is not null
-            ? RenderSearchMetadata(selected, _lastReport?.Auth)
+            ? RenderSearchMetadata(selected, _lastReport?.Auth) + "\n\n" + (_workflows.DiscoverObservation?.Describe(selected) ?? "Installed: unknown; no current inventory observation.")
             : null;
         _discoverTab.DetailPane.SetMetadataContent(text);
     }
@@ -512,6 +535,6 @@ public sealed partial class SkillViewApp
                 SkillName: null,
                 AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)),
             () => IsDiscoverWorkspaceActive(generation) && !GetRunLifetimeToken().IsCancellationRequested,
-            lifetimeToken);
+            lifetimeToken, revealInstalled: RevealInstalledInstall);
     }
 }

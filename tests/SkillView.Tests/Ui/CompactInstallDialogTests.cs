@@ -20,6 +20,33 @@ namespace SkillView.Tests.Ui;
 public sealed class CompactInstallDialogTests
 {
     [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 36)]
+    public async Task MoreAgentsHasRealTabAndEnterRouteWithoutChangingSelection(int width, int height)
+    {
+        using var fixture = new Fixture(false);
+        var found = false;
+        await RunModal(fixture, width, height, false, (app, dialog) =>
+        {
+            var grid = dialog.SubViews.Single(view => view.SubViews.OfType<CheckBox>().Count() == InstallAgentCatalog.Entries.Length);
+            var more = grid.SubViews.OfType<Button>().Single();
+            var before = grid.SubViews.OfType<CheckBox>().Select(box => box.Value).ToArray();
+            for (var count = 0; count < 40 && !more.HasFocus; count++)
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Tab));
+            Assert.True(more.HasFocus, "Tab could not reach More agents");
+            app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+            Assert.Equal("Fewer agents", more.Text);
+            Assert.True(dialog.IsRunning);
+            Assert.Equal(before, grid.SubViews.OfType<CheckBox>().Select(box => box.Value).ToArray());
+            app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+            Assert.Equal("More agents", more.Text);
+            found = true;
+            app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+        });
+        Assert.True(found);
+    }
+
+    [Theory]
     [InlineData(80, 24, false, -1, false)]
     [InlineData(120, 36, false, -1, false)]
     [InlineData(80, 24, true, -1, false)]
@@ -48,7 +75,7 @@ public sealed class CompactInstallDialogTests
             for (var i = 1; i < buttons.Length; i++)
                 Assert.True(buttons[i - 1].Frame.Right < buttons[i].Frame.Left);
             Assert.All(buttons, b => Assert.Equal(1, b.Frame.Height));
-            Assert.Equal(all ? 2 : 3, buttons.Length);
+            Assert.Equal(all ? 3 : 4, buttons.Length);
 
             // Exercise real traversal, then return to the primary action.
             app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Tab));
@@ -112,7 +139,7 @@ public sealed class CompactInstallDialogTests
         });
         Assert.Equal(action == "Advanced…" ? InstallConfirmModal.Outcome.EscalateToAdvanced : InstallConfirmModal.Outcome.Cancelled, result.Outcome);
         Assert.Null(result.Install);
-        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal) && entry.Message.Contains(" demo", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -186,18 +213,26 @@ public sealed class CompactInstallDialogTests
             app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
             app.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
             {
-                if (!fixture.Logger.Snapshot().Any(entry => entry.Message.Contains(stall, StringComparison.Ordinal))) return true;
+                if (!fixture.Logger.Snapshot().Any(entry => entry.Message.Contains(stall, StringComparison.Ordinal) && entry.Message.Contains(" demo", StringComparison.Ordinal))) return true;
                 var buttons = dialog.SubViews.OfType<Button>().ToArray();
                 Assert.All(buttons, button => Assert.False(button.Enabled));
                 buttons.Single(button => button.Text == "Advanced…").InvokeCommand(Command.Accept);
                 Assert.True(dialog.IsRunning);
                 buttons.Single(button => button.Text == "Install").InvokeCommand(Command.Accept);
-                Assert.Single(fixture.Logger.Snapshot(), entry => entry.Message.Contains(stall, StringComparison.Ordinal));
+                Assert.Single(fixture.Logger.Snapshot(), entry => entry.Message.Contains(stall, StringComparison.Ordinal) && entry.Message.Contains(" demo", StringComparison.Ordinal));
                 dialog.SubViews.OfType<TextField>().Single(field => field.ReadOnly).SetFocus();
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
                 Assert.True(dialog.IsRunning);
                 checkedActive = true;
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
+                app.AddTimeout(TimeSpan.FromMilliseconds(20), () =>
+                {
+                    var details = dialog.SubViews.OfType<Button>().Single(button => button.Text == "Details");
+                    if (!details.Visible || !details.Enabled) return true;
+                    Assert.Contains(dialog.SubViews.OfType<Label>(), label => label.Text.Contains("may have changed files", StringComparison.Ordinal));
+                    dialog.SubViews.OfType<Button>().Single(button => button.Text == "Cancel").InvokeCommand(Command.Accept);
+                    return false;
+                });
                 return false;
             });
         }, stall);
@@ -226,7 +261,7 @@ public sealed class CompactInstallDialogTests
                 Assert.False(install.Enabled);
                 install.InvokeCommand(Command.Accept);
                 Assert.True(dialog.IsRunning);
-                Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal));
+                Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal) && entry.Message.Contains(" demo", StringComparison.Ordinal));
                 checkedPending = true;
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Esc));
                 return false;
@@ -299,7 +334,7 @@ public sealed class CompactInstallDialogTests
         });
         Assert.Equal(InstallConfirmModal.Outcome.Cancelled, result.Outcome);
         Assert.Null(result.Install);
-        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal) && entry.Message.Contains(" demo", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -355,7 +390,7 @@ public sealed class CompactInstallDialogTests
         });
         Assert.Equal(InstallConfirmModal.Outcome.Cancelled, result.Outcome);
         Assert.Null(result.Install);
-        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal) && entry.Message.Contains(" demo", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -444,7 +479,7 @@ public sealed class CompactInstallDialogTests
         Assert.Null(result.Install);
         Assert.Equal(rawHome, fixture.Runner.GetEffectiveEnvironmentVariable("HOME"));
         Assert.Equal(workingDirectory, fixture.Runner.EffectiveWorkingDirectory);
-        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.StartsWith("exec:", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains(" demo", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -465,7 +500,7 @@ public sealed class CompactInstallDialogTests
         Assert.Equal("interaction assertion sentinel", error.Message);
         Assert.Contains(nameof(FailInteraction), error.StackTrace);
         Assert.False(observedApp!.Initialized);
-        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal));
+        Assert.DoesNotContain(fixture.Logger.Snapshot(), entry => entry.Message.Contains("/bin/echo", StringComparison.Ordinal) && entry.Message.Contains(" demo", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -613,7 +648,9 @@ public sealed class CompactInstallDialogTests
                 for (var i = 1; i < buttons.Length; i++) Assert.True(buttons[i - 1].Frame.Right < buttons[i].Frame.Left);
                 var status = dialog.SubViews.OfType<Label>().Single(label => label.Text.Contains("install failed", StringComparison.Ordinal));
                 Assert.Contains("Details for full error", status.Text);
-                Assert.True(status.Text.Length <= status.Frame.Width);
+                Assert.Equal(3, status.Frame.Height);
+                Assert.True(status.Text.Length <= status.Frame.Width * status.Frame.Height);
+                AssertFits(status, dialog);
                 details.SetFocus();
                 app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
                 return;

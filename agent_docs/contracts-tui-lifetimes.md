@@ -394,3 +394,64 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   refresh, leaving and shutdown cancel stale requests and clear old inspections.
   Refresh retains the selected operation ID when it is still present. History
   work remains owned by the app task tracker after a canceled modal closes.
+
+- Install dialogs record attempt receipts before cancelable UI delivery. Their
+  ModalOperationTracker owns and drains the execution/reconciliation worker
+  task, including forced modal close/shutdown; evaluate returned result fields
+  only after that worker settles. Child exit and both pipe drains remain bounded.
+  If termination is refused/unconfirmed, preserve positive start and cancellation
+  or transport failure with ChildDrained=false; invalidate facts without inventory
+  capture, return WriterUnverified/manual-refresh-after-stop guidance, and do not
+  start a reaper or wait indefinitely during teardown. For verified child exit,
+  reconciliation uses its own bounded deadline, never the canceled review token,
+  and does not await UI dispatch. Publish one uncached inventory snapshot per
+  submitted possible-write batch with context and catalog generation guards. Pure preflight refusal or opening
+  and canceling a review must not invalidate/capture inventory. Generation
+  invalidation also retires display, Issues, package and availability facts.
+- Show immediate possible-file-change guidance while Installed refreshes, then
+  distinguish complete, partial, failed and unverified-writer outcomes with
+  literal bounded Details. Child failure/cancellation is not atomic rollback.
+  Retain completed/failed/not-attempted subset selectors and never present a
+  mixed batch as all installed. Compact success handoff reuses the reconciled
+  snapshot with its original context/generation and exact-source checks; it
+  cannot recapture or name-match its way around unavailable evidence. Failure
+  does not navigate or resubmit Discover. Explicit Refresh remains a user action;
+  do not call it to publish reconciliation because it invalidates again and
+  repeats the active search.
+
+- Install placement preview owns one background worker and one replaceable pending
+  request. Edits cancel the current request; 15-second deadlines and modal disposal
+  bound/drain the work. Queued UI callbacks recheck revision, lifetime and captured
+  context. Placement/conflict details are literal, scrollable, bounded guidance;
+  no placement I/O, hashing or classification belongs in drawing. Keep conflict
+  diagnostics ahead of potentially long destination lists.
+- Install agent selectors keep detected config/root observations first, expose the
+  full catalog through visible More agents, and keep checked agents in the collapsed
+  set. Expanding/collapsing never changes selections or Universal fallback. The
+  scrollable parent must be focusable so Tab can reach More and the boxes. Detection
+  runs during owned preparation under captured child HOME/overrides, never in draw
+  and never by launching clients. Advanced's scrollable form keeps fixed result,
+  placement-review and cancel actions visible at 80x24.
+- Advanced unchanged named Discover sources may use the same strict G1 verifier as
+  compact installs. Picker or uncertain placement returns browse only observed
+  repository sources from the G2 reconciled snapshot, with no initial group/copy
+  selected. A receipt without a current snapshot cannot navigate. Failure, partial
+  attempts and canceled owners never navigate automatically or resubmit. Returning
+  preserves Discover rows, query text, submitted filters/page, selection and scroll.
+- Discover installed markers are a frozen projection of captured display inventory,
+  keyed by normalized repository plus actual source subpath. They retain unknown
+  source/coverage states and retire immediately at catalog invalidation. They grant
+  no mutation admission, skip no preflight and trigger no extra row-level I/O.
+
+- Installed repository browse is an explicit persistent display filter. Its
+  Repository indicator derives from the active restriction and survives seeded
+  loads, reloads, explicit refresh, selections and transient status changes,
+  including a filtered-empty inventory. Clear removes the restriction and indicator
+  with the ordinary filters. A valid exact G1 handoff clears a prior repository
+  restriction before revealing its verified subject; rejected handoffs leave it
+  intact. No inventory or mutation authority comes from this indicator.
+- Advanced navigation may reuse Discover's source-path anchor only when both the
+  skill and requested version match their initial observed values. A changed
+  version gets the existing safe notice, with no new source resolution; changing
+  back only restores anchor eligibility under the existing current context,
+  generation and exact G1 verification checks.

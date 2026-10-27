@@ -28,6 +28,8 @@ public sealed partial class SkillUpdateCoordinator(
         if (options.Targets is not { Count: > 0 } targets || targets.Count > MaxTargets)
             return UpdateResult.Failure(options.DryRun, 2,
                 $"Select 1–{MaxTargets} exact physical installations before updating.", []);
+        var stagingOutputRemaining = InstallAttemptSummary.MaxBatchOutputCharacters;
+        var stagingInstallAttempts = ImmutableArray.CreateBuilder<InstallResult>();
         var outcomes = ImmutableArray.CreateBuilder<InstallationUpdateOutcome>();
         var entries = ImmutableArray.CreateBuilder<UpdateEntry>();
         var notices = ImmutableArray.CreateBuilder<UpdateNotice>();
@@ -50,6 +52,7 @@ public sealed partial class SkillUpdateCoordinator(
             string status = "refused";
             string? staging = null;
             OwnedDirectoryLease? stagingOwner = null;
+            var stagingWriterUnverified = false;
             var targetAttempted = false;
             var mutationAdmissionUncertain = false;
             IReadOnlyDictionary<string, string>? mutationEnvironment = null;
@@ -142,6 +145,13 @@ public sealed partial class SkillUpdateCoordinator(
                             new GhSkillInstallService.Options(Path: refDestination, Version: recordedRef, Pin: true,
                                 ProcessEnvironment: stageEnvironment),
                             cancellationToken).ConfigureAwait(false);
+                        stagingInstallAttempts.Add(InstallAttemptSummary.Retain(staged, ref stagingOutputRemaining));
+                        stagingWriterUnverified |= staged.MayHaveChangedFiles && !staged.ChildDrained;
+                        if (staged.Canceled)
+                        {
+                            AppendBounded(stdout, staged.StdOut); AppendBounded(stderr, staged.StdErr);
+                            throw new OperationCanceledException(cancellationToken);
+                        }
                         if (!staged.Succeeded) throw new GhSourceRequestException($"Cannot stage recorded base: {staged.ErrorMessage}", staged.StdOut, staged.StdErr);
                         var stagedPaths = Directory.EnumerateDirectories(refDestination).Take(2).ToArray();
                         if (stagedPaths.Length != 1) throw new IOException("Recorded source did not materialize one exact skill.");
@@ -161,6 +171,13 @@ public sealed partial class SkillUpdateCoordinator(
                                 new GhSkillInstallService.Options(Path: materialized, FromLocal: true, All: true,
                                     ProcessEnvironment: stageEnvironment),
                                 cancellationToken).ConfigureAwait(false);
+                            stagingInstallAttempts.Add(InstallAttemptSummary.Retain(import, ref stagingOutputRemaining));
+                            stagingWriterUnverified |= import.MayHaveChangedFiles && !import.ChildDrained;
+                            if (import.Canceled)
+                            {
+                                AppendBounded(stdout, import.StdOut); AppendBounded(stderr, import.StdErr);
+                                throw new OperationCanceledException(cancellationToken);
+                            }
                             if (!import.Succeeded) throw new GhSourceRequestException($"Cannot materialize recorded tree: {import.ErrorMessage}", import.StdOut, import.StdErr);
                             var basePaths = Directory.EnumerateDirectories(materialized).Take(2).ToArray();
                             if (basePaths.Length != 1) throw new IOException("Recorded tree did not materialize one exact skill.");
@@ -236,7 +253,12 @@ public sealed partial class SkillUpdateCoordinator(
                 }
                 if (staging is not null && stagingOwner is not null)
                 {
-                    try { RemoveOwnedStaging(staging, stagingOwner); }
+                    try
+                    {
+                        if (stagingWriterUnverified)
+                            message = $"{message} Private staging child exit is unverified; retained {staging}. Inspect it after the child stops; cleanup was not attempted.".Trim();
+                        else RemoveOwnedStaging(staging, stagingOwner);
+                    }
                     finally { stagingOwner.Dispose(); }
                 }
             }
@@ -264,6 +286,7 @@ public sealed partial class SkillUpdateCoordinator(
             Notices = notices.ToImmutable(),
             Outcomes = outcomes.ToImmutable(),
             Cancelled = canceled,
+            StagingInstallAttempts = stagingInstallAttempts.ToImmutable(),
             MutationAttempted = attempted
         };
     }

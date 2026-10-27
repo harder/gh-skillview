@@ -49,6 +49,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Button _checkUpdates;
     private readonly Button _reviewUpdate;
     private readonly Label _coverage;
+    private readonly Label _repositoryFilter;
     private readonly Label _controls;
     private readonly Button _detailsButton;
     private readonly Button _moreActions;
@@ -69,6 +70,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly HashSet<string> _expanded = new(StringComparer.Ordinal);
     private readonly HashSet<string> _knownGroups = new(StringComparer.Ordinal);
     private string? _selectedKey;
+    private string? _repositoryBrowse;
     private string? _topRowKey;
     private bool _topRowHidden;
     private int _lastRestoredTop;
@@ -161,6 +163,15 @@ internal sealed class InstalledTabView : FrameView
         _searchSkills = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Search skills (1)", Visible = false };
         _searchSkills.Accepting += (_, e) => { e.Handled = true; _onLeaveTab(); };
         _coverage = new Label { X = 14, Y = 2, Width = Dim.Fill(), Height = 1, Text = "Inventory not loaded" };
+        _repositoryFilter = new Label
+        {
+            X = 0,
+            Y = 3,
+            Width = Dim.Fill(),
+            Height = 1,
+            Visible = false,
+            HotKeySpecifier = (System.Text.Rune)0xffff,
+        };
         _controls = new Label { X = 22, Y = 0, Width = Dim.Fill(35), Height = 1 };
         _clearFilters = new SingleRowButton { X = Pos.AnchorEnd(9), Y = 0, Text = "Clear" };
         _clearFilters.Accepting += (_, e) => { e.Handled = true; ClearFilters(); };
@@ -285,7 +296,7 @@ internal sealed class InstalledTabView : FrameView
             this, filterLabel, _filterField, _table, _detail, _footer, _spinner);
 
         Add(filterLabel, _filterField, _table, _detail, _spinner, _footer,
-            _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills, _coverage, _controls, _coverageButton, _clearFilters);
+            _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills, _coverage, _repositoryFilter, _controls, _coverageButton, _clearFilters);
         Add(_facetButtons);
         _detail.TabStop = TabBehavior.NoStop;
         foreach (var control in new View[] { _filterField, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detail, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills })
@@ -361,10 +372,24 @@ internal sealed class InstalledTabView : FrameView
     internal bool RevealInstall(InstalledInstallHandoff handoff)
     {
         if (_disposed || _lifetimeToken.IsCancellationRequested) return false;
+        if (handoff.BrowseRepository is { } repository)
+        {
+            if (!handoff.BrowseOnly || !handoff.Snapshot.Skills.Any(skill => SkillViewWorkflowCoordinator.RepositoryBrowseMatches(skill, repository))) return false;
+            LoadSeeded(handoff.Snapshot, handoff.Overview);
+            ClearFilters();
+            _repositoryBrowse = repository;
+            _selectedKey = _topRowKey = null;
+            _coverageOpen = _detailOpen = false;
+            _expanded.Clear();
+            RefreshAll();
+            RefreshOperationStatus(); FocusList();
+            return true;
+        }
         var group = handoff.Overview.Groups.SingleOrDefault(group => group.Key == handoff.GroupKey);
         var copies = group?.Copies.Where(copy => handoff.CopyKeys.Contains(copy.Key, StringComparer.Ordinal)).ToArray();
         if (group is null || copies is null || copies.Length != handoff.CopyKeys.Count || copies.Length == 0
             || copies.Any(copy => copy.Ambiguous)) return false;
+        _repositoryBrowse = null;
         LoadSeeded(handoff.Snapshot, handoff.Overview);
         // Evaluate every verified copy against the full fresh projection first.
         // Clearing is the same single state transition as ordinary Clear filters.
@@ -407,7 +432,8 @@ internal sealed class InstalledTabView : FrameView
     {
         var q = _filterField.Text.Trim();
         var cmp = StringComparison.OrdinalIgnoreCase;
-        return (q.Length == 0 || s.Name.Contains(q, cmp) || s.ResolvedPath.Contains(q, cmp)
+        return (_repositoryBrowse is null || SkillViewWorkflowCoordinator.RepositoryBrowseMatches(s, _repositoryBrowse))
+            && (q.Length == 0 || s.Name.Contains(q, cmp) || s.ResolvedPath.Contains(q, cmp)
             || s.Agents.Any(a => a.AgentId.Contains(q, cmp) || a.Path.Contains(q, cmp))
             || s.AllOwnershipClaims.Any(o => o.Source.Contains(q, cmp) || (o.SourceUrl?.Contains(q, cmp) ?? false))
             || (s.FrontMatter.Upstream?.Contains(q, cmp) ?? false) || (s.FrontMatter.LocalPath?.Contains(q, cmp) ?? false))
@@ -426,7 +452,7 @@ internal sealed class InstalledTabView : FrameView
         _viewRows = _overview.View(Matches, _sort.ToString().ToLowerInvariant(), _expanded,
             _availability is null ? null : _availability.Get, _lifetimeToken);
         _rows = _viewRows.Rows;
-        _selectedKey ??= _rows.FirstOrDefault()?.Key;
+        if (_repositoryBrowse is null) _selectedKey ??= _rows.FirstOrDefault()?.Key;
         BuildTableSource();
         _restoring = true;
         try
@@ -564,7 +590,9 @@ internal sealed class InstalledTabView : FrameView
             var showDetail = _wide || detail || _rows.Count == 0;
             _table.Width = _wide ? Dim.Percent(55) : Dim.Fill();
             _detail.X = _wide && _rows.Count > 0 ? Pos.Right(_table) + 1 : 0;
-            _detail.Y = 3;
+            _repositoryFilter.Visible = _repositoryBrowse is not null;
+            _repositoryFilter.Text = RepositoryFilterText(_repositoryBrowse, Math.Max(60, Viewport.Width));
+            _table.Y = _detail.Y = _repositoryBrowse is null ? 3 : 4;
             LayoutFilters();
             _detail.Width = Dim.Fill();
             if (showTable) _table.Visible = true;
@@ -713,6 +741,7 @@ internal sealed class InstalledTabView : FrameView
 
     private void ClearFilters()
     {
+        _repositoryBrowse = null;
         _filters = new();
         Array.Fill(_chosenLabels, "Any");
         _scopeFilter = ScopeFilter.All; _pinFilter = PinFilter.All;
@@ -782,9 +811,21 @@ internal sealed class InstalledTabView : FrameView
         }
     }
 
+    internal static string RepositoryFilterText(string? repository, int columns)
+    {
+        if (repository is null) return "";
+        const string prefix = "Repository: ";
+        const string suffix = " — Clear shows all";
+        const string github = "https://github.com/";
+        var value = repository.StartsWith(github, StringComparison.Ordinal) ? repository[github.Length..] : repository;
+        return prefix + InstalledFilters.ChoiceText(value, Math.Max(1, columns - prefix.Length - suffix.Length)) + suffix;
+    }
+
     private string FilterDescription()
     {
-        var text = string.Join(" · ", Enumerable.Range(0, 4).Select(i => FilterTitles[i] + ": "
+        var repository = _repositoryBrowse is null ? "" : "Repository: "
+            + MarkdownTableFormatter.FormatCodeSpan(InstalledOverview.Text(_repositoryBrowse, 320)) + " · Clear shows all\n\n";
+        var text = repository + string.Join(" · ", Enumerable.Range(0, 4).Select(i => FilterTitles[i] + ": "
             + MarkdownTableFormatter.FormatCodeSpan(_chosenLabels[i])
             + (FilterKey(i) is { } key && !FilterChoices(i).Any(c => c.Key == key) ? " (unavailable; 0 matches)" : "")));
         if (_snapshot is not null && _issueView.Evidence?.IsCurrent(_snapshot, _issueView.Generation) != true)

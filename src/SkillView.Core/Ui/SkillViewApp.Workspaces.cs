@@ -60,7 +60,10 @@ public sealed partial class SkillViewApp
     private void DeactivateDiscoverWorkspace(bool clearBusy)
     {
         if (_discoverTab?.IsLoading == true)
-            SetSearchFeedback("Search canceled.\n\nNo results to show. Submit the search again to try it.");
+        {
+            SetSearchFeedback($"Search canceled.\n\nSubmitted: {InstallFailureDetails.Literal(_submittedSearch?.Query)} · page {_searchPage}\n\nNo results to show. Previous returns to an earlier page; submit to retry.");
+            _discoverTab.SetPage(_searchPage, "canceled", true);
+        }
         _discoverTab?.SetLoading(false);
         if (clearBusy) ClearDiscoverFeedback();
         Interlocked.Increment(ref _discoverGeneration);
