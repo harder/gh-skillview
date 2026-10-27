@@ -17,6 +17,109 @@ namespace SkillView.Tests.Ui;
 public sealed class InstalledFilterRenderingTests
 {
     [Theory]
+    [InlineData(80, 24, false)]
+    [InlineData(120, 36, false)]
+    [InlineData(80, 24, true)]
+    [InlineData(120, 36, true)]
+    public void EmptyInventoryShowsHonestCoverageAndKeyboardSearchWithCopyActionsGated(int width, int height, bool partial)
+    {
+        using var app = Application.Create().Init("ansi");
+        app.Driver!.SetScreenSize(width, height);
+        using var window = new Window();
+        var searches = 0; var actions = 0; var loads = 0;
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
+            _ => { loads++; return Task.FromResult(InventorySnapshot.Empty); }, (_, _, _) => { actions++; return Task.CompletedTask; }, () => searches++,
+            onPackageCheck: (_, _, _) => actions++, onLocalReimport: _ => actions++, onLocalSourceSwitch: _ => actions++,
+            availability: new UpdateAvailabilitySession(), onCheckUpdates: () => actions++, onReviewUpdate: _ => actions++)
+        { Width = Dim.Fill(), Height = Dim.Fill() };
+        var snapshot = InventorySnapshot.Empty with
+        {
+            ConfiguredRoots = [.. Enumerable.Range(0, 79).Select(i => new ScanRoot("/locations/" + i, Scope.User, "codex"))],
+            ConfiguredRootsComplete = !partial,
+            Diagnostics = ScanDiagnostics.Empty with { InaccessiblePaths = partial ? ["/locations/unknown"] : [] }
+        };
+        window.Add(view); view.LoadSeeded(snapshot);
+        window.KeyDown += (_, key) => { if (!key.Handled && key.AsRune.Value == 'C') actions++; };
+        var session = app.Begin(window);
+        try
+        {
+            Draw(); view.FocusList();
+            Assert.Contains("No installed skills found", view.DetailTextForTests);
+            Assert.Contains("0 locations scanned; 79 locations configured", view.DetailTextForTests);
+            Assert.Equal(partial, view.DetailTextForTests.Contains("other copies may exist", StringComparison.Ordinal));
+            Assert.DoesNotContain("Selected copy is missing", view.DetailTextForTests);
+            Assert.DoesNotContain("No matching installed", view.DetailTextForTests);
+            var detail = view.SubViews.OfType<Markdown>().Single();
+            Assert.Equal(0, detail.Frame.X); Assert.True(detail.Frame.Width >= width - 4);
+            var buttons = view.SubViews.OfType<Button>().ToArray();
+            var search = buttons.Single(b => b.Text == "Search skills (1)");
+            var coverage = buttons.Single(b => b.Text == "Coverage");
+            Assert.True(search.Visible); Assert.True(search.Enabled);
+            Assert.True(search.Frame.Bottom <= view.Frame.Height); Assert.True(search.Frame.Right <= view.Frame.Width);
+            foreach (var label in new[] { "Details", "Review update (u)", "More actions" })
+            { var button = buttons.Single(b => b.Text == label); Assert.False(button.Visible); Assert.False(button.Enabled); }
+            Assert.False(buttons.Single(b => b.Text == "Check all updates (C)").Visible);
+            foreach (var key in new[] { 'K', 'u', 'C', 'R', 'T' }) app.Keyboard.RaiseKeyDownEvent(new Key(key));
+            Assert.False(view.TryStartSelectedRemoveForTests()); Assert.Null(view.GetSelectedSkill()); Assert.Equal(0, actions);
+            coverage.SetFocus(); Assert.True(view.HandleLocalNavigation(Key.Tab)); Assert.True(search.HasFocus);
+            app.Keyboard.RaiseKeyDownEvent(Key.Enter); Assert.Equal(1, searches);
+            view.FocusList(); app.Keyboard.RaiseKeyDownEvent(new Key('1')); Assert.Equal(2, searches);
+            view.FocusFilterForTests(); app.Keyboard.RaiseKeyDownEvent(new Key('1'));
+            Assert.Equal("1", view.GetFilterText()); Assert.Equal(2, searches);
+            view.ToggleCoverage(); Draw(); Assert.Contains("Captured coverage", view.DetailTextForTests);
+            Assert.Null(view.GetSelectedSkill()); view.NewKeyDownEvent(Key.Esc); Draw();
+            Assert.Contains("No installed skills found", view.DetailTextForTests);
+            Assert.Equal(0, loads); Assert.Equal(0, actions);
+        }
+        finally { app.End(session!); }
+        void Draw() { window.Layout(); window.Draw(new DrawContext()); }
+    }
+
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 36)]
+    public void FilteredAndMissingSelectionRemainDistinctFromNoObservedCopiesAndClearIsExplicit(int width, int height)
+    {
+        using var app = Application.Create().Init("ansi");
+        app.Driver!.SetScreenSize(width, height);
+        using var window = new Window();
+        var skill = InstalledOverviewTests.Copy("/skills/demo", "demo") with { Agents = [new("codex", "/skills/demo", false)] };
+        var snapshot = InventorySnapshot.Empty with { Skills = [skill] };
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
+            _ => throw new InvalidOperationException("No scan allowed"), (_, _, _) => Task.CompletedTask, () => { })
+        { Width = Dim.Fill(), Height = Dim.Fill() };
+        window.Add(view); view.LoadSeeded(snapshot);
+        var session = app.Begin(window);
+        try
+        {
+            Draw(); view.SetSelectedRowForTests(1);
+            var key = view.SelectedKeyForTests;
+            view.SelectFilter(0, Assert.Single(view.FilterChoices(0)).Key);
+            view.SetFilterTextForTests("no-matches"); Draw();
+            Assert.Contains("No matching installed skills", view.DetailTextForTests);
+            Assert.Contains("Selected copy is missing, filtered out or hidden", view.DetailTextForTests);
+            Assert.DoesNotContain("No installed skills found", view.DetailTextForTests);
+            Assert.Equal(key, view.SelectedKeyForTests); Assert.Null(view.GetSelectedSkill());
+            Assert.False(view.SubViews.OfType<Button>().Single(b => b.Text == "Search skills (1)").Visible);
+            view.LoadSeeded(InventorySnapshot.Empty); Draw();
+            Assert.Contains("No installed skills found", view.DetailTextForTests);
+            Assert.Contains("unavailable; 0 matches", view.DetailTextForTests);
+            Assert.Equal("no-matches", view.GetFilterText()); Assert.Equal(key, view.SelectedKeyForTests);
+            view.LoadSeeded(snapshot); Draw(); Assert.Empty(view.RowsForTests);
+            var clear = view.SubViews.OfType<Button>().Single(b => b.Text == "Clear");
+            clear.SetFocus(); app.Keyboard.RaiseKeyDownEvent(Key.Enter); Draw();
+            Assert.Equal("", view.GetFilterText()); Assert.Equal(key, view.SelectedKeyForTests);
+            Assert.Equal(skill, view.GetSelectedSkill());
+            // Existing ambiguity remains an inspect-only state, not empty.
+            view.LoadSeeded(snapshot with { Skills = [skill, skill] }); Draw();
+            Assert.Contains("Ambiguous installation ID", view.DetailTextForTests);
+            Assert.DoesNotContain("No installed skills found", view.DetailTextForTests); Assert.Null(view.GetSelectedSkill());
+        }
+        finally { app.End(session!); }
+        void Draw() { window.Layout(); window.Draw(new DrawContext()); }
+    }
+
+    [Theory]
     [InlineData(80, 24)]
     [InlineData(120, 36)]
     public void VisibleControlsKeepListBudgetAndFilterSelectionCoverageFocusAndExactActionsAcrossRefresh(int width, int height)
@@ -235,7 +338,7 @@ public sealed class InstalledFilterRenderingTests
         installed.SetSelectedRowForTests(1); installed.NewKeyDownEvent(Key.Enter);
         Assert.Contains("line 56", installed.DetailTextForTests);
         Assert.Contains("references/maintenance.md", installed.DetailTextForTests);
-        Assert.Contains("1 Reviews", installed.DetailTextForTests);
+        Assert.Contains("1 Review", installed.DetailTextForTests);
         current = fact with { Report = report with { Findings = [report.Findings[2]], FindingCount = 1 } };
         await issues.LoadAsync();
         Assert.DoesNotContain(issues.RowsForTests, r => r.PackageCheck is not null);

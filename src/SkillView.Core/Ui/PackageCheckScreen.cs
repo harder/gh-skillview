@@ -77,8 +77,8 @@ internal static class PackageCheckScreen
                         if (!closeRequested && request == epoch && !ownedToken.IsCancellationRequested && !token.IsCancellationRequested && !lifetimeToken.IsCancellationRequested)
                         {
                             var attached = publish is null || publish(captured);
-                            output.Text = rendered + (attached ? "" : "\nCheck retained here only. The copy or displayed inventory could not be bound; Refresh Installed before checking again.\n");
-                            status.Text = (attached ? "" : "Refresh Installed · ") + $"Format: {result.Format.State} · agent: {result.AgentAssessment.State} · intact: {result.PayloadIntact.State} · source: {result.SourceReviewed.State}";
+                            SetReportText(output, rendered + (attached ? "" : "\nCheck retained here only. The copy or displayed inventory could not be bound; Refresh Installed before checking again.\n"));
+                            status.Text = (attached ? "" : "Refresh Installed · ") + PackageCheckFact.ProblemReviewLabel(result) + " · Local package check";
                         }
                         else if (!lifetimeToken.IsCancellationRequested) status.Text = "Check canceled.";
                         Finish();
@@ -130,7 +130,7 @@ internal static class PackageCheckScreen
         app.Run(dialog);
     }
 
-    internal static void ShowRetained(IApplication app, PackageCheckFact fact, CancellationToken token)
+    internal static void ShowRetained(IApplication app, PackageCheckFact fact, CancellationToken token, Action<Dialog>? readyForTests = null)
     {
         if (token.IsCancellationRequested) return;
         using var dialog = new Dialog { Title = " Retained package check ", Width = Dim.Percent(96), Height = Dim.Percent(92) };
@@ -142,7 +142,10 @@ internal static class PackageCheckScreen
             Height = Dim.Fill(2),
             ReadOnly = true,
             WordWrap = true,
-            Text = fact.Detail + "\n\n" + RenderReport(fact.Report)
+            Text = "Last explicit package check · " + fact.CheckedAt.ToString("O")
+                + "\nCopy: " + Literal(fact.Request.Target.ResolvedPath)
+                + "\nScope: " + fact.Request.Target.Scope + " · captured local package only\n" + RenderReport(fact.Report)
+                + "\n\n" + PackageCheckFact.InventoryLifetimeNotice
         };
         var close = new SingleRowButton { Text = "_Close", X = 0, Y = Pos.AnchorEnd(1) };
         close.Accepting += (_, e) => { e.Handled = true; app.RequestStop(); };
@@ -150,16 +153,67 @@ internal static class PackageCheckScreen
         dialog.Add(output, close);
         TuiHelpers.ApplyScheme(SchemeNames.Dialog, dialog, output, close);
         TuiHelpers.ConfigureReadOnlyPane(output, SchemeNames.Dialog);
+        var initialLayout = true;
+        dialog.SubViewsLaidOut += (_, _) =>
+        {
+            if (!initialLayout) return;
+            initialLayout = false;
+            ScrollToTop(output);
+        };
+        readyForTests?.Invoke(dialog);
         app.Run(dialog);
     }
 
-    private static string RenderReport(PackageCheckReport report)
+    private static void SetReportText(Editor output, string text)
+    {
+        output.Text = text;
+        // Text replacement moves the Editor caret to the end. Reset after its
+        // document and wrapped layout have been updated, including Check again.
+        output.Layout();
+        ScrollToTop(output);
+    }
+
+    private static void ScrollToTop(Editor output)
+    {
+        output.CaretOffset = 0;
+        output.Viewport = output.Viewport with { X = 0, Y = 0 };
+    }
+
+    internal static string RenderReport(PackageCheckReport report)
     {
         const int limit = 256 * 1024;
         var text = CliDispatcher.RenderPackageCheckText(report);
-        if (text.Length <= limit) return text;
-        var end = char.IsHighSurrogate(text[limit - 1]) ? limit - 1 : limit;
-        return text[..end] + $"\nReport display limit: {text.Length - end} characters omitted. Retained totals: {report.FindingCount} findings, {report.ObservationCount} observations; check limits omitted {report.OmittedFindingCount} findings and {report.OmittedObservationCount} observations.\n";
+        if (text.Length > limit)
+        {
+            var end = char.IsHighSurrogate(text[limit - 1]) ? limit - 1 : limit;
+            text = text[..end] + $"\nReport display limit: {text.Length - end} characters omitted. Retained totals: {report.FindingCount} findings, {report.ObservationCount} observations; check limits omitted {report.OmittedFindingCount} findings and {report.OmittedObservationCount} observations.\n";
+        }
+        return RenderSummary(report) + "\n\nFull package evidence\n\n" + text;
     }
 
+    private static string RenderSummary(PackageCheckReport report)
+    {
+        var lines = new List<string>
+        {
+            "Package check summary",
+            PackageCheckFact.CountsLabel(report),
+            PackageCheckFact.ChecksIncomplete(report) ? "Package checks incomplete; unchecked content remains unknown."
+                : "Supported package checks only; unchecked content remains unknown."
+        };
+        foreach (var finding in report.Findings.OrderBy(f => PackageCheckFact.IsProblem(f) ? 0 : 1).Take(8))
+            lines.Add((PackageCheckFact.IsProblem(finding) ? "Problem: Missing file referenced by " : "Review: ")
+                + Location(finding.Path, finding.Line) + ": " + Literal(finding.Target ?? finding.Code));
+        foreach (var observation in report.Observations.OrderBy(o => o.State == "review" ? 0 : 1).Take(4))
+            lines.Add((observation.State == "review" ? "Review: " : "Info: ") + Location(observation.Path, observation.Line)
+                + ": " + Literal(observation.Value) + " (" + Literal(observation.State) + ")");
+        var hidden = Math.Max(0, report.Findings.Length - 8) + Math.Max(0, report.Observations.Length - 4);
+        if (hidden > 0) lines.Add($"{hidden} retained findings/observations are not shown in this summary; see the full evidence and display limits below.");
+        if (report.OmittedFindingCount > 0 || report.OmittedObservationCount > 0)
+            lines.Add($"Check limits omitted {report.OmittedFindingCount} findings and {report.OmittedObservationCount} observations.");
+        lines.Add("Local files only. Source integrity, dependency availability and effective agent compatibility remain unknown.");
+        return string.Join("\n", lines);
+    }
+
+    private static string Location(string path, int? line) => Literal(path) + (line is > 0 ? $" (line {line})" : "");
+    private static string Literal(string value) => InstalledOverview.Text(value, 240);
 }

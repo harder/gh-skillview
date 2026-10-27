@@ -296,7 +296,15 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   when that selection is missing, hidden, filtered or ambiguous. Refresh leaves
   old rows visibly refreshing with copy actions paused. Bound display to 8,192
   rows including headings and omission indication. C (Shift+c) remains global
-  check/cancel; c remains Cleanup. The existing Issues copy chooser is separate.
+  check/cancel for observed copies or a running check; an empty Installed view
+  hides Check all updates and consumes C without starting work. c remains Cleanup.
+  The existing Issues copy chooser is separate.
+
+- With no observed Installed copies, show a full-width empty explanation, separate
+  scanned/configured location counts and honest partial coverage, plus Search
+  skills (1) through the existing Discover callback. Keep Coverage/Back available
+  and exact-copy actions disabled. Filtered no matches and missing/ambiguous
+  selections remain distinct; never clear retained filters or choices implicitly.
 
 - Installed's four visible selectors use stable captured keys, never shortened
   display labels. Tab reaches each direct choice popup; Esc cancels it. Keep
@@ -368,3 +376,12 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   context before null, normalized agent/profile ordinally, then every original
   membership field in declaration order (ordinal/null-first strings, ascending
   enums and false before true). Raw evidence, authority and filters are unchanged.
+
+- Repository subset listing owns a synchronous modal and its background work.
+  Failure/empty results retain bounded literal detail with explicit Retry/Cancel;
+  Cancel is the default. Never widen a failed or canceled subset request to
+  install-all. Retry and queued completion recheck Discover lifetime and captured
+  child context before handing the successful listing to the existing picker.
+  Compact install failures expose Details with bounded, sanitized plain text for
+  the full refusal and retained stdout/stderr. Keep the original result intact;
+  output cannot create Markdown, active links or terminal controls.

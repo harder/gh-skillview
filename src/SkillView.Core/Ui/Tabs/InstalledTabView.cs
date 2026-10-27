@@ -87,6 +87,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly TableView _table;
     private readonly Markdown _detail;
     private readonly Label _footer;
+    private readonly Button _searchSkills;
     private readonly TabLoadingView _loading = new("Loading installed skills…");
     private bool _showDetails;
     private readonly SpinnerView _spinner;
@@ -157,6 +158,8 @@ internal sealed class InstalledTabView : FrameView
         _moreActions.Accepting += (_, e) => { e.Handled = true; ShowMoreActions(); };
         _back = new SingleRowButton { X = 56, Y = Pos.AnchorEnd(1), Text = "Back (Esc)", Visible = false };
         _back.Accepting += (_, e) => { e.Handled = true; BackToList(); };
+        _searchSkills = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Search skills (1)", Visible = false };
+        _searchSkills.Accepting += (_, e) => { e.Handled = true; _onLeaveTab(); };
         _coverage = new Label { X = 14, Y = 2, Width = Dim.Fill(), Height = 1, Text = "Inventory not loaded" };
         _controls = new Label { X = 22, Y = 0, Width = Dim.Fill(35), Height = 1 };
         _clearFilters = new SingleRowButton { X = Pos.AnchorEnd(9), Y = 0, Text = "Clear" };
@@ -282,10 +285,10 @@ internal sealed class InstalledTabView : FrameView
             this, filterLabel, _filterField, _table, _detail, _footer, _spinner);
 
         Add(filterLabel, _filterField, _table, _detail, _spinner, _footer,
-            _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _coverage, _controls, _coverageButton, _clearFilters);
+            _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills, _coverage, _controls, _coverageButton, _clearFilters);
         Add(_facetButtons);
         _detail.TabStop = TabBehavior.NoStop;
-        foreach (var control in new View[] { _filterField, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detail, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back })
+        foreach (var control in new View[] { _filterField, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detail, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills })
             control.HasFocusChanged += (_, _) => { if (control.HasFocus) _rememberedFocus = control; };
         Disposing += (_, _) => { _disposed = true; _actionsMenu?.Dispose(); CancelPendingWork(); };
     }
@@ -560,7 +563,7 @@ internal sealed class InstalledTabView : FrameView
             var showTable = !detail && _rows.Count > 0;
             var showDetail = _wide || detail || _rows.Count == 0;
             _table.Width = _wide ? Dim.Percent(55) : Dim.Fill();
-            _detail.X = _wide ? Pos.Right(_table) + 1 : 0;
+            _detail.X = _wide && _rows.Count > 0 ? Pos.Right(_table) + 1 : 0;
             _detail.Y = 3;
             LayoutFilters();
             _detail.Width = Dim.Fill();
@@ -571,6 +574,11 @@ internal sealed class InstalledTabView : FrameView
             _table.Visible = showTable;
             _detail.Visible = showDetail;
             _back.Visible = _detailOpen;
+            _searchSkills.Visible = NoObservedCopies;
+            _detailsButton.Visible = !NoObservedCopies;
+            _reviewUpdate.Visible = !NoObservedCopies && _onReviewUpdate is not null;
+            _moreActions.Visible = !NoObservedCopies;
+            _checkUpdates.Visible = _availability is not null && (!NoObservedCopies || _availability.Running);
             RecomputeColumnWidths();
         }
         finally { _layoutActive = false; }
@@ -786,7 +794,8 @@ internal sealed class InstalledTabView : FrameView
         if (_packageView is not null && _snapshot is not null && ReferenceEquals(_packageView.Request.Snapshot, _snapshot)
             && _packageView.Request.Generation == _issueView.Generation)
             text += "\n\nHas captured findings also includes the last explicit package check for its exact copy. Package Reviews and incomplete/omitted checks exclude No local findings observed; other copies remain package not checked for this inventory capture.";
-        return text + $"\n\nPins: {DescribePin(_pinFilter)} · Scope: {DescribeScope(_scopeFilter)} · Sort: {_sort.ToString().ToLowerInvariant()}" + "\n\nCheck updates (C) checks the whole captured catalog, including copies outside these filters; it never prepares a plan.";
+        return text + $"\n\nPins: {DescribePin(_pinFilter)} · Scope: {DescribeScope(_scopeFilter)} · Sort: {_sort.ToString().ToLowerInvariant()}"
+            + (NoObservedCopies ? "" : "\n\nCheck updates (C) checks the whole captured catalog, including copies outside these filters; it never prepares a plan.");
     }
 
     private void ShowFilterChoices(int facet)
@@ -839,7 +848,7 @@ internal sealed class InstalledTabView : FrameView
     {
         if ((key.KeyCode & ~KeyCode.ShiftMask) == KeyCode.Tab)
         {
-            var order = new View[] { _filterField, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back }
+            var order = new View[] { _filterField, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills }
                 .Where(v => v.Visible && v.Enabled && v.CanFocus).ToArray();
             if (order.Length == 0) return false;
             var index = Array.FindIndex(order, v => v.HasFocus);
@@ -852,6 +861,7 @@ internal sealed class InstalledTabView : FrameView
             if (key.KeyCode != KeyCode.Esc) return false;
             FocusList(); return true;
         }
+        if (key.AsRune.Value == '1' && _searchSkills.Visible) { _onLeaveTab(); return true; }
         if (key.AsRune.Value == '/') { _filterField.SetFocus(); _filterField.SelectAll(); return true; }
         if ((_table.HasFocus || _detail.HasFocus) && key.KeyCode is KeyCode.CursorLeft or KeyCode.CursorRight)
         { ExpandSelected(key.KeyCode == KeyCode.CursorRight); return true; }
@@ -861,7 +871,7 @@ internal sealed class InstalledTabView : FrameView
 
     private void RefreshCoverage()
     {
-        var blocked = SelectedRow is null && _selectedKey is not null ? "Selection missing/hidden/filtered; actions disabled · "
+        var blocked = !NoObservedCopies && SelectedRow is null && _selectedKey is not null ? "Selection missing/hidden/filtered; actions disabled · "
             : SelectedRow?.Copy?.Ambiguous == true ? "Ambiguous installation ID; actions disabled · " : "";
         _coverage.Text = blocked + (_snapshot is not null && _issueView.Evidence?.IsCurrent(_snapshot, _issueView.Generation) != true ? "Issues not loaded · " : "") + _overview.Coverage + (_availability is null ? "" : " · " + _availability.Summary);
     }
@@ -873,7 +883,7 @@ internal sealed class InstalledTabView : FrameView
         if (!_filterField.HasFocus && key.AsRune.Value == 'C' && _onCheckUpdates is not null)
         {
             key.Handled = true;
-            _onCheckUpdates();
+            if (_checkUpdates.Visible && _checkUpdates.Enabled) _onCheckUpdates();
             return;
         }
         if (!_filterField.HasFocus && key.AsRune.Value is 'u' or 'U' && _onReviewUpdate is not null)
@@ -883,7 +893,7 @@ internal sealed class InstalledTabView : FrameView
             return;
         }
         if (!_filterField.HasFocus && key.KeyCode == KeyCode.Enter && !_detailsButton.HasFocus && !_reviewUpdate.HasFocus
-            && !_moreActions.HasFocus && !_checkUpdates.HasFocus && !_back.HasFocus
+            && !_moreActions.HasFocus && !_checkUpdates.HasFocus && !_back.HasFocus && !_searchSkills.HasFocus
             && !_facetButtons.Any(b => b.HasFocus) && !_coverageButton.HasFocus && !_clearFilters.HasFocus)
         { key.Handled = true; BrowseSelected(); return; }
         if ((_table.HasFocus || _detail.HasFocus) && key.KeyCode is KeyCode.CursorLeft or KeyCode.CursorRight)
@@ -1018,6 +1028,7 @@ internal sealed class InstalledTabView : FrameView
         _coverageOpen = false;
         _detailOpen = false;
         ApplyResponsiveLayout();
+        RefreshSelectedDetail();
         FocusList();
     }
 
@@ -1248,12 +1259,14 @@ internal sealed class InstalledTabView : FrameView
     }
 
     private InstalledOverviewRow? SelectedRow => FindRow(_selectedKey) is var index && index >= 0 ? _rows[index] : null;
+    private bool NoObservedCopies => _snapshot is not null && _overview.Copies == 0;
 
     private void RefreshSelectedDetail()
     {
         if (_snapshot is null || Volatile.Read(ref _removeActive) != 0 || Volatile.Read(ref _loadActive) != 0) return;
         var row = SelectedRow;
-        _selectionReason = row is null ? "Selected copy is missing, filtered out or hidden. Select a visible exact copy to enable actions."
+        _selectionReason = row is null ? NoObservedCopies ? "" : _selectedKey is null ? "Select a visible exact copy to enable actions."
+            : "Selected copy is missing, filtered out or hidden. Select a visible exact copy to enable actions."
             : row.Copy is null ? "Select an exact copy; source groups cannot run copy actions."
             : row.Copy.Ambiguous ? "Ambiguous installation ID; all records retained, copy actions disabled." : "";
         _detailsButton.Enabled = row?.Group is not null;
@@ -1275,7 +1288,16 @@ internal sealed class InstalledTabView : FrameView
         else if (row?.Group is { } group)
             _detail.Text = "## " + MarkdownTableFormatter.FormatTableCell(group.Name) + "\n\nSource: " + MarkdownTableFormatter.FormatCodeSpan(group.Source)
                 + "\n\n" + row.Summary + "\n\n" + _selectionReason + "\n\nEnter or Left/Right expands/collapses the group.\n\n" + _overview.Coverage;
-        else _detail.Text = _rows.Count == 0 ? "(no matches)\n\n" + _selectionReason : _selectionReason;
+        else if (NoObservedCopies)
+            _detail.Text = "## No installed skills found\n\n"
+                + (_snapshot.IsPartial || !_snapshot.ConfiguredRootsComplete
+                    ? "No copies were observed. Some locations could not be checked; other copies may exist."
+                    : "No copies were observed in the scanned locations.")
+                + $"\n\n{_snapshot.ScannedRoots.Length} locations scanned; {_snapshot.ConfiguredRoots.Length} locations configured. See Coverage for scan details."
+                + "\n\nSearch skills (1) to find a skill to install.";
+        else _detail.Text = _rows.Count == 0
+                ? "## No matching installed skills\n\nNo copies match the current search or filters. Choose Clear to show all observed copies.\n\n" + _selectionReason
+                : _selectionReason;
         if (!_coverageOpen && row?.Copy is null) _detail.Text += "\n\n" + FilterDescription();
         RefreshCoverage();
     }
