@@ -35,7 +35,10 @@ public sealed class CapturedFindingTests
         Assert.Equal(2, ((FindingCopies)family.Subject).Copies[0].Exposures.Length);
         var row = Assert.Single(ChangesQueueBuilder.Build(queue, Token).Rows);
         var text = ChangesQueueBuilder.Render(row, Token, true, null);
-        Assert.Contains("Review version alignment", text); Assert.Contains("Compare files", text);
+        Assert.Contains("**Enter / Right:** expand the exact captured members here.", text);
+        Assert.Contains("Select a child for inline **Compare files**", text);
+        Assert.Contains("use **u** for its exact saved update review. Each copy is reviewed separately.", text);
+        Assert.Contains("Compare files", text);
         Assert.Contains("neither is assumed newer", text); Assert.Contains("/fixtures/links/demo", text);
         Assert.Contains("Updates not checked", ChangesQueueBuilder.Build(queue, Token).Counts);
         Assert.DoesNotContain(queue.Findings, finding => finding.Classification == FindingClass.Update);

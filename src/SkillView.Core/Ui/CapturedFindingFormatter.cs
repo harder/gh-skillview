@@ -11,7 +11,7 @@ internal static class CapturedFindingFormatter
         { "recorded-revisions" => "Recorded revisions differ", "installation-methods" => "Installation methods differ", "same-source-copies" => "Same source, separate copies", _ => "Same name, separate sources" };
         var actions = registry
             ? "Inspect this captured record below. To include a known location, restart with **--scan-root ROOT** (before the subcommand), or configure an existing workspace/profile. **1 Discover** offers normal install review. gh has no supported exact-record remove/uninstall; registry cleanup and editing are unavailable.\n\n"
-            : "**Enter:** choose an exact copy for **Review version alignment** (latest/tag saved review) or **Compare files** (explicit captured comparison). Each copy is reviewed separately.\n\n"
+            : "**Enter / Right:** expand the exact captured members here. Select a child for inline **Compare files**, or use **u** for its exact saved update review. Each copy is reviewed separately.\n\n"
                 + (finding.Difference is null ? "Keep both unavailable: family evidence exceeds its bounded binding limit.\n\n"
                     : finding.Intentional ? "**Intentional difference. k / Restore suggestions:** undo Keep both. Other problems, updates and coverage remain visible.\n\n"
                     : "**k / Keep both:** acknowledge this exact observed difference; cleanup suppression is separate.\n\n");

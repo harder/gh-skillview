@@ -69,6 +69,7 @@ public sealed partial class SkillViewApp
     private SkillView.Ui.Tabs.UpdatesTabView? _updatesTab;
     private SkillView.Ui.Tabs.DoctorTabView? _doctorTab;
     private SkillView.Ui.Tabs.DiscoverTabView? _discoverTab;
+    private readonly GuidedRepairSequence _guidedRepairs = new();
     private SkillView.Ui.Tabs.ChangesTabView? _changesTab;
     // Remembered before Doctor took over so Esc returns to where the user was.
     private SkillViewTab _tabBeforeDoctor = SkillViewTab.Discover;

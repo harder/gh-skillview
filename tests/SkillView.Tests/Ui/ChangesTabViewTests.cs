@@ -78,26 +78,99 @@ public sealed class ChangesTabViewTests
     }
 
     [Fact]
-    public async Task Enter_RoutesExactSelectedIssueAndPhysicalInstallation()
+    public async Task FamilyEnterExpandsAndOnlyExplicitChildReviewRoutesAnExactInstallation()
     {
         var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
         var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
-        CapturedFinding? activated = null;
+        MaintenanceQueueEntry? activated = null;
         using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
             _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
-            static () => { }, activateEntryAsync: (_, _) => throw new InvalidOperationException("Family cannot route as one cleanup target."),
-            activateFinding: (finding, _) => { activated = finding; return Task.CompletedTask; },
-            runTask: (work, _) => work().GetAwaiter().GetResult());
+            static () => { }, onActivateEntry: entry => activated = entry,
+            reviewCopy: skill => activated = InlineCopyWorkflowTests.Entry(skill));
         await view.LoadAsync();
         var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
         table.SetSelection(0, 0, false); // One family, anchored at the first exact address.
         table.NewKeyDownEvent(Key.Enter);
+        Assert.Null(activated);
+        Assert.Equal(3, view.RowCountForTests);
+        table.SetSelection(0, 1, false);
+        view.NewKeyDownEvent(new Key('u'));
         Assert.NotNull(activated);
-        Assert.Equal("source-differences", activated.Kind);
-        Assert.Equal([FindingNavigation.InspectCopies], activated.Navigation);
-        var copies = Assert.IsType<FindingCopies>(activated.Subject).Copies;
-        Assert.Equal(new[] { first.InstallationId, second.InstallationId }, copies.Select(copy => copy.InstallationId));
-        Assert.All(activated.Entries, entry => Assert.Null(entry.Cleanup));
+        Assert.Equal(first.InstallationId, activated.Subject.InstallationId);
+        Assert.Equal(first.ResolvedPath, activated.Subject.Path);
+    }
+
+    [Fact]
+    public async Task CleanupShortcutAndRefreshPreserveTheExactSecondChildRatherThanItsFamilyAnchor()
+    {
+        var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
+        var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }), () => { });
+        await view.LoadAsync();
+        view.ShowCleanup(OperationSubject.From(second));
+        var table = view.SubViews.OfType<TableView>().Single();
+        var row = view.RowsForTests[table.GetSelectedRow()];
+        Assert.True(row.IsExactChild); Assert.Equal(second.InstallationId, row.Entry.Subject.InstallationId);
+        await view.LoadAsync();
+        var refreshed = view.RowsForTests[table.GetSelectedRow()];
+        Assert.True(refreshed.IsExactChild); Assert.Equal(row.Key, refreshed.Key);
+        Assert.NotEqual(view.RowsForTests.Single(item => item.IsFamily).Key, refreshed.Key);
+    }
+
+    [Fact]
+    public async Task MissingExactChildOnRefreshCannotAuthorizeTheRemainingFinding()
+    {
+        var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
+        var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
+        var other = MaintenanceQueueTests.Skill("/skills/broken", "https://github.com/other/repo") with
+        { Name = "broken", Validity = ValidityState.UnparsableFrontMatter };
+        var snapshot = InventorySnapshot.Empty with { Skills = [first, second, other] };
+        var activated = 0;
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; }, _ => Task.FromResult(snapshot),
+            () => { }, onActivateEntry: _ => activated++);
+        await view.LoadAsync(); view.ShowCleanup(OperationSubject.From(second));
+        snapshot = snapshot with { Skills = [first, other] };
+        await view.LoadAsync();
+        view.NewKeyDownEvent(new Key('u'));
+        Assert.Equal(0, activated);
+        Assert.Contains("Selection changed", view.SubViews.OfType<Markdown>().Single().Text);
+        Assert.False(view.SubViews.OfType<Button>().Single(button => button.Text == "Review (u)").Enabled);
+    }
+
+    [Fact]
+    public async Task StopCancelsTheUnstartedGuidedHandoffAndCannotReopenAReview()
+    {
+        var skill = MaintenanceQueueTests.Skill("/skills/broken", "https://github.com/one/repo") with
+        { Validity = ValidityState.UnparsableFrontMatter };
+        var sequence = new GuidedRepairSequence(); var pending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var work = new List<Task>(); var token = CancellationToken.None; var opened = 0;
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }), () => { }, guided: sequence,
+            runTask: (operation, _) => work.Add(operation()), activateGuided: async (_, request) =>
+            { token = request.Token; await pending.Task.WaitAsync(token); if (request.IsCurrent) opened++; });
+        await view.LoadAsync();
+        // Seed one exact observed item; no source or filesystem work is submitted.
+        var entry = InlineCopyWorkflowTests.Entry(skill) with { Issue = "upstream-update" };
+        sequence.Start([entry], InventorySnapshot.Empty with { Skills = [skill] }, "");
+        view.NewKeyDownEvent(new Key('n')); Assert.True(token.CanBeCanceled);
+        view.NewKeyDownEvent(new Key('x')); Assert.True(token.IsCancellationRequested);
+        pending.SetResult(); await Task.WhenAll(work);
+        Assert.Equal(0, opened); Assert.Null(sequence.ReviewNext()); Assert.Contains("stopped", sequence.Summary);
+    }
+
+    [Fact]
+    public async Task CatalogInvalidationPausesActionsUntilARealLoadRebindsTheSnapshot()
+    {
+        var skill = MaintenanceQueueTests.Skill("/skills/demo", "https://github.com/one/repo") with { Validity = ValidityState.UnparsableFrontMatter };
+        var generation = 1L; var activated = 0;
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }), () => { },
+            catalogGeneration: () => generation, onActivateEntry: _ => activated++);
+        await view.LoadAsync();
+        view.NewKeyDownEvent(new Key('u')); Assert.Equal(1, activated);
+        generation++; view.RefreshAvailability(); view.NewKeyDownEvent(new Key('u')); Assert.Equal(1, activated);
+        await view.LoadAsync(); view.NewKeyDownEvent(new Key('u')); Assert.Equal(2, activated);
     }
 
     [Fact]

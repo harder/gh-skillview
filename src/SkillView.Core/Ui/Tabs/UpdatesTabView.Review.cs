@@ -102,6 +102,7 @@ internal sealed partial class UpdatesTabView
         if (_review is null) return _inventoryNeedsRefresh ? LoadAsync() : Task.CompletedTask;
         _resourceIntent = null;
         ClearResourceNote();
+        if (_target is { } target) ReviewSkipped?.Invoke(OperationSubject.From(target), _review.Id, Interlocked.Read(ref _loadGeneration));
         _review = null;
         _retainBox.Value = CheckState.UnChecked;
         _sourceReviewBox.Value = CheckState.UnChecked;
@@ -116,12 +117,14 @@ internal sealed partial class UpdatesTabView
     private async Task ExecuteReviewOperationAsync(Func<CancellationToken, Task<UpdateResult>> operation, bool applying = false, bool unpinOnly = false,
         ResourceIntent? preparingResource = null)
     {
+        if (_target is not { } selected) return;
         using var ownership = _operationCancellations.TryBegin(_lifetimeToken);
         if (ownership is null) return;
         if (!applying) ClearUndo();
         var generation = Interlocked.Increment(ref _reviewGeneration);
         var token = ownership.Token;
         var capturedReview = applying ? _review : null;
+        var work = new UpdateReviewWork(OperationSubject.From(selected), capturedReview?.Id, Interlocked.Read(ref _loadGeneration), applying);
         var resource = applying ? _resourceIntent : preparingResource;
         var resourceRevisionTag = applying ? _options?.Tag : null;
         var invalidated = false;
@@ -129,9 +132,12 @@ internal sealed partial class UpdatesTabView
         SetOperationControlsEnabled(false);
         _status.Text = applying ? " applying the reviewed candidate…"
             : unpinOnly ? " capturing installed content for a pin-only review…" : " preparing one exact candidate…";
+        UpdateResult? settledResult = null;
+        ReviewWorkStarted?.Invoke(work);
         try
         {
             var result = await operation(token).ConfigureAwait(false);
+            settledResult = result;
             // This callback is only cache notification. Production reconciliation
             // belongs to the workflow and runs even if this UI dispatch is canceled.
             if (result.MutationAttempted) { _onUpdateApplied(); invalidated = true; }
@@ -199,6 +205,7 @@ internal sealed partial class UpdatesTabView
                 SetOperationControlsEnabled(true);
             }).ConfigureAwait(false);
         }
+        finally { ReviewWorkSettled?.Invoke(work, settledResult); }
     }
 
     private void SaveOutcomes(IEnumerable<InstallationUpdateOutcome> outcomes)

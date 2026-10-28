@@ -325,76 +325,12 @@ internal sealed partial class SkillViewWorkflowCoordinator
         skill.SourceIdentity is { Provider: "repository", Key: not null } source && source.Origin == repository
         && skill.MetadataConflicts.IsEmpty && skill.OwnershipDiagnostics.IsEmpty;
 
-    public void ShowCleanupScreen()
+    internal async Task<bool> ValidateFindingAsync(FindingBinding binding, ChangesSelectionGate.Lease request)
     {
-        var app = _getApp();
-        if (app is null) return;
-        _setBusy("scanning for cleanup candidates…");
-        _runBackground(async cancellationToken =>
-        {
-            var report = await GetOrProbeReportAsync(cancellationToken).ConfigureAwait(false);
-            var snapshot = await CaptureInventoryAsync(report, cancellationToken).ConfigureAwait(false);
-            var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, snapshot.ScannedRoots, null, cancellationToken);
-            await _invokeAsync(() =>
-            {
-                if (cancellationToken.IsCancellationRequested) return;
-                _clearBusy();
-                ShowCleanupReview(app, report, snapshot, candidates);
-            }, cancellationToken).ConfigureAwait(false);
-        }, "cleanup");
-    }
-
-    internal static ImmutableArray<CleanupClassifier.Candidate> FilterCleanupForInstallation(
-        ImmutableArray<CleanupClassifier.Candidate> candidates, OperationSubject selected, string issue)
-    {
-        var matches = candidates.Where(candidate => candidate.Kind.ToString() == issue
-            && PathIdentity.Equals(candidate.Path, selected.Path)
-            && candidate.Impact?.Subject.InstallationId == selected.InstallationId
-            && PathIdentity.Equals(candidate.Impact.Subject.Path, selected.Path)).Take(2).ToImmutableArray();
-        return matches.Length == 1 ? matches : [];
-    }
-
-    internal async Task ShowCopiesAsync(SkillView.Maintenance.MaintenanceQueueEntry selected,
-        ChangesSelectionGate.Lease request, Action<OperationSubject> activateUpdates, CancellationToken lifetimeToken,
-        CapturedFinding? finding = null)
-    {
-        if (_getApp() is not { } app || !request.IsCurrent) return;
+        if (!request.IsCurrent) return false;
         var report = await GetOrProbeReportAsync(request.Token).ConfigureAwait(false);
-        var snapshot = await CaptureInventoryAsync(report, request.Token).ConfigureAwait(false);
-        var target = SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, selected.Subject);
-        var group = target is null ? null : CopiesPresentation.Build(snapshot, target, request.Token);
-        if (finding is not null)
-        {
-            var fresh = MaintenanceQueueBuilder.Build(snapshot, request.Token).Findings
-                .SingleOrDefault(current => current.Id == finding.Id && current.Difference == finding.Difference);
-            var copies = fresh?.Subject is FindingCopies captured ? captured.Copies : [];
-            if (group is null || fresh is null || copies.Any(copy => MaintenanceQueueBuilder.ResolveInstallation(snapshot, copy) is null)) group = null;
-            else group = CopiesPresentation.Build(snapshot, target!, request.Token, copies.Select(copy => (copy.InstallationId, copy.Path)).ToHashSet());
-        }
-        if (group is { Copies.Length: > 0 })
-        {
-            var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, snapshot.ScannedRoots, null, request.Token);
-            group = group with
-            {
-                CleanupCandidates = group.Copies.Select(skill => (Id: skill.InstallationId,
-                        Matches: FilterCleanupForInstallation(candidates, OperationSubject.From(skill), selected.Issue)))
-                    .Where(row => row.Matches.Length == 1).ToImmutableDictionary(row => row.Id, row => row.Matches[0])
-            };
-        }
-        await _invokeAsync(() =>
-        {
-            if (!request.TryEnterDispatch() || lifetimeToken.IsCancellationRequested) return;
-            if (group is null || group.Copies.Length == 0)
-            { _setStatus("Selected installation is missing or ambiguous — refresh Issues."); return; }
-            var choice = CopiesScreen.Show(app, _services.Logger, group,
-                (left, right, token) => new SkillView.Maintenance.SkillComparisonService().CompareAsync(left, right, token,
-                    inventoryComplete: !group.Partial), lifetimeToken);
-            if (choice is null || lifetimeToken.IsCancellationRequested) return;
-            if (choice.Action == CopiesAction.Update) activateUpdates(choice.Subject);
-            else if (SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, choice.Subject) is not null
-                && group.CleanupCandidates.TryGetValue(choice.Subject.InstallationId, out var candidate))
-                ShowCleanupReview(app, report, snapshot, [candidate]);
-        }, request.Token).ConfigureAwait(false);
+        var snapshot = await CaptureInventoryCoreAsync(report, request.Token, bypassGhCache: true).ConfigureAwait(false);
+        return request.IsCurrent && await Task.Run(() => binding.IsCurrent(snapshot, request.Token), request.Token).ConfigureAwait(false);
     }
 
     internal async Task ShowSelectedCleanupAsync(SkillView.Maintenance.MaintenanceQueueEntry selected,
@@ -403,23 +339,26 @@ internal sealed partial class SkillViewWorkflowCoordinator
         var app = _getApp();
         if (app is null || !request.IsCurrent) return;
         var report = await GetOrProbeReportAsync(request.Token).ConfigureAwait(false);
+        CleanupReviewOutcome? outcome = null;
         await SelectedCleanupHandoff.RunAsync(selected, request,
-            token => CaptureInventoryAsync(report, token), _invokeAsync,
-            (snapshot, candidates) => ShowCleanupReview(app, report, snapshot, candidates),
+            token => CaptureInventoryAsync(report, token, bypassGhCache: true), _invokeAsync,
+            (snapshot, candidates) => outcome = ShowCleanupReview(app, report, snapshot, candidates, request.Token),
             () => _setStatus("selected cleanup issue is missing or ambiguous — refresh Issues")).ConfigureAwait(false);
+        if (outcome?.Changed == true) await ReconcileCleanupAsync(outcome).ConfigureAwait(false);
     }
 
-    private void ShowCleanupReview(IApplication app, EnvironmentReport report, InventorySnapshot snapshot,
-        ImmutableArray<CleanupClassifier.Candidate> candidates)
+    private sealed record CleanupReviewOutcome(bool Changed, string Summary);
+
+    private CleanupReviewOutcome ShowCleanupReview(IApplication app, EnvironmentReport report, InventorySnapshot snapshot,
+        ImmutableArray<CleanupClassifier.Candidate> candidates, CancellationToken lifetimeToken)
     {
         var screen = new CleanupScreen(app, _services.RemoveService, _services.Logger, candidates,
             snapshot.ProtectedRoots.ToArray(), snapshot.Skills, ownershipRunner: _services.Runner,
-            captureInventory: token => CaptureInventoryAsync(report, token));
-        _services.ListAdapter.Invalidate();
+            captureInventory: token => CaptureInventoryAsync(report, token, bypassGhCache: true), lifetimeToken: lifetimeToken);
         screen.Show();
         var changed = screen.RemovedCount > 0 || screen.RemovedFileCount > 0 || screen.RemovedDirectoryCount > 0
             || screen.IgnoredCount > 0 || screen.PreferenceMutationObserved;
-        var status = $"Cleanup: removed {screen.RemovedCount} items, {screen.RemovedFileCount} files, {screen.RemovedDirectoryCount} folders; ignored {screen.IgnoredCount}."
+        var status = screen.OutcomeSummary + $" Cleanup totals: removed {screen.RemovedCount} items, {screen.RemovedFileCount} files, {screen.RemovedDirectoryCount} folders; ignored {screen.IgnoredCount}."
             + (screen.CancellationObserved ? " Some operations were canceled." : "");
         if (changed)
         {
@@ -437,12 +376,31 @@ internal sealed partial class SkillViewWorkflowCoordinator
             }
         }
         _setStatus(status);
+        return new(changed, status);
+    }
+
+    private async Task<string> ReconcileCleanupAsync(CleanupReviewOutcome outcome)
+    {
+        try
+        {
+            using var deadline = new CancellationSource(TimeSpan.FromSeconds(30), CancellationCallbackReporter.For(_services.Logger, "cleanup reconciliation"));
+            var report = await GetOrProbeReportAsync(deadline.Token).ConfigureAwait(false);
+            var snapshot = await CaptureInventoryAsync(report, deadline.Token, bypassGhCache: true).ConfigureAwait(false);
+            return outcome.Summary + (snapshot.IsPartial || !snapshot.ConfiguredRootsComplete
+                ? " Post-action inventory verification incomplete." : " Post-action inventory captured within configured bounds.");
+        }
+        catch (Exception ex)
+        {
+            _services.Logger.Error("cleanup.reconcile", ex.ToString());
+            return outcome.Summary + " Native result retained; post-action inventory verification incomplete.";
+        }
     }
 
     internal static bool MatchesCleanupSelection(CleanupClassifier.Candidate candidate,
         SkillView.Maintenance.MaintenanceQueueEntry selected) =>
         candidate.Kind.ToString() == selected.Issue && PathIdentity.Equals(candidate.Path, selected.Cleanup?.Path ?? selected.Subject.Path)
-        && candidate.Impact?.Subject.InstallationId == selected.Subject.InstallationId;
+        && candidate.Impact?.Subject.InstallationId == selected.Subject.InstallationId
+        && PathIdentity.Equals(candidate.Impact.Subject.Path, selected.Subject.Path);
 
 
 
@@ -851,9 +809,10 @@ internal sealed partial class SkillViewWorkflowCoordinator
     }
 
     internal async Task<SkillView.Gh.Models.UpdateResult> PrepareUpdatesAsync(string ghPath,
-        SkillView.Gh.GhSkillUpdateService.Options options, CancellationToken token)
+        SkillView.Gh.GhSkillUpdateService.Options options, CancellationToken token, ExactCopyIntent? originalIntent = null)
     {
         var inventory = await CaptureUpdateInventoryAsync(ghPath, options.AllowHiddenDirectories, token).ConfigureAwait(false);
+        if (originalIntent is not null && originalIntent.Resolve(inventory) is null) throw new IOException("Guided target changed; no namesake or peer was selected.");
         return await Task.Run(() => _services.SavedUpdates.PrepareAsync(ghPath, options, inventory, token), token).ConfigureAwait(false);
     }
 

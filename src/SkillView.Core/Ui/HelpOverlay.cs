@@ -12,12 +12,12 @@ namespace SkillView.Ui;
 /// with the rest of the app. Dismisses on Esc, Enter, `?`, or button click.
 internal static class HelpOverlay
 {
-    internal static string BuildMarkdown(ActionScreen screen = ActionScreen.Discover, bool showingLogs = false)
+    internal static string BuildMarkdown(ActionScreen screen = ActionScreen.Discover, bool showingLogs = false, bool sourceDiffVisible = false)
     {
         var title = screen == ActionScreen.UpdateReview ? "Update review" : screen.ToString();
         var primary = new[] { ActionLabels.Selection, ActionLabels.Focus, ActionLabels.Back, ActionLabels.Help, ActionLabels.Locations };
         var advanced = new[] { ActionLabels.Tabs, ActionLabels.History, ActionLabels.Quit, ActionLabels.ListQuit };
-        return "## " + title + "\n\n" + string.Join("\n", ActionLabels.ScreenActions(screen, showingLogs).Select(action => action.Markdown))
+        return "## " + title + "\n\n" + string.Join("\n", ActionLabels.ScreenActions(screen, showingLogs, sourceDiffVisible).Select(action => action.Markdown))
             + "\n\n## Primary\n\n" + string.Join("\n", primary.Select(action => action.Markdown))
             + "\n\n## Advanced\n\n" + string.Join("\n", advanced.Select(action => action.Markdown))
             + "\n\n_Printable shortcuts type into focused text fields. Leave the field first; F1 and Ctrl+Q remain available._"
@@ -26,7 +26,7 @@ internal static class HelpOverlay
 
     internal static string MarkdownBodyForTests => BuildMarkdown();
 
-    internal static void Show(IApplication app, ActionScreen screen, bool showingLogs)
+    internal static void Show(IApplication app, ActionScreen screen, bool showingLogs, bool sourceDiffVisible = false)
     {
         var dialog = new Dialog
         {
@@ -42,7 +42,7 @@ internal static class HelpOverlay
             Y = 0,
             Width = Dim.Fill(2),
             Height = Dim.Fill(2),
-            Text = BuildMarkdown(screen, showingLogs),
+            Text = BuildMarkdown(screen, showingLogs, sourceDiffVisible),
         };
         TuiHelpers.ConfigureMarkdownPane(body, SchemeNames.Dialog);
         dialog.Add(body);

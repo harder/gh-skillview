@@ -12,14 +12,14 @@ The TUI is organized around three primary tabs in a persistent top header — **
 |---|---|---|
 | **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Opens when no skills are installed. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Browse physical copies by source; filter by Agent, Project/location, Source/owner or Issue, inspect coverage and details, or review an exact copy. | `2`, click the pill, or `←/→` |
-| **Issues** △ | Problems, checked Updates and Review suggestions, with incomplete discovery/checks separate. Checks are explicit. Enter reviews the exact issue or opens the existing copy chooser. | `3`, click the pill, or `←/→` |
+| **Issues** △ | Problems, checked Updates and Review suggestions, with incomplete discovery/checks separate. Checks are explicit. Enter expands a family, opens an expanded child's inline comparison, inspects a registry row, or opens an exact item's review (narrow ordinary rows show details first). | `3`, click the pill, or `←/→` |
 | **Locations** | Select extra workspaces, skill folders and agent profiles; save choices and refresh local inventory. | `F5` or **Locations** |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, `gh skill` availability, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
 | **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and options for hidden-dir scanning, installing from a republished skill's upstream source, or local installs. | `I` from a Discover result, or **Advanced…** from the compact modal |
 | **Remove — compact** | `[y]es / [n]o` confirm for simple single-skill removes. | `x` from an Installed row whose plan is straightforward |
 | **Remove wizard** | Multi-step review/confirm for plans with incoming symlinks, validation warnings, or package/repo group removes. | Automatically escalated from `x` when needed |
-| **Cleanup view** | Finds name collisions, metadata issues, broken symlinks, and residue; compare/review uncertain items and remove eligible cleanup candidates. | `c` |
+| **Cleanup findings** | Filters Issues to captured cleanup findings; review one exact item or use a guided per-item sequence. | `c` |
 | **Help overlay** | Grouped Markdown reference for the current screen's actions and shared navigation keys. | `?` or `F1` |
 
 At narrow widths, **History ! F4** is the compact retained-history attention hint;
@@ -264,7 +264,7 @@ Installed tab:
 | `Esc` | Return from full-width detail, then leave Installed from the list |
 | `C` (Shift+c) | Check updates for the whole catalog, or cancel the check |
 | `u` | Hand the selected exact copy to saved update review |
-| `c` | Open Cleanup |
+| `c` | Show Cleanup findings in Issues |
 | `Tab` / `Shift+Tab` | Reach the four visible filter selectors, Clear, Coverage and copy controls; Enter opens a selector, arrows/Enter choose, Esc cancels |
 | `G` | Cycle scope (all / user / project / custom), keeping all consumers |
 | `/` or `f` | Search Installed by name, path, agent or recorded source |
@@ -313,7 +313,7 @@ Issues tab:
 | `F2` | Switch between its issue summary and technical details |
 | `r` | Refresh disk inventory; upstream availability and running-session state remain unknown |
 | `C` | Check updates for the inventory, or cancel a running check |
-| `u` | Review the selected finding (alias for Enter) |
+| `u` | Review the selected eligible exact item directly (an expanded child: its saved update review) |
 
 Routine valid installs show **No local problems found. Updates not checked.**
 The list excludes generic installation-review opportunities and absence from gh
@@ -322,9 +322,12 @@ malformed metadata, broken links, conflicting records and empty residue, even
 when only review is supported. Same-name observations form one **Review**
 family with an affected-copy count and distinct locations in its detail pane.
 Matching names alone do not establish damage or redundant content; project
-overrides can be intentional. Enter opens the existing copy chooser, where an
-exact copy must be chosen before update/version or cleanup review. Other faults
-at those locations remain separate Problems.
+overrides can be intentional. Enter or Right expands the exact captured family.
+Enter on an expanded child opens its inline comparison; u opens its exact saved
+update review. An exact copy must be chosen before update/version or cleanup
+review. Ordinary exact rows open their review (details first below 110 columns);
+registry rows provide inspection only. Other faults at those locations remain
+separate Problems.
 
 **Check updates (C)** is visible in both Installed and Issues. Nothing checks
 upstream automatically at startup. Checks run for all captured physical copies,
@@ -362,23 +365,61 @@ case differences remain distinct. When long or sanitized paths would still look
 identical, a `#` marker
 distinguishes them within the captured list; details retain the full location.
 
-For **Same name, multiple copies** observations, Enter opens
-**Copies and versions**. Each row is one physical installation; its recorded
-consumers share those files. Select a row to see its full location, source,
-recorded ref, authored version and pin. Related rows include matching names and
-matching recorded sources/subpaths; matching names alone do not prove a common
-source. Unknown provenance and incomplete discovery stay visible.
+For **Same name, multiple copies**, Enter expands the family in Issues. Family
+headers have no copy action. Select an exact child and press Enter for inline
+copy detail. Installed also expands source groups into exact children. Below
+110 columns the detail uses the full width; **Back / Esc** returns to the same
+selection and scroll. Wider terminals retain the list beside the detail.
 
-The original selection is the reference. Select another row and press
-**Compare** to inspect local file differences, or **Use as reference** to change
-the pair. This does not check upstream availability or infer which version is
-best. **Update / version...** selects that exact location in the existing Updates
-workspace, where **Choose version...** offers a Git tag. **Cleanup review...**
-opens the matching captured issue at that location; name conflicts remain
-review-only. Actions without an applicable finding, and updates to managed
-read-only copies, are disabled with an explanation in the details.
-Opening either review changes no skill files. The list shows at most 128 copies;
-comparison summaries show at most 12 changed paths and report omissions.
+Installed's **More actions → Compare copies (broad: same name or recorded source; not the finding's family)** opens the shared inline
+selected-copy detail. Choose a **Reference...** explicitly, then **Compare**.
+The reference is only a comparison partner, never a preferred survivor. Related
+choices include matching names or recorded sources; that browsing relation grants
+no removal authority. Compare reads bounded local payloads in the background;
+Back, selection changes, refresh and navigation retire its transient result.
+There is no startup payload hashing or upstream check in this action.
+
+A completed local capture does not establish complete inventory or consumer
+coverage. Raw fingerprints can differ even when normalized source differences
+are empty. Root modes and held physical identities are checked separately; aliases
+are one payload. Matching files with unknown source/revision stay unknown.
+Known-source matching captures can support Review guidance only with compatible
+observed modes, revisions and complete bounded coverage. Full ACL/xattr/ADS
+metadata equivalence, authentic origin, non-use and running sessions remain
+unverified. No survivor is chosen automatically. Tracked copies cannot use
+standalone Move aside; use their exact update/version or owning-tool review.
+
+**More actions → Review standalone Move aside...** independently requests the
+existing quarantine admission for the deliberately selected untracked standalone
+Custom copy. It requires fresh inventory, exact native checks, separate standalone
+and effect approvals, and the Preview fingerprint. Provider, managed, owned,
+tracked, pinned, shared, partial and unknown states remain refused. The native
+same-volume move retains the original objects; it does not edit a registry or
+retarget consumers. The result separates native movement from inventory
+verification and offers **Inspect retained** and a separate **Review Undo**.
+Undo revalidates the exact operation, vacant destination, consumers, retained
+identities and original context. It has no `--expect` fingerprint contract and
+never overwrites a destination. A newly dangling exposure can refuse Undo.
+
+After restart, use `quarantine-history` and `undo --id <operation>` for a fresh
+preview under the same HOME/state/CWD and global scan-root options; execute with
+`--yes` only after review. F4 History lists saved replacements, not quarantine.
+
+**c** navigates to Cleanup findings in Issues, retaining the selected exact target
+when a finding matches. Enter or **Review (u)** freshly classifies and matches the
+exact issue/kind/path/installation ID; missing or ambiguous matches refuse. The
+focused removal review retains native preflight, confirmation, cancellation and
+partial-result accounting. Deletion has no automatic Undo. **Suppress suggestion**
+is a private preference, separate from health, disablement and ownership.
+
+**Guided (g)** freezes up to 128 eligible visible cleanup/update findings.
+Use **Review next (n)**, **Skip (s)** and **Stop (x)**. Each item resolves afresh to
+its original exact address/native/source intent; changed, missing or ambiguous
+items are reported as skipped/refused. No replacement sibling is prepared until
+the prior apply/reconciliation returns and the user chooses Review next. Existing
+source and retention approvals remain independent. Outcomes, skipped and remaining
+counts survive cancellation; incomplete inventory verification is separate from
+native failure. Stop leaves unstarted items untouched. There is no Apply all.
 
 In Updates, the selected-copy and saved-review summaries use the full reading
 width. **Review update** prepares one immutable candidate; it does not apply it.
@@ -488,7 +529,7 @@ Other:
 | Key | Action |
 |---|---|
 | `d` | Open Doctor (full-screen) |
-| `c` | Open Cleanup |
+| `c` | Show Cleanup findings in Issues |
 
 **Warp note:** if `Enter` is unreliable after the first interaction, use `Ctrl+J` or `→` for preview.
 
@@ -951,7 +992,7 @@ skillview --scan-root /path/to/skills cleanup --candidates EmptyDirectory --appl
 An apply batch can remove eligible entries while refusing protected entries;
 inspect the per-entry `applied` results and exit status.
 
-Cleanup's **Ignore** action stores a preference outside the skill directory. It
+Cleanup's **Suppress suggestion** action stores a preference outside the skill directory. It
 suppresses suggestions for that physical installation across its consumer
 contexts; agent loading and update policy stay unchanged. The CLI accepts an
 exact `--path` (including an agent symlink) or `--install-id`, plus `--json`.
@@ -1153,8 +1194,10 @@ Installation method differences describe captured owners, links and contexts;
 they are informational. Same-name copies with different or unknown sources stay
 separate. Same-source physical copies also remain visible: matching recorded
 evidence is informational, while incomplete revision evidence stays unknown.
-Neither proves identical payloads or redundant copies. Enter opens the copy chooser for **Review version alignment** through
-the existing latest/tag saved review, or an explicit **Compare files**. Review
+Neither proves identical payloads or redundant copies. Enter or Right expands a
+family; Enter on an expanded child opens its inline comparison, and u opens that
+copy's exact saved update review. Ordinary exact rows open their review (details
+first below 110 columns), while registry rows provide inspection only. Review
 and apply each exact copy separately; a family never selects a survivor.
 
 On Issues, **k / Keep both** marks an exact observed source, revision or method
@@ -1203,10 +1246,12 @@ registry-only cleanup, raw registry editor or installation mutation for this row
 Unsupported/diagnostic record evidence stays protected/unknown. Capture/display
 bounds can omit records and never prove the absence of omitted records.
 
-Below 110 columns, Issues uses the full width: Enter opens the selected detail,
-then Enter opens any supported copy review. Escape returns to the same list
-selection before leaving the tab. Wider terminals show the list and detail side
-by side. F2 toggles technical evidence; r refreshes local inventory only.
+Below 110 columns, Issues uses the full width. For ordinary exact rows, including
+Updates and package rows, Enter shows details first; a second Enter opens the
+supported review. Families still expand, expanded children open their inline
+comparison with one Enter, and registry rows show details only. Escape returns
+to the same list selection before leaving the tab. Wider terminals show the list
+and detail side by side. F2 toggles technical evidence; r refreshes local inventory only.
 
 CLI `queue --json` remains schema 1 with its existing exact-installation rows,
 fields and unknown update semantics. The grouped typed observations and
@@ -1287,3 +1332,5 @@ update availability as unsupported and refuses ordinary update/version choice.
 Use the existing exact-copy remove and reinstall flows where admitted. Repair
 never runs a later gh update or invents a ref. Other unscanned copies and running
 sessions remain unknown.
+
+Guided **n / s / x** act only during an active sequence. **k / K** remain Keep both / Choices; while a guided review is open or working, finish or Stop it before preference or cleanup actions. Starting **g** requires an eligible exact item and no active review or preference work. Typed family children retain that finding's exact captured membership; stale membership requires refresh before comparison. Registry-only observations stay inspect-only.

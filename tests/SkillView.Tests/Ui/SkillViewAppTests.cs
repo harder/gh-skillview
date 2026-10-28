@@ -1764,20 +1764,21 @@ public sealed class SkillViewAppTests
         Assert.Equal(0, app.ChangesTabForTests!.RowCountForTests);
         var changesHints = app.StatusStripForTests.HintsForTests;
         Assert.Contains(changesHints, hint => hint is { Key: "C", Label: "Check updates" });
-        Assert.Contains(changesHints, hint => hint is { Key: "Enter", Label: "Review" });
+        Assert.Contains(changesHints, hint => hint is { Key: "Enter", Label: "Open" });
         Assert.Contains(changesHints, hint => hint is { Key: "F2", Label: "Details" });
         Assert.Contains(changesHints, hint => hint is { Key: "c", Label: "Cleanup" });
         Assert.Contains(changesHints, hint => hint is { Key: "d", Label: "Doctor" });
         Assert.DoesNotContain(changesHints, hint => hint.Key is "f" or "x");
         Assert.Contains("## Issues", app.CurrentHelpForTests);
-        Assert.Contains("**Enter / u / U**", app.CurrentHelpForTests);
+        Assert.Contains("**Enter**", app.CurrentHelpForTests);
+        Assert.Contains("**u / U**", app.CurrentHelpForTests);
         Assert.DoesNotContain("**i**", app.CurrentHelpForTests);
         Assert.Contains("**F4**", app.CurrentHelpForTests);
         Assert.DoesNotContain("2.95", app.CurrentHelpForTests);
 
         // Log mode belongs to Discover; it must not hide Installed/Issues hints.
         app.ShowLogPaneForTests();
-        Assert.Contains(app.CurrentHintsForTests, hint => hint is { Key: "Enter", Label: "Review" });
+        Assert.Contains(app.CurrentHintsForTests, hint => hint is { Key: "Enter", Label: "Open" });
         app.ForceActiveTabForTests(SkillViewTab.Discover);
         Assert.Contains(app.CurrentHintsForTests, hint => hint is { Key: "l", Label: "Preview" });
         Assert.Contains("Preview: return from logs", app.CurrentHelpForTests);

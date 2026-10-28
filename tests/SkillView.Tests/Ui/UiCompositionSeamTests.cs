@@ -46,7 +46,7 @@ public sealed class UiCompositionSeamTests
         try
         {
             window.Draw(new DrawContext());
-            var labels = new[] { ActionLabels.CheckUpdates, ActionLabels.ReviewIssue, ActionLabels.KeepBoth, ActionLabels.Choices };
+            var labels = new[] { ActionLabels.CheckUpdates, ActionLabels.ReviewExactIssue, ActionLabels.KeepBoth, ActionLabels.Choices };
             var controls = labels.Select(label => view.SubViews.OfType<Button>().Single(button => button.Text == label.ButtonText)).ToArray();
             foreach (var control in controls)
             {

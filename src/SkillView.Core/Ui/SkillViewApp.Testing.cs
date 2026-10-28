@@ -98,7 +98,7 @@ public sealed partial class SkillViewApp
     internal StatusStripView? StatusStripForTests => _statusStrip;
 
     internal IReadOnlyList<StatusHint> CurrentHintsForTests => GetCurrentHints();
-    internal string CurrentHelpForTests => HelpOverlay.BuildMarkdown(CurrentActionScreen, _showingLogs);
+    internal string CurrentHelpForTests => HelpOverlay.BuildMarkdown(CurrentActionScreen, _showingLogs, _updatesTab?.SourceDiffAvailable == true);
 
     internal string PreviewTextForTests => _previewPane?.Text.ToString() ?? string.Empty;
 

@@ -49,7 +49,12 @@ internal static class ActionLabels
     internal static readonly ActionLabel Browse = new("Enter", "Details/Expand", "expand a source group or browse the selected exact copy");
     internal static readonly ActionLabel Expand = new("← / →", "Collapse/Expand", "collapse / expand the selected Installed source group");
     internal static readonly ActionLabel ReviewUpdate = new("u", "Review update", "review an update for the selected exact copy", "U");
-    internal static readonly ActionLabel ReviewIssue = new("Enter", "Review", "review the selected finding without changing files", "u", "U");
+    internal static readonly ActionLabel ReviewIssue = new("Enter", "Open", "expand a family, open an exact child's comparison, inspect registry guidance, or open an exact item's review (narrow layouts show details first); never applies a change");
+    internal static readonly ActionLabel ReviewExactIssue = new("u", "Review", "open the existing review for the selected eligible exact copy", "U");
+    internal static readonly ActionLabel Guided = new("g", "Guided", "start a sequence only with eligible exact items and no active sequence, review or preference work");
+    internal static readonly ActionLabel ReviewNext = new("n", "Review next", "review one next exact item after prior reconciliation; active sequence only");
+    internal static readonly ActionLabel SkipGuided = new("s", "Skip", "skip the unstarted guided item; active sequence only");
+    internal static readonly ActionLabel StopGuided = new("x", "Stop", "stop only the guided request; active sequence only");
     internal static readonly ActionLabel KeepBoth = new("k", "Keep both", "mark the selected observed copy difference intentional; an intentional difference offers Restore suggestions instead");
     internal static readonly ActionLabel RestoreSuggestions = KeepBoth with { Label = "Restore" };
     internal static readonly ActionLabel Choices = new("K", "Choices", "review saved intentional differences; resetting them requires separate confirmation");
@@ -61,10 +66,10 @@ internal static class ActionLabels
     internal static readonly ActionLabel PinFilter = new("P", "Pin filter", "cycle the Installed pin filter");
     internal static readonly ActionLabel ScopeFilter = new("G", "Scope filter", "cycle all / user / project / custom; retain every shared consumer");
     internal static readonly ActionLabel PrepareUpdate = ReviewUpdate with { Explanation = "prepare a candidate for this exact copy when available; approval is separate", Aliases = ["U", "c"] };
-    internal static readonly ActionLabel SourceDiff = new("D", "View source changes", "open frozen saved source changes; opening Diff grants no source or retention approval", "d");
+    internal static readonly ActionLabel SourceDiff = new("D", "View source changes", "when a saved candidate is shown, open frozen saved source changes; opening Diff grants no source or retention approval", "d");
     internal static readonly ActionLabel PlanUnpin = new("p", "Plan unpin only", "prepare a separate pin-only review for this exact copy when available");
 
-    internal static ActionLabel[] ScreenActions(ActionScreen screen, bool showingLogs = false) => screen switch
+    internal static ActionLabel[] ScreenActions(ActionScreen screen, bool showingLogs = false, bool sourceDiffVisible = false) => screen switch
     {
         ActionScreen.Discover => [DiscoverSearch, Preview, Filters, Install, AdvancedInstall, PickSkills, Previous, Next,
             OpenRepo, Sort, showingLogs ? ReturnPreview : Logs, PreviewMode,
@@ -72,8 +77,8 @@ internal static class ActionLabels
             new("r", "Refresh", "rerun the current Discover query, if one is entered", "R")],
         ActionScreen.Installed => [Browse, Expand, Search, Details, CheckUpdates, ReviewUpdate, MoreActions, Cleanup,
             Remove, OpenPath, PackageCheck, Reimport, SwitchSource, Sort, PinFilter, ScopeFilter, Refresh],
-        ActionScreen.Issues => [ReviewIssue, Details, CheckUpdates, KeepBoth, Choices, Refresh with { Aliases = ["R"] }, Cleanup, Doctor],
-        ActionScreen.UpdateReview => [Details, SourceDiff, PrepareUpdate, PlanUnpin, Refresh with { Aliases = ["R"] },
+        ActionScreen.Issues => [ReviewIssue, ReviewExactIssue, Details, CheckUpdates, KeepBoth, Choices, Guided, ReviewNext, SkipGuided, StopGuided, Refresh with { Aliases = ["R"] }, Cleanup with { Explanation = "review the selected exact cleanup finding, or filter Issues to cleanup findings; no deletion without confirmation" }, Doctor],
+        ActionScreen.UpdateReview => [Details, .. sourceDiffVisible ? new[] { SourceDiff } : [], PrepareUpdate, PlanUnpin, Refresh with { Aliases = ["R"] },
             new("", "Review controls", "Choose version, source acknowledgement, retention approval and apply remain separate visible controls; F2 includes frozen source changes")],
         ActionScreen.Doctor => [Doctor, new("/", "Search", "return to Discover and focus its query field")],
         _ => [],

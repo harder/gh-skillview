@@ -109,18 +109,15 @@ public sealed class CopiesPresentationTests
     }
 
     [Fact]
-    public void CleanupHandoffRequiresExactlyOneMatchingIssueCandidateAndSubjectAddress()
+    public void SelectedCleanupMatchesKindPathAndExactSubjectAddress()
     {
-        var selected = Copy("/one"); var other = Copy("/two");
-        var candidate = Collision(selected);
-        var subject = OperationSubject.From(selected);
-        var wrongKind = candidate with { Kind = CleanupClassifier.CandidateKind.EmptyDirectory, ReviewOnly = false };
-        var wrongPath = candidate with { Path = "/exposure/link" };
-        var result = SkillViewWorkflowCoordinator.FilterCleanupForInstallation([Collision(other), wrongKind, wrongPath, candidate], subject, "NameCollision");
-        Assert.Same(candidate, Assert.Single(result));
-        Assert.Empty(SkillViewWorkflowCoordinator.FilterCleanupForInstallation([candidate], subject with { Path = "/replacement" }, "NameCollision"));
-        Assert.Empty(SkillViewWorkflowCoordinator.FilterCleanupForInstallation([wrongKind, wrongPath], subject, "NameCollision"));
-        Assert.Empty(SkillViewWorkflowCoordinator.FilterCleanupForInstallation([candidate, candidate], subject, "NameCollision"));
-        Assert.Empty(SkillViewWorkflowCoordinator.FilterCleanupForInstallation([candidate], subject, "Duplicate"));
+        var selected = Copy("/one"); var candidate = Collision(selected);
+        var entry = InlineCopyWorkflowTests.Entry(selected) with { Issue = "NameCollision", Cleanup = candidate };
+        Assert.True(SkillViewWorkflowCoordinator.MatchesCleanupSelection(candidate, entry));
+        Assert.False(SkillViewWorkflowCoordinator.MatchesCleanupSelection(candidate with { Path = "/exposure/link" }, entry));
+        Assert.False(SkillViewWorkflowCoordinator.MatchesCleanupSelection(candidate with { Kind = CleanupClassifier.CandidateKind.EmptyDirectory }, entry));
+        Assert.False(SkillViewWorkflowCoordinator.MatchesCleanupSelection(Collision(Copy("/two")), entry));
+        Assert.False(SkillViewWorkflowCoordinator.MatchesCleanupSelection(candidate,
+            entry with { Subject = entry.Subject with { Path = "/replacement" } }));
     }
 }

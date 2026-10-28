@@ -28,6 +28,10 @@ internal sealed partial class UpdatesTabView : FrameView
     private readonly Logger _logger;
     private readonly Action _onLeaveTab;
     private readonly Action _onUpdateApplied;
+    internal Action<UpdateReviewWork>? ReviewWorkStarted { get; set; }
+    internal Action<UpdateReviewWork, UpdateResult?>? ReviewWorkSettled { get; set; }
+    internal Action<OperationSubject, string?, long>? ReviewSkipped { get; set; }
+    internal Action<OperationSubject, long>? ReviewLoaded { get; set; }
     private readonly CancellationToken _lifetimeToken;
 
     private readonly Label _tableLabel;
@@ -241,6 +245,7 @@ internal sealed partial class UpdatesTabView : FrameView
         _drillInSubject = selected;
         ClearUndo();
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
+        ReviewLoaded?.Invoke(selected, loadGeneration);
         using var loadCancellation = _loadCancellations.Replace(_lifetimeToken);
         Visible = true;
         // Never leave a previous copy actionable after failed/canceled loading.
@@ -318,6 +323,7 @@ internal sealed partial class UpdatesTabView : FrameView
     internal Button UnpinOnlyButtonForTests => _unpinOnlyButton;
     internal Task PlanUnpinForTestsAsync() => RunUnpinAsync();
     internal void ChooseVersionForTests() => ChooseVersion();
+    internal bool SourceDiffAvailable => _diffButton.Visible;
     internal Button ChooseVersionButtonForTests => _chooseVersionButton;
     internal string StatusTextForTests => _status.Text.ToString();
     internal string TableLabelForTests => _tableLabel.Text.ToString();

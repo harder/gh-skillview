@@ -686,52 +686,7 @@ public sealed class CleanupScreenTests
         Assert.Contains("context protection", CleanupScreen.RenderDetail(candidate, showDetails: true));
     }
 
-    [Fact]
-    public void BuildShortcuts_UsesCompactOrderedCleanupActions()
-    {
-        var shortcuts = CleanupScreen.BuildShortcutsForTests();
 
-        Assert.Collection(
-            shortcuts,
-            shortcut =>
-            {
-                Assert.Equal("Space", shortcut.Title);
-                Assert.Equal("Select", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("Enter", shortcut.Title);
-                Assert.Equal("Review", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("F2", shortcut.Title);
-                Assert.Equal("Details", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("i", shortcut.Title);
-                Assert.Equal("Ignore", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("x", shortcut.Title);
-                Assert.Equal("Export", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("Esc", shortcut.Title);
-                Assert.Equal("Back", shortcut.HelpText);
-            });
-    }
-
-    [Fact]
-    public void BuildHeaderText_UsesShortSelectionHint()
-    {
-        Assert.Contains("Space Select", CleanupScreen.BuildHeaderTextForTests());
-        Assert.Contains("Enter Review", CleanupScreen.BuildHeaderTextForTests());
-        Assert.Contains("F2 Details", CleanupScreen.BuildHeaderTextForTests());
-    }
 
     [Fact]
     public void ConfirmationGroupsRepeatedFriendlyIssuesTogether()

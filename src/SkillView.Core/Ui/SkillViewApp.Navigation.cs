@@ -175,7 +175,13 @@ public sealed partial class SkillViewApp
             else { ActivateTab(SkillViewTab.Changes); SetStatus("Use Check updates (C), then select an Updates finding and press Enter."); }
             return true;
         }
-        if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
+        if (rune.Value == 'c')
+        {
+            var selected = _activeTab == SkillViewTab.Installed ? _installedTab?.GetSelectedSkill() : null;
+            ActivateTab(SkillViewTab.Changes);
+            _changesTab?.ShowCleanup(selected is null ? null : OperationSubject.From(selected));
+            return true;
+        }
         if (key.KeyCode == KeyCode.F1 || rune.Value == '?') { ShowHelp(); return true; }
 
         // Search-tab sort cycle. Lower-case `s` is unused at this level so
@@ -247,7 +253,7 @@ public sealed partial class SkillViewApp
     /// Switch active tab. All three (Discover / Installed / Changes) are
     /// embedded views — flipping the Visible flags swaps them in-place
     /// without re-running the app loop.
-    private void ActivateTab(SkillViewTab tab, InstalledInstallHandoff? installHandoff = null)
+    private void ActivateTab(SkillViewTab tab, InstalledInstallHandoff? installHandoff = null, bool returningReview = false)
     {
         var leftDoctor = false;
         if (_inDoctor)
@@ -264,6 +270,7 @@ public sealed partial class SkillViewApp
                 : SkillViewTab.Discover;
         }
         if (tab == _activeTab) return;
+        if (!returningReview) _guidedRepairs.Stop();
 
         if (_activeTab == SkillViewTab.Discover)
         {
@@ -397,10 +404,11 @@ public sealed partial class SkillViewApp
 
     private void LeaveUpdates()
     {
+        _guidedRepairs.CloseReview();
         _updatesTab?.CancelPendingWork();
         if (_updatesTab is not null) _updatesTab.Visible = false;
         _activeTab = _tabBeforeUpdateReview == SkillViewTab.Discover ? SkillViewTab.Installed : SkillViewTab.Discover;
-        ActivateTab(_tabBeforeUpdateReview);
+        ActivateTab(_tabBeforeUpdateReview, returningReview: true);
     }
 
     private void CheckUpdates()
@@ -460,7 +468,7 @@ public sealed partial class SkillViewApp
     private void ShowHelp()
     {
         if (_app is null) return;
-        HelpOverlay.Show(_app, CurrentActionScreen, _showingLogs);
+        HelpOverlay.Show(_app, CurrentActionScreen, _showingLogs, _updatesTab?.SourceDiffAvailable == true);
     }
 
     private void FocusSearchFromInstalled()
