@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 
 from source_review_proof import acknowledge_frozen_source
+from registry_proof_budget import ProductCommands, cli_role, product_environment, public_stderr
 from registry_proof_process import RegistryProofArtifacts, run_checkpoint_child, write_proof_marker
 
 
@@ -62,8 +63,9 @@ def environment(root, gh):
 
 
 class Journey:
-    def __init__(self, root, app, proof, gh, evidence, damage, pinned=False, expect_metadata_refusal=False):
+    def __init__(self, root, app, proof, gh, evidence, damage, pinned=False, expect_metadata_refusal=False, product_counts=None):
         self.root, self.app, self.proof, self.gh = root, app, proof, gh
+        self.product_counts = product_counts or ProductCommands({})
         root.mkdir(mode=0o700)
         for name in ('home', 'state', 'custom', 'tmp', 'receipts'):
             (root / name).mkdir()
@@ -129,9 +131,12 @@ class Journey:
     def command(self, argv, ok=True, env=None):
         self.sequence += 1
         prefix = self.root / 'receipts' / f'{self.sequence:04d}'
+        role = cli_role(argv[0], self.app, proof=self.proof)
+        command_env = product_environment(env or self.env, role)
         try:
-            p = subprocess.run(list(map(str, argv)), cwd=self.root, env=env or self.env,
-                               stdin=subprocess.DEVNULL, capture_output=True, timeout=180)
+            with self.product_counts.observe(command_env, self.gh, role, self.damage, self.root):
+                p = subprocess.run(list(map(str, argv)), cwd=self.root, env=command_env,
+                                   stdin=subprocess.DEVNULL, capture_output=True, timeout=180)
         except subprocess.TimeoutExpired as ex:
             prefix.with_suffix('.stdout').write_bytes(ex.stdout or b'')
             prefix.with_suffix('.stderr').write_bytes(ex.stderr or b'')
@@ -140,7 +145,7 @@ class Journey:
         prefix.with_suffix('.stdout').write_bytes(p.stdout)
         prefix.with_suffix('.stderr').write_bytes(p.stderr)
         prefix.with_suffix('.json').write_text(json.dumps(dict(argv=list(map(str, argv)), exit=p.returncode)))
-        assert (p.returncode == 0) == ok, (argv, p.returncode, p.stdout.decode(errors='replace'), p.stderr.decode(errors='replace'))
+        assert (p.returncode == 0) == ok, (argv, p.returncode, p.stdout.decode(errors='replace'), public_stderr(p.stderr, role))
         return p
 
     def run(self, action, *arguments, ok=True):
@@ -196,9 +201,10 @@ class Journey:
         child_record = {}
         self.proof_children.append(child_record)
         try:
-            run_checkpoint_child(argv, self.env, self.root, prefix.with_suffix('.stdout'), prefix.with_suffix('.stderr'),
-                                 checkpoint, child_record, self.artifacts, str(self.root), gh=self.gh,
-                                 ready_timeout=45, failure_message='Native checkpoint was not reached: ' + checkpoint)
+            with self.product_counts.observe(self.env, self.gh, 'proof-host', self.damage, self.root):
+                run_checkpoint_child(argv, self.env, self.root, prefix.with_suffix('.stdout'), prefix.with_suffix('.stderr'),
+                                     checkpoint, child_record, self.artifacts, str(self.root), gh=self.gh,
+                                     ready_timeout=45, failure_message='Native checkpoint was not reached: ' + checkpoint)
         finally:
             # Metadata only; publication failure must not mask the proof result.
             try:
@@ -290,6 +296,7 @@ def main():
         scope='Attempted direct gh subprocess.run invocations by this script only',
         productGhApiCommands=None, httpRequests=None,
         unknownReason='No existing product debug request log; gh-internal HTTP and other proofs are unknown')
+    product_counts = ProductCommands(report['commandDiagnostics'])
     def save(): a.output.write_text(json.dumps(report, indent=2) + '\n')
     save()
     try:
@@ -300,7 +307,7 @@ def main():
                 assert digest(evidence / entry['path']) == entry['sha256'], entry['path']
             report['offlineManifest'] = manifest
         if a.expect_metadata_refusal:
-            Journey(root / 'metadata-refusal', app, proof, gh, evidence, 'missing-empty', expect_metadata_refusal=True)
+            Journey(root / 'metadata-refusal', app, proof, gh, evidence, 'missing-empty', expect_metadata_refusal=True, product_counts=product_counts)
             report['status'] = 'expected-metadata-capability-refusal'
             return
         scenarios = ['abandon-empty', 'abandon-corrupt', 'abandon-invalid', 'abandon-nonempty',
@@ -314,7 +321,7 @@ def main():
                      'surviving-installed-blob', 'surviving-installed-manifest', 'surviving-installed-metadata']
         for index, scenario in enumerate(a.scenario or scenarios):
             damage = 'corrupt-yaml' if scenario == 'consumer-readable' or scenario.startswith('surviving-installed-') else 'missing-nonempty' if 'nonempty' in scenario and scenario != 'nonempty-immutable' else 'corrupt-yaml' if 'corrupt' in scenario else 'invalid-metadata' if 'invalid' in scenario else 'missing-empty'
-            j = Journey(root / scenario, app, proof, gh, evidence, damage, pinned=(index % 2 == 0 or damage == 'invalid-metadata') and damage != 'missing-nonempty')
+            j = Journey(root / scenario, app, proof, gh, evidence, damage, pinned=(index % 2 == 0 or damage == 'invalid-metadata') and damage != 'missing-nonempty', product_counts=product_counts)
             j.artifacts, j.proof_children = artifacts, []
             case = dict(proofChildren=j.proof_children, name=scenario, root=str(j.root), id=j.plan['id'], damage=damage, status='running')
             report['cases'].append(case); save()

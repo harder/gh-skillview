@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 
 from source_review_proof import acknowledge_frozen_source
+from registry_proof_budget import ProductCommands, InstallTemplates, cli_role, product_environment, public_stderr
 from registry_proof_process import RegistryProofArtifacts, run_checkpoint_child, write_proof_marker
 
 
@@ -68,6 +69,8 @@ def main():
         unknownReason='No existing product debug request log; gh-internal HTTP and other proofs are unknown')
     report['managedBindings'] = {p.name: sha(p) for p in sorted(app.parent.glob('*.dll'))}
     output.write_text(json.dumps(report, indent=2))
+    product_counts = ProductCommands(report['commandDiagnostics'])
+    templates = InstallTemplates(root / 'install-templates')
     sequence = 0
     try:
         for tool in args.gh:
@@ -99,9 +102,12 @@ def main():
                             report['commandDiagnostics']['directGhCommands'][category] += 1
                         sequence += 1
                         prefix = receipt_dir / f'{sequence:04d}'
+                        role = cli_role(argv[0], app, args.old_app, args.proof_host)
+                        command_env = product_environment(process_environment or env, role)
                         try:
-                            p = subprocess.run(list(map(str, argv)), env=process_environment or env, cwd=process_cwd or case_root, stdin=subprocess.DEVNULL,
-                                               capture_output=True, timeout=timeout)
+                            with product_counts.observe(command_env, gh, role, 'independent-contexts' if process_cwd is not None else damage, case_root):
+                                p = subprocess.run(list(map(str, argv)), env=command_env, cwd=process_cwd or case_root, stdin=subprocess.DEVNULL,
+                                                   capture_output=True, timeout=timeout)
                             prefix.with_suffix('.stdout').write_bytes(p.stdout)
                             prefix.with_suffix('.stderr').write_bytes(p.stderr)
                             prefix.with_suffix('.json').write_text(json.dumps(dict(argv=list(map(str, argv)), exit=p.returncode), indent=2))
@@ -111,7 +117,7 @@ def main():
                             prefix.with_suffix('.json').write_text(json.dumps(dict(argv=list(map(str, argv)), timeout=timeout), indent=2))
                             raise
                         if expect is not None:
-                            assert (p.returncode == 0) == (expect == 0), (argv, p.returncode, p.stdout.decode(errors='replace'), p.stderr.decode(errors='replace'))
+                            assert (p.returncode == 0) == (expect == 0), (argv, p.returncode, p.stdout.decode(errors='replace'), public_stderr(p.stderr, role))
                         return p
 
                     write_proof_marker(case_root)
@@ -122,7 +128,13 @@ def main():
                     source = '.github/skills/cli-exercise' if name == 'cli-exercise' else 'skills/gh-skill'
                     install = [gh, 'skill', 'install', '--agent', 'universal', '--scope', 'user', '--allow-hidden-dirs']
                     if pinned: install += ['--pin=v2.103.2']
-                    command([*install, '--', 'cli/cli', source])
+                    before_install = templates.before(home)
+                    install_source = templates.reuse(gh, pinned, source, home) if damage == 'missing-empty' else None
+                    if install_source is None:
+                        command([*install, '--', 'cli/cli', source])
+                        if damage == 'corrupt-yaml':
+                            templates.capture(gh, pinned, source, home, case_root, case_root, before_install)
+                        install_source = 'real'
                     payload = home / '.agents/skills' / name
                     registry = home / '.agents/.skill-lock.json'
                     registry_bytes, registry_native = registry.read_bytes(), native(registry)
@@ -157,6 +169,7 @@ def main():
                     assert len(selected) == 1, captured
                     planned = run('registry-restore-plan', '--path', payload, ok=not args.expect_metadata_refusal)
                     case = dict(gh=str(gh), ghSha256=sha(gh), pinned=pinned, damage=damage, root=str(case_root))
+                    case.update(installSource=install_source, templateModeEvidence=templates.mode_evidence)
                     report['cases'].append(case)
                     if args.expect_metadata_refusal:
                         assert 'CAP_SYS_ADMIN' in json.dumps(planned), planned
@@ -186,9 +199,10 @@ def main():
                         boundary = 'retain-moved' if damage == 'corrupt-yaml' else 'install-moved'
                         argv = [str(args.proof_host.resolve()), str(case_root), str(gh), plan['id'], plan['planFingerprint'], 'apply-registry-restore', boundary]
                         case['proofChild'] = {}
-                        run_checkpoint_child(argv, env, case_root, case_root / 'kill.stdout', case_root / 'kill.stderr',
-                                             boundary, case['proofChild'], artifacts, str(case_root), gh=gh,
-                                             ready_timeout=45, failure_message='Proof host did not reach ' + boundary)
+                        with product_counts.observe(env, gh, 'proof-host', damage, case_root):
+                            run_checkpoint_child(argv, env, case_root, case_root / 'kill.stdout', case_root / 'kill.stderr',
+                                                 boundary, case['proofChild'], artifacts, str(case_root), gh=gh,
+                                                 ready_timeout=45, failure_message='Proof host did not reach ' + boundary)
                         case['killedAt'] = boundary
                         interrupted = run('registry-restore-inspect', '--id', plan['id'])['operation']
                         applied = run('registry-restore-recover', '--id', plan['id'], '--yes', '--expect', interrupted['reviewFingerprint'])['operation']

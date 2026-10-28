@@ -24,6 +24,172 @@ spec.loader.exec_module(budget)
 BASE_HASHES = {'.github/workflows/ci.yml': 'a9250a7c4d6238b86002f551a47119b81442e456401e25c0b82251cafe5fc692', 'tests/native/prove-registry-recorded-restore.py': '509489c6a38123f3fda245c5d5b26fea7fef6aeee8cea1aef77a1578668afac9', 'tests/native/prove-registry-recorded-retirement.py': '3443b9564fbb5136a967c2909469e2157d6b4851e47e36b055f5965f73b039e9'}
 
 CORE = dict(limit=5000, used=5000, remaining=0, reset=1793219888)
+
+APPROVED_PROOF_ADDITIONS = {'tests/native/prove-registry-recorded-restore.py': [('',
+                                                      'from registry_proof_budget import ProductCommands, '
+                                                      'InstallTemplates, cli_role, product_environment, '
+                                                      'public_stderr\n'),
+                                                     ('',
+                                                      '    product_counts = '
+                                                      "ProductCommands(report['commandDiagnostics'])\n"
+                                                      '    templates = InstallTemplates(root / '
+                                                      "'install-templates')\n"),
+                                                     ('',
+                                                      '                        role = cli_role(argv[0], app, '
+                                                      'args.old_app, args.proof_host)\n'
+                                                      '                        command_env = '
+                                                      'product_environment(process_environment or env, '
+                                                      'role)\n'),
+                                                     ('                            p = '
+                                                      'subprocess.run(list(map(str, argv)), '
+                                                      'env=process_environment or env, cwd=process_cwd or '
+                                                      'case_root, stdin=subprocess.DEVNULL,\n'
+                                                      '                                               '
+                                                      'capture_output=True, timeout=timeout)\n',
+                                                      '                            with '
+                                                      'product_counts.observe(command_env, gh, role, '
+                                                      "'independent-contexts' if process_cwd is not None "
+                                                      'else damage, case_root):\n'
+                                                      '                                p = '
+                                                      'subprocess.run(list(map(str, argv)), env=command_env, '
+                                                      'cwd=process_cwd or case_root, '
+                                                      'stdin=subprocess.DEVNULL,\n'
+                                                      '                                                   '
+                                                      'capture_output=True, timeout=timeout)\n'),
+                                                     ('                            assert (p.returncode == '
+                                                      '0) == (expect == 0), (argv, p.returncode, '
+                                                      "p.stdout.decode(errors='replace'), "
+                                                      "p.stderr.decode(errors='replace'))\n",
+                                                      '                            assert (p.returncode == '
+                                                      '0) == (expect == 0), (argv, p.returncode, '
+                                                      "p.stdout.decode(errors='replace'), "
+                                                      'public_stderr(p.stderr, role))\n'),
+                                                     ("                    command([*install, '--', "
+                                                      "'cli/cli', source])\n",
+                                                      '                    before_install = '
+                                                      'templates.before(home)\n'
+                                                      '                    install_source = '
+                                                      'templates.reuse(gh, pinned, source, home) if damage '
+                                                      "== 'missing-empty' else None\n"
+                                                      '                    if install_source is None:\n'
+                                                      "                        command([*install, '--', "
+                                                      "'cli/cli', source])\n"
+                                                      "                        if damage == 'corrupt-yaml':\n"
+                                                      '                            templates.capture(gh, '
+                                                      'pinned, source, home, case_root, case_root, '
+                                                      'before_install)\n'
+                                                      "                        install_source = 'real'\n"),
+                                                     ('',
+                                                      '                    '
+                                                      'case.update(installSource=install_source, '
+                                                      'templateModeEvidence=templates.mode_evidence)\n'),
+                                                     ('                        run_checkpoint_child(argv, '
+                                                      "env, case_root, case_root / 'kill.stdout', case_root "
+                                                      "/ 'kill.stderr',\n"
+                                                      '                                             '
+                                                      "boundary, case['proofChild'], artifacts, "
+                                                      'str(case_root), gh=gh,\n'
+                                                      '                                             '
+                                                      "ready_timeout=45, failure_message='Proof host did not "
+                                                      "reach ' + boundary)\n",
+                                                      '                        with '
+                                                      "product_counts.observe(env, gh, 'proof-host', damage, "
+                                                      'case_root):\n'
+                                                      '                            '
+                                                      'run_checkpoint_child(argv, env, case_root, case_root '
+                                                      "/ 'kill.stdout', case_root / 'kill.stderr',\n"
+                                                      '                                                 '
+                                                      "boundary, case['proofChild'], artifacts, "
+                                                      'str(case_root), gh=gh,\n'
+                                                      '                                                 '
+                                                      "ready_timeout=45, failure_message='Proof host did not "
+                                                      "reach ' + boundary)\n")],
+ 'tests/native/prove-registry-recorded-retirement.py': [('',
+                                                         'from registry_proof_budget import ProductCommands, '
+                                                         'cli_role, product_environment, public_stderr\n'),
+                                                        ('    def __init__(self, root, app, proof, gh, '
+                                                         'evidence, damage, pinned=False, '
+                                                         'expect_metadata_refusal=False):\n',
+                                                         '    def __init__(self, root, app, proof, gh, '
+                                                         'evidence, damage, pinned=False, '
+                                                         'expect_metadata_refusal=False, '
+                                                         'product_counts=None):\n'),
+                                                        ('',
+                                                         '        self.product_counts = product_counts or '
+                                                         'ProductCommands({})\n'),
+                                                        ('',
+                                                         '        role = cli_role(argv[0], self.app, '
+                                                         'proof=self.proof)\n'
+                                                         '        command_env = product_environment(env or '
+                                                         'self.env, role)\n'),
+                                                        ('            p = subprocess.run(list(map(str, '
+                                                         'argv)), cwd=self.root, env=env or self.env,\n'
+                                                         '                               '
+                                                         'stdin=subprocess.DEVNULL, capture_output=True, '
+                                                         'timeout=180)\n',
+                                                         '            with '
+                                                         'self.product_counts.observe(command_env, self.gh, '
+                                                         'role, self.damage, self.root):\n'
+                                                         '                p = subprocess.run(list(map(str, '
+                                                         'argv)), cwd=self.root, env=command_env,\n'
+                                                         '                                   '
+                                                         'stdin=subprocess.DEVNULL, capture_output=True, '
+                                                         'timeout=180)\n'),
+                                                        ('        assert (p.returncode == 0) == ok, (argv, '
+                                                         "p.returncode, p.stdout.decode(errors='replace'), "
+                                                         "p.stderr.decode(errors='replace'))\n",
+                                                         '        assert (p.returncode == 0) == ok, (argv, '
+                                                         "p.returncode, p.stdout.decode(errors='replace'), "
+                                                         'public_stderr(p.stderr, role))\n'),
+                                                        ('            run_checkpoint_child(argv, self.env, '
+                                                         "self.root, prefix.with_suffix('.stdout'), "
+                                                         "prefix.with_suffix('.stderr'),\n"
+                                                         '                                 checkpoint, '
+                                                         'child_record, self.artifacts, str(self.root), '
+                                                         'gh=self.gh,\n'
+                                                         '                                 ready_timeout=45, '
+                                                         "failure_message='Native checkpoint was not "
+                                                         "reached: ' + checkpoint)\n",
+                                                         '            with '
+                                                         'self.product_counts.observe(self.env, self.gh, '
+                                                         "'proof-host', self.damage, self.root):\n"
+                                                         '                run_checkpoint_child(argv, '
+                                                         'self.env, self.root, '
+                                                         "prefix.with_suffix('.stdout'), "
+                                                         "prefix.with_suffix('.stderr'),\n"
+                                                         '                                     checkpoint, '
+                                                         'child_record, self.artifacts, str(self.root), '
+                                                         'gh=self.gh,\n'
+                                                         '                                     '
+                                                         "ready_timeout=45, failure_message='Native "
+                                                         "checkpoint was not reached: ' + checkpoint)\n"),
+                                                        ('',
+                                                         '    product_counts = '
+                                                         "ProductCommands(report['commandDiagnostics'])\n"),
+                                                        ("            Journey(root / 'metadata-refusal', "
+                                                         "app, proof, gh, evidence, 'missing-empty', "
+                                                         'expect_metadata_refusal=True)\n',
+                                                         "            Journey(root / 'metadata-refusal', "
+                                                         "app, proof, gh, evidence, 'missing-empty', "
+                                                         'expect_metadata_refusal=True, '
+                                                         'product_counts=product_counts)\n'),
+                                                        ('            j = Journey(root / scenario, app, '
+                                                         'proof, gh, evidence, damage, pinned=(index % 2 == '
+                                                         "0 or damage == 'invalid-metadata') and damage != "
+                                                         "'missing-nonempty')\n",
+                                                         '            j = Journey(root / scenario, app, '
+                                                         'proof, gh, evidence, damage, pinned=(index % 2 == '
+                                                         "0 or damage == 'invalid-metadata') and damage != "
+                                                         "'missing-nonempty', "
+                                                         'product_counts=product_counts)\n')]}
+
+def before_d2b(test, name, text):
+    for original, addition in APPROVED_PROOF_ADDITIONS[name]:
+        test.assertTrue(addition)
+        test.assertEqual(text.count(addition), 1)
+        text = text.replace(addition, original, 1)
+    return text
+
 DIAGNOSTICS = """    report['commandDiagnostics'] = dict(
         directGhCommands=dict(skillInstall=0, api=0, other=0),
         scope='Attempted direct gh subprocess.run invocations by this script only',
@@ -260,7 +426,7 @@ class ProofAndWorkflowGuards(unittest.TestCase):
 
     def test_restore_cases_plans_negatives_hashes_markers_and_native_guards_unchanged(self):
         name = 'tests/native/prove-registry-recorded-restore.py'
-        text = (ROOT / name).read_text()
+        text = before_d2b(self, name, (ROOT / name).read_text())
         self.assertEqual(text.count(DIAGNOSTICS), 1)
         self.assertEqual(text.count(RESTORE_COUNT), 1)
         restored = text.replace(DIAGNOSTICS, '').replace(RESTORE_COUNT, '')
@@ -268,7 +434,7 @@ class ProofAndWorkflowGuards(unittest.TestCase):
 
     def test_retirement_cases_plans_negatives_hashes_markers_and_native_guards_unchanged(self):
         name = 'tests/native/prove-registry-recorded-retirement.py'
-        text = (ROOT / name).read_text()
+        text = before_d2b(self, name, (ROOT / name).read_text())
         self.assertEqual(text.count(DIAGNOSTICS), 1)
         restored = text.replace(DIAGNOSTICS, '')
         restored = restored.replace('def prepare_live_evidence(root, gh, gh_counts):', 'def prepare_live_evidence(root, gh):')
@@ -282,6 +448,13 @@ class ProofAndWorkflowGuards(unittest.TestCase):
         command.body = [ast.Global(names=n.names) if isinstance(n, ast.Nonlocal) else n for n in command.body]
         namespace = dict(sequence=0, gh=Path('/fake/gh'), receipt_dir=None, env={}, case_root=None,
                          subprocess=Mock(), json=json, report={'commandDiagnostics': {'directGhCommands': dict(skillInstall=0, api=0, other=0)}})
+        proof_spec = importlib.util.spec_from_file_location('proof_budget', ROOT / 'tests/native/registry_proof_budget.py')
+        proof_budget = importlib.util.module_from_spec(proof_spec)
+        proof_spec.loader.exec_module(proof_budget)
+        namespace.update(app=Path('/product/app'), args=types.SimpleNamespace(old_app=None, proof_host=None),
+                         cli_role=proof_budget.cli_role, product_environment=proof_budget.product_environment,
+                         public_stderr=proof_budget.public_stderr, product_counts=proof_budget.ProductCommands({}),
+                         damage='corrupt-yaml')
         namespace['subprocess'].TimeoutExpired = subprocess.TimeoutExpired
         namespace['subprocess'].run.return_value = types.SimpleNamespace(returncode=0, stdout=b'{}', stderr=b'')
         exec(compile(ast.fix_missing_locations(ast.Module(body=[command], type_ignores=[])), '<actual-wrapper>', 'exec'), namespace)
