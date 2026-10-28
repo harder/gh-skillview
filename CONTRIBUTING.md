@@ -43,7 +43,7 @@ Program.cs
      -> TUI: SkillViewApp.RunAsync(...)
 ```
 
-The TUI has a persistent Discover, Installed, and Changes shell. `SkillViewApp`
+The TUI has a persistent Discover, Installed, and Issues shell. `SkillViewApp`
 owns that shell and its application lifetime; `SkillViewWorkflowCoordinator`
 orchestrates install, update, inventory, remove, cleanup, and Doctor work.
 Views under `src/SkillView.Core/Ui/Tabs/` render the primary and temporary
@@ -51,7 +51,10 @@ workspaces. Advanced install, remove, and cleanup flows use owned modals.
 See the [architecture guide](docs/architecture.md) for the current boundaries.
 
 SkillView requires GitHub CLI 2.97.0 or newer and checks `gh skill --help`
-before enabling the app. When launched as an extension by GitHub CLI 2.101.0
+as a local capability check; local browsing does not await remote authentication.
+Doctor probes authentication when opened, and Discover requests optional account
+context on explicit search. See the [isolated PTY guide](agent_docs/tui-pty-testing.md)
+for credential-free UI fixtures. When launched as an extension by GitHub CLI 2.101.0
 or newer, it uses the host-provided `GH_PATH` for subprocesses.
 
 ### Project layout

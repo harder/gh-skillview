@@ -1,5 +1,7 @@
 # Using SkillView
 
+This guide describes the development checkout. Installed releases may have an earlier command or UI surface; check `skillview --version` and `skillview --help`. The [supported actions matrix](supported-actions.md) summarizes selection and approval boundaries.
+
 For installation and a quick start, see the [README](../README.md).
 
 ## TUI
@@ -36,7 +38,7 @@ own failures. No startup update or remote skill scan runs.
 
 Startup checks the local inventory. If skills are found before you start
 interacting, it opens Installed and focuses the list. Otherwise it keeps the
-current view. From a list, press `/` to focus the Discover search box.
+current view. Outside Installed, press `/` to focus the Discover search box.
 
 ### Select locations
 
@@ -144,7 +146,7 @@ with explicit/default roots. No process environment is changed.
 
 The main "discover and inspect" loop:
 
-1. Focus the Discover search box (press `/` from a list), then type a search query. Leave the field and press `f` to narrow the next search with **Owner**, **Agent**, **Limit**, and hidden-dir options.
+1. Focus the Discover search box (press `1`, then `/`, from another list), then type a search query. Leave the field and press `f` to narrow the next search with **Owner**, **Agent**, **Limit**, and hidden-dir options.
 2. Browse results in the left table; selection drives the detail pane on the right.
 3. Press `S` to cycle a sort (stars ↓ → name ↑ → name ↓ → repo ↑ → off). The active sort column's header shows the direction.
 4. Press `e` to flip the detail pane between rendered markdown and raw, `o` to open the repo in a browser, or `l` to inspect logs.
@@ -231,12 +233,13 @@ Navigation:
 | Key | Action |
 |---|---|
 | `1` / `2` / `3` | Jump directly to Discover / Installed / Issues |
-| `←` / `→` | Cycle tabs |
+| `←` / `→` | Outside Installed, cycle tabs when the focused list/pane does not use these keys |
 | `↑` / `↓`, `PgUp` / `PgDn`, `Home` / `End` | Move through rows |
 | `Tab` / `Shift+Tab` | Move focus between list and detail |
-| `/` | Jump to Discover and focus the search box |
+| `/` | Focus Installed search in Installed; otherwise open Discover and focus its query |
 | `?` or `F1` | Open the help overlay |
 | `F5` | Open Locations, including while typing |
+| `F4` | Open saved replacement History, including while typing |
 | `Esc` | Leave a field or back out of the current sub-view / modal |
 | `q` | Quit from a top-level list or preview |
 | `Ctrl+Q` | Quit from anywhere, including while typing |
@@ -309,11 +312,14 @@ Issues tab:
 
 | Key | Action |
 |---|---|
-| `Enter` | Review the selected maintenance item without changing files |
+| `Enter` | Expand a family; open an exact child comparison; inspect registry guidance; open an ordinary exact review (details first below 110 columns) |
 | `F2` | Switch between its issue summary and technical details |
 | `r` | Refresh disk inventory; upstream availability and running-session state remain unknown |
 | `C` | Check updates for the inventory, or cancel a running check |
 | `u` | Review the selected eligible exact item directly (an expanded child: its saved update review) |
+| `k` / `K` | Keep both or Restore suggestions for an eligible family / review saved Choices |
+| `g` | Start a guided sequence of eligible exact items, when no review or preference work is active |
+| `n` / `s` / `x` | Review next / Skip / Stop, only during an active guided sequence |
 
 Routine valid installs show **No local problems found. Updates not checked.**
 The list excludes generic installation-review opportunities and absence from gh
