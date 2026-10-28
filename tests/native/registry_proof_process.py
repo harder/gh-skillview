@@ -12,6 +12,9 @@ STREAM_LIMIT = 64 * 1024
 CASE_LIMIT = 2 * 1024 * 1024
 TOTAL_LIMIT = 32 * 1024 * 1024
 SECRET_KEYS = ('GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN')
+_HANDLE_DOMAIN_ONLY = os.name == 'nt'
+_IDENTITY_FIELDS = ('dev', 'ino', 'size', 'mtimeNs', 'ctimeNs')
+_UNSTABLE_REASONS = ('not-regular', 'reparse', 'name-handle-mismatch', 'handle-changed', 'name-changed')
 PHASES = frozenset((
     b'maintenance-proof phase: started',
     b'maintenance-proof phase: inventory-started',
@@ -29,16 +32,32 @@ def write_proof_marker(root):
     assert marker.read_bytes() == MARKER_BYTES, 'Disposable proof marker must be exact LF bytes'
 
 
+class _Unstable(ValueError):
+    def __init__(self, reason, fields=()):
+        if reason not in _UNSTABLE_REASONS or any(field not in _IDENTITY_FIELDS for field in fields):
+            raise ValueError()
+        self.reason = reason
+        self.fields = tuple(sorted(set(fields)))
+        super().__init__()  # No values, paths or messages in this exception.
+
+
 def _error(record, stage, error):
     # Never include exception messages: they can contain credentials or output.
-    value = stage + ': ' + type(error).__name__
+    detail = type(error).__name__
+    if isinstance(error, _Unstable) and error.reason in _UNSTABLE_REASONS and all(field in _IDENTITY_FIELDS for field in error.fields):
+        detail = error.reason
+        if error.fields:
+            detail += ' [' + ', '.join(sorted(set(error.fields))) + ']'
+    value = stage + ': ' + detail
     record['diagnosticError'] = (record.get('diagnosticError', '') + '; ' + value).strip('; ')[:512]
 
 
 def _regular(path):
     info = path.lstat()
-    if not stat.S_ISREG(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 1024:
-        raise ValueError('Not a regular non-reparse file')
+    if not stat.S_ISREG(info.st_mode):
+        raise _Unstable('not-regular')
+    if getattr(info, 'st_file_attributes', 0) & 1024:
+        raise _Unstable('reparse')
     return info
 
 
@@ -46,18 +65,54 @@ def _identity(info):
     return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
 
 
+def _compare(reason, before, after, fields=_IDENTITY_FIELDS):
+    differing = [name for name, left, right in zip(_IDENTITY_FIELDS, before, after) if name in fields and left != right]
+    if differing:
+        raise _Unstable(reason, differing)
+
+
+def _open_evidence(path, name_before, original_handle=None):
+    _compare('name-changed', _identity(name_before), _identity(_regular(path)))
+    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NOFOLLOW', 0))
+    source = None
+    try:
+        source = os.fdopen(fd, 'rb')
+        handle = _identity(os.fstat(source.fileno()))
+        if not _HANDLE_DOMAIN_ONLY:
+            # POSIX retains the entire old cross-source tuple, including ctime.
+            _compare('name-handle-mismatch', _identity(name_before), handle)
+        if original_handle is not None:
+            fields = _IDENTITY_FIELDS[:4] if _HANDLE_DOMAIN_ONLY else _IDENTITY_FIELDS
+            _compare('name-changed', original_handle, handle, fields)
+        return source, handle
+    except BaseException:
+        if source is None: os.close(fd)
+        else: source.close()
+        raise
+
+
+def _verify_evidence(source, path, name_before, handle_before):
+    _compare('handle-changed', handle_before, _identity(os.fstat(source.fileno())))
+    _compare('name-changed', _identity(name_before), _identity(_regular(path)))
+    if _HANDLE_DOMAIN_ONLY:
+        # Windows name and handle observations each self-revalidate. A new open
+        # must identify the same object without comparing cross-domain tuples.
+        fresh, fresh_before = _open_evidence(path, name_before, handle_before)
+        with fresh:
+            _compare('handle-changed', fresh_before, _identity(os.fstat(fresh.fileno())))
+            _compare('name-changed', _identity(name_before), _identity(_regular(path)))
+        _compare('handle-changed', handle_before, _identity(os.fstat(source.fileno())))
+
+
 def _file_evidence(path, marker=False):
     before = _regular(path)
-    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_BINARY', 0) | getattr(os, 'O_NOFOLLOW', 0))
-    with os.fdopen(fd, 'rb') as source:
-        if _identity(os.fstat(source.fileno())) != _identity(before):
-            raise ValueError('File changed before hashing')
+    source, handle_before = _open_evidence(path, before)
+    with source:
         digest = hashlib.sha256()
         size, cr = 0, False
         while chunk := source.read(64 * 1024):
             digest.update(chunk); size += len(chunk); cr |= b'\r' in chunk
-        if _identity(os.fstat(source.fileno())) != _identity(before) or _identity(_regular(path)) != _identity(before):
-            raise ValueError('File changed while hashing')
+        _verify_evidence(source, path, before, handle_before)
     result = dict(bytes=size, sha256=digest.hexdigest())
     if marker:
         result['containsCR'] = cr
@@ -78,12 +133,14 @@ def _launch_bindings(argv, gh):
         except FileNotFoundError:
             result[name] = dict(absent=True)
         except Exception as ex:
-            result[name] = dict(diagnosticError=type(ex).__name__)
+            result[name] = {}
+            _error(result[name], 'binding', ex)
     if gh is not None:
         try:
             result['gh'] = dict(path=str(gh), **_file_evidence(Path(gh)))
         except Exception as ex:
-            result['gh'] = dict(diagnosticError=type(ex).__name__)
+            result['gh'] = {}
+            _error(result['gh'], 'binding', ex)
     return result
 
 
@@ -131,14 +188,14 @@ class RegistryProofArtifacts:
                 _error(record, 'credential-check', ex)
             size, matched, tail = 0, False, b''
             digest = hashlib.sha256()
-            with path.open('rb') as source:
+            source, first_handle = _open_evidence(path, before)
+            with source:
                 while chunk := source.read(64 * 1024):
                     digest.update(chunk); size += len(chunk)
                     combined = tail + chunk
                     matched |= any(value in combined for value in secrets)
                     tail = combined[-overlap:] if overlap else b''
-                if _identity(os.fstat(source.fileno())) != _identity(before) or _identity(_regular(path)) != _identity(before):
-                    raise ValueError('Stream changed while inspecting')
+                _verify_evidence(source, path, before, first_handle)
             result.update(bytes=size, sha256=digest.hexdigest(), omitted=size, omittedFlag=bool(size))
             if check_error or matched:
                 result['withheld'] = 'credential-check-error' if check_error else 'credential-match'
@@ -149,7 +206,8 @@ class RegistryProofArtifacts:
             if available <= 0:
                 result['withheld'] = 'budget-exhausted'
                 return result
-            with path.open('rb') as source:
+            source, read_handle = _open_evidence(path, before, first_handle)
+            with source:
                 if size <= available:
                     data = source.read()
                 else:
@@ -157,8 +215,7 @@ class RegistryProofArtifacts:
                     data = source.read(head)
                     source.seek(size - (available - head))
                     data += source.read(available - head)
-                if _identity(os.fstat(source.fileno())) != _identity(before) or _identity(_regular(path)) != _identity(before):
-                    raise ValueError('Stream changed before publication')
+                _verify_evidence(source, path, before, read_handle)
             # Check retained bytes too: joining head+tail can create a token.
             if any(value in data for value in secrets):
                 result['withheld'] = 'credential-match'

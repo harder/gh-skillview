@@ -194,5 +194,211 @@ class RegistryProofProcessTests(unittest.TestCase):
         self.assertIsNone(self.record['phase'])
 
 
+class RegistryProofDomainTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='registry-domain-unit-')
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.path = self.root / 'payload'
+        self.data = bytes(range(256)) * 320
+        self.path.write_bytes(self.data)
+        self.publisher = proof.RegistryProofArtifacts(self.root / 'result.json')
+
+    @staticmethod
+    def changed(info, **values):
+        from types import SimpleNamespace
+        fields = {name: getattr(info, name) for name in
+                  ('st_mode', 'st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns')}
+        fields['st_file_attributes'] = getattr(info, 'st_file_attributes', 0)
+        fields.update(values)
+        return SimpleNamespace(**fields)
+
+    def assert_controlled(self, record):
+        self.assertRegex(record['diagnosticError'], r'^[a-z-]+: [a-z-]+( \[[a-zA-Z, ]*\])?(; [a-z-]+: [a-z-]+( \[[a-zA-Z, ]*\])?)*$')
+        self.assertNotIn(str(self.root), record['diagnosticError'])
+
+    def test_stable_cross_domain_dev_ino_and_ctime_disagree_posix_refuses_windows_hashes(self):
+        original = Path.lstat
+        for fields in (('dev', 'ino'), ('ctimeNs',)):
+            def name_stat(path, *args, **kwargs):
+                info = original(path, *args, **kwargs)
+                if path != self.path: return info
+                return self.changed(info, **({'st_dev': info.st_dev + 17, 'st_ino': info.st_ino + 19} if fields == ('dev', 'ino') else {'st_ctime_ns': info.st_ctime_ns + 23}))
+            for windows in (False, True):
+                with self.subTest(fields=fields, windows=windows), patch.object(proof, '_HANDLE_DOMAIN_ONLY', windows), patch.object(Path, 'lstat', name_stat):
+                    record = {}
+                    if windows:
+                        evidence = proof._file_evidence(self.path)
+                        self.assertEqual(evidence, dict(bytes=len(self.data), sha256=hashlib.sha256(self.data).hexdigest()))
+                    else:
+                        with self.assertRaises(proof._Unstable) as raised: proof._file_evidence(self.path)
+                        self.assertEqual(raised.exception.reason, 'name-handle-mismatch')
+                        self.assertEqual(raised.exception.fields, fields)
+                    result = self.publisher.stream(self.path, {}, 'case', record)
+                    bindings = proof._launch_bindings([str(self.path)], self.path)
+                    if windows:
+                        self.assertIsNone(result['withheld'])
+                        self.assertEqual(result['sha256'], hashlib.sha256(self.data).hexdigest())
+                        self.assertEqual(result['bytes'], len(self.data))
+                        artifact = (self.publisher.root / result['artifact']['path']).read_bytes()
+                        self.assertEqual(artifact, self.data[:32768] + self.data[-32768:])
+                        self.assertEqual(bindings['gh']['sha256'], hashlib.sha256(self.data).hexdigest())
+                        self.assertNotIn('diagnosticError', bindings[self.path.name])
+                    else:
+                        expected = 'name-handle-mismatch [' + ', '.join(fields) + ']'
+                        self.assertEqual(record['diagnosticError'], 'stream-publication: ' + expected)
+                        self.assertEqual(bindings[self.path.name]['diagnosticError'], 'binding: ' + expected)
+                        self.assertEqual(bindings['gh']['diagnosticError'], 'binding: ' + expected)
+                        self.assertEqual(result['withheld'], 'diagnostic-error')
+                        self.assertEqual(result['retained'], 0)
+                        self.assert_controlled(record)
+                        self.assert_controlled(bindings['gh'])
+
+    def test_during_read_append_refuses_handle_changed_in_both_modes(self):
+        fdopen, fstat = os.fdopen, os.fstat
+        for windows in (False, True):
+            self.path.write_bytes(self.data)
+            baseline = self.path.stat(); mutated = [False]
+            path = self.path
+            class AppendingReader:
+                def __init__(self, fd, mode): self.source = fdopen(fd, mode)
+                def __enter__(self): return self
+                def __exit__(self, *args): self.source.close()
+                def fileno(self): return self.source.fileno()
+                def close(self): self.source.close()
+                def read(self, size=-1):
+                    data = self.source.read(size)
+                    if data and not mutated[0]:
+                        with path.open('ab') as target: target.write(b'x')
+                        mutated[0] = True
+                    return data
+            def handle_stat(fd):
+                info = fstat(fd)
+                if mutated[0]:
+                    return self.changed(info, st_ctime_ns=baseline.st_ctime_ns, st_mtime_ns=baseline.st_mtime_ns + 1, st_size=baseline.st_size + 1)
+                return info
+            with self.subTest(windows=windows), patch.object(proof, '_HANDLE_DOMAIN_ONLY', windows), patch.object(os, 'fdopen', AppendingReader), patch.object(os, 'fstat', handle_stat):
+                record = {}; result = self.publisher.stream(self.path, {}, 'case', record)
+            self.assertEqual(record['diagnosticError'], 'stream-publication: handle-changed [mtimeNs, size]')
+            self.assertEqual(result['withheld'], 'diagnostic-error')
+            self.assertEqual(result['retained'], 0)
+            self.assertFalse(list(self.publisher.root.iterdir()))
+            self.assert_controlled(record)
+
+    def test_name_domain_change_and_handle_ctime_change_still_refuse(self):
+        lstat, fstat = Path.lstat, os.fstat
+        for windows in (False, True):
+            calls = [0]
+            def name_stat(path, *args, **kwargs):
+                info = lstat(path, *args, **kwargs)
+                if path == self.path:
+                    calls[0] += 1
+                    if calls[0] >= 3: return self.changed(info, st_mtime_ns=info.st_mtime_ns + 1)
+                return info
+            with self.subTest(windows=windows, domain='name'), patch.object(proof, '_HANDLE_DOMAIN_ONLY', windows), patch.object(Path, 'lstat', name_stat):
+                with self.assertRaises(proof._Unstable) as raised: proof._file_evidence(self.path)
+            self.assertEqual((raised.exception.reason, raised.exception.fields), ('name-changed', ('mtimeNs',)))
+            calls = [0]
+            def handle_stat(fd):
+                info = fstat(fd); calls[0] += 1
+                return self.changed(info, st_ctime_ns=info.st_ctime_ns + 1) if calls[0] >= 2 else info
+            with self.subTest(windows=windows, domain='handle'), patch.object(proof, '_HANDLE_DOMAIN_ONLY', windows), patch.object(os, 'fstat', handle_stat):
+                with self.assertRaises(proof._Unstable) as raised: proof._file_evidence(self.path)
+            self.assertEqual((raised.exception.reason, raised.exception.fields), ('handle-changed', ('ctimeNs',)))
+
+    def test_replacement_before_fresh_open_refuses_without_reading_replacement(self):
+        replacement = self.root / 'replacement'; replacement.write_bytes(b'NEVER-PUBLISH-REPLACEMENT')
+        open_original, fdopen = os.open, os.fdopen
+        opens = [0]; replacement_fds = set(); reads = []
+        def opening(path, flags, *args, **kwargs):
+            if Path(path) == self.path:
+                opens[0] += 1
+                if opens[0] == 2: replacement.replace(self.path)
+            fd = open_original(path, flags, *args, **kwargs)
+            if Path(path) == self.path and opens[0] == 2: replacement_fds.add(fd)
+            return fd
+        class GuardedReader:
+            def __init__(self, fd, mode): self.source = fdopen(fd, mode); self.fd = fd
+            def __enter__(self): return self
+            def __exit__(self, *args): self.source.close()
+            def fileno(self): return self.source.fileno()
+            def close(self): self.source.close()
+            def read(self, size=-1):
+                reads.append(self.fd)
+                if self.fd in replacement_fds: raise AssertionError('replacement must not be read')
+                return self.source.read(size)
+        with patch.object(proof, '_HANDLE_DOMAIN_ONLY', True), patch.object(os, 'open', opening), patch.object(os, 'fdopen', GuardedReader):
+            record = {}; result = self.publisher.stream(self.path, {}, 'case', record)
+        self.assertIn('stream-publication: name-changed [', record['diagnosticError'])
+        self.assertFalse(replacement_fds.intersection(reads))
+        self.assertEqual(result['withheld'], 'diagnostic-error')
+        self.assertFalse(list(self.publisher.root.iterdir()))
+        self.assert_controlled(record)
+
+    def test_windows_fresh_handle_retains_dev_ino_size_and_mtime_checks(self):
+        opening, fstat = os.open, os.fstat
+        for field, attribute in [('dev', 'st_dev'), ('ino', 'st_ino'), ('size', 'st_size'), ('mtimeNs', 'st_mtime_ns')]:
+            opens = [0]; fresh = set()
+            def open_file(path, flags, *args, **kwargs):
+                fd = opening(path, flags, *args, **kwargs); opens[0] += 1
+                if opens[0] == 2: fresh.add(fd)
+                return fd
+            def handle_stat(fd):
+                info = fstat(fd)
+                return self.changed(info, **{attribute: getattr(info, attribute) + 1}) if fd in fresh else info
+            with self.subTest(field=field), patch.object(proof, '_HANDLE_DOMAIN_ONLY', True), patch.object(os, 'open', open_file), patch.object(os, 'fstat', handle_stat):
+                with self.assertRaises(proof._Unstable) as raised: proof._file_evidence(self.path)
+            self.assertEqual((raised.exception.reason, raised.exception.fields), ('name-changed', (field,)))
+
+    def test_symlink_and_reparse_refuse_before_open_with_controlled_binding_errors(self):
+        link = self.root / 'link'; link.symlink_to(self.path)
+        original = Path.lstat
+        def reparse(path, *args, **kwargs):
+            info = original(path, *args, **kwargs)
+            return self.changed(info, st_file_attributes=1024) if path == self.path else info
+        for path, reason in [(link, 'not-regular'), (self.path, 'reparse')]:
+            with self.subTest(reason=reason), patch.object(proof, '_HANDLE_DOMAIN_ONLY', True), patch.object(Path, 'lstat', reparse), patch.object(os, 'open', side_effect=AssertionError('must not open')):
+                with self.assertRaises(proof._Unstable) as raised: proof._file_evidence(path)
+                bindings = proof._launch_bindings([str(path)], path)
+                record = {}; result = self.publisher.stream(path, {}, 'case', record)
+            self.assertEqual(raised.exception.reason, reason)
+            self.assertEqual(bindings[path.name]['diagnosticError'], 'binding: ' + reason)
+            self.assertEqual(record['diagnosticError'], 'stream-publication: ' + reason)
+            self.assert_controlled(record)
+            self.assertEqual(result['retained'], 0)
+            self.assertFalse(list(self.publisher.root.iterdir()))
+
+    def test_fixed_vocabulary_sorted_fields_and_other_exception_type_only(self):
+        error = proof._Unstable('handle-changed', ('size', 'dev', 'ctimeNs', 'ino', 'mtimeNs', 'size'))
+        self.assertEqual(error.args, ())
+        self.assertEqual(error.fields, ('ctimeNs', 'dev', 'ino', 'mtimeNs', 'size'))
+        record = {}; proof._error(record, 'marker-evidence', error)
+        self.assertEqual(record['diagnosticError'], 'marker-evidence: handle-changed [ctimeNs, dev, ino, mtimeNs, size]')
+        self.assert_controlled(record)
+        for reason, fields in [('SECRET /path', ()), ('handle-changed', ('SECRET /path',))]:
+            with self.assertRaises(ValueError): proof._Unstable(reason, fields)
+        record = {}; proof._error(record, 'marker-evidence', OSError('SECRET /path 123456789'))
+        self.assertEqual(record['diagnosticError'], 'marker-evidence: OSError')
+        with patch.object(proof, '_file_evidence', side_effect=OSError('SECRET /path 123456789')):
+            bindings = proof._launch_bindings([str(self.path)], self.path)
+        self.assertTrue(all(item['diagnosticError'] == 'binding: OSError' for item in bindings.values()))
+        self.assertNotIn('SECRET', json.dumps(bindings))
+        self.assertNotIn(str(self.root), json.dumps(bindings))
+
+    def test_windows_mode_keeps_whole_chunk_boundary_and_head_tail_secret_checks(self):
+        token = b'fake-domain-secret'
+        half = len(token) // 2
+        cases = [b'A' * (65536 - 4) + token + b'Z' * 70000,
+                 b'A' * (32768 - half) + token[:half] + b'M' * 80000 + token[half:] + b'Z' * (32768 - len(token) + half)]
+        with patch.object(proof, '_HANDLE_DOMAIN_ONLY', True):
+            for data in cases:
+                self.path.write_bytes(data)
+                result = self.publisher.stream(self.path, {'GH_TOKEN': token.decode()}, 'case', {})
+                self.assertEqual(result['withheld'], 'credential-match')
+                self.assertEqual(result['sha256'], hashlib.sha256(data).hexdigest())
+                self.assertEqual(result['retained'], 0)
+        self.assertFalse(list(self.publisher.root.iterdir()))
+
+
 if __name__ == '__main__':
     unittest.main()
