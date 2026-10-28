@@ -192,8 +192,9 @@ public sealed class MaintenanceQueueKeyboardTests
             Assert.True(table.HasFocus);
             Press(new Key(KeyCode.CursorDown)); // A one-row family keeps its exact anchor.
             Press(Key.Enter);
+            if (width < 110) { Assert.Null(activated); Press(Key.Enter); }
             Assert.NotNull(activated);
-            Assert.Equal("NameCollision", activated.Issue);
+            Assert.Equal("installation-review", activated.Issue);
             Assert.Equal(first.InstallationId, activated.Subject.InstallationId);
             Assert.Contains(first.ResolvedPath, activated.AffectedPaths);
         }

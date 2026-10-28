@@ -286,6 +286,11 @@ public sealed partial class SkillViewApp
                 if (request.IsCurrent) OpenUpdatesWorkspace(entry.Subject);
                 return Task.CompletedTask;
             },
+            setIntentional: (finding, request) => _workflows.SetIntentionalDifferenceAsync(finding, request),
+            resetIntentional: request => _workflows.ShowIntentionalDifferenceResetAsync(request),
+            activateFinding: (finding, request) => finding.Entries.IsEmpty ? Task.CompletedTask
+                : _workflows.ShowCopiesAsync(finding.Entries[0], request,
+                    subject => OpenUpdatesWorkspace(subject, prepareImmediately: false), GetRunLifetimeToken(), finding),
             runTask: RunOwnedTask)
         {
             X = 0,
@@ -297,10 +302,13 @@ public sealed partial class SkillViewApp
         void InvalidateUpdateObservations() => _workflows.InvalidateAvailability(RefreshUpdateAvailability);
         _services.ListAdapter.Invalidated += InvalidateUpdateObservations;
         window.Disposing += (_, _) => _services.ListAdapter.Invalidated -= InvalidateUpdateObservations;
-        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = "History (F4)", Width = 30 };
+        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = ActionLabels.History.ButtonText, Width = Dim.Func(_ => window.Viewport.Width >= 110 ? 30 : 16) };
         _historyButton.Accepting += (_, args) => { args.Handled = true; OpenHistory(); };
+        _locationsButton = new SingleRowButton { X = Pos.Right(_historyButton), Y = 0, Text = "Locations F5", Width = 17 };
+        window.FrameChanged += (_, _) => RefreshHistoryButton();
+        _locationsButton.Accepting += (_, args) => { args.Handled = true; OpenLocations(); };
         window.Add(_tabBar, _contextBar, _discoverTab, _installedTab, _updatesTab, _doctorTab,
-                   _changesTab, _historyButton,
+                   _changesTab, _historyButton, _locationsButton,
                    _statusStrip, _sizeGuard);
         window.FrameChanged += (_, _) =>
             _sizeGuard.UpdateForSize(window.Frame.Width, window.Frame.Height);

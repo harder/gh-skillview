@@ -82,18 +82,22 @@ public sealed class ChangesTabViewTests
     {
         var first = MaintenanceQueueTests.Skill("/skills/one", "https://github.com/one/repo");
         var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
-        MaintenanceQueueEntry? activated = null;
+        CapturedFinding? activated = null;
         using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
             _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }),
-            static () => { }, onActivateEntry: entry => activated = entry);
+            static () => { }, activateEntryAsync: (_, _) => throw new InvalidOperationException("Family cannot route as one cleanup target."),
+            activateFinding: (finding, _) => { activated = finding; return Task.CompletedTask; },
+            runTask: (work, _) => work().GetAwaiter().GetResult());
         await view.LoadAsync();
         var table = Assert.IsType<TableView>(view.SubViews.Single(child => child is TableView));
         table.SetSelection(0, 0, false); // One family, anchored at the first exact address.
         table.NewKeyDownEvent(Key.Enter);
         Assert.NotNull(activated);
-        Assert.Equal("NameCollision", activated.Issue);
-        Assert.Equal(first.InstallationId, activated.Subject.InstallationId);
-        Assert.Equal(first.ResolvedPath, activated.Cleanup!.Path);
+        Assert.Equal("source-differences", activated.Kind);
+        Assert.Equal([FindingNavigation.InspectCopies], activated.Navigation);
+        var copies = Assert.IsType<FindingCopies>(activated.Subject).Copies;
+        Assert.Equal(new[] { first.InstallationId, second.InstallationId }, copies.Select(copy => copy.InstallationId));
+        Assert.All(activated.Entries, entry => Assert.Null(entry.Cleanup));
     }
 
     [Fact]
@@ -131,7 +135,7 @@ public sealed class ChangesTabViewTests
         Assert.Contains("0 Problems", view.StatusTextForTests);
         Assert.Contains("Updates not checked", view.StatusTextForTests);
         Assert.Contains("0 Review", view.StatusTextForTests);
-        Assert.Equal("0 Problems · Updates not checked · 0 Review", view.GetQueueLabel());
+        Assert.Equal("0 Problems · Updates not checked · 0 Review · 0 Info", view.GetQueueLabel());
         Assert.DoesNotContain("0 Updates", view.GetQueueLabel());
         Assert.Contains("**Enter / u:**", detail);
     }
@@ -202,7 +206,7 @@ public sealed class ChangesTabViewTests
         await view.LoadAsync();
 
         Assert.Contains("1 Problems", view.StatusTextForTests);
-        Assert.Equal("1 Problems · Updates not checked · 0 Review", view.GetQueueLabel());
+        Assert.Equal("1 Problems · Updates not checked · 0 Review · 0 Info", view.GetQueueLabel());
         Assert.DoesNotContain("0 Updates", view.GetQueueLabel());
         Assert.Contains("Updates not checked", view.StatusTextForTests);
         Assert.Contains("F2 Details", view.StatusTextForTests);

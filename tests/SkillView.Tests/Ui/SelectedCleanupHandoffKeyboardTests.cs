@@ -29,7 +29,10 @@ public sealed class SelectedCleanupHandoffKeyboardTests
             captured.SetResult(fixture.Snapshot);
             await fixture.DispatchQueued.Task.WaitAsync(TestContext.Current.CancellationToken);
         }
-        fixture.Press(Key.Esc); // Actual focus/navigation path cancels the Changes activation.
+        fixture.Press(Key.Esc); // Back cancels pending review before leaving Issues.
+        Assert.True(fixture.View.Visible);
+        Assert.True(captureToken.IsCancellationRequested);
+        fixture.Press(Key.Esc); // The next Escape leaves Issues.
         Assert.False(fixture.View.Visible);
         Assert.True(captureToken.IsCancellationRequested);
         if (!queueBeforeLeaving) captured.SetResult(fixture.Snapshot);
@@ -110,6 +113,8 @@ public sealed class SelectedCleanupHandoffKeyboardTests
             var table = View.SubViews.OfType<TableView>().Single();
             table.SetFocus();
             Assert.True(table.HasFocus);
+            Press(Key.Enter); // Narrow layout opens captured detail before review.
+            Assert.False(table.Visible);
         }
 
         internal void Press(Key key)

@@ -225,13 +225,10 @@ internal static class TuiHelpers
         CleanupClassifier.CandidateKind.NameCollision => "compare",
         CleanupClassifier.CandidateKind.Untracked => "untracked",
         CleanupClassifier.CandidateKind.MetadataConflict => "metadata",
-        CleanupClassifier.CandidateKind.SourceOrphaned => "orphan",
-        CleanupClassifier.CandidateKind.Duplicate => "duplicate",
         CleanupClassifier.CandidateKind.EmptyDirectory => "empty-dir",
         CleanupClassifier.CandidateKind.BrokenSharedMapping => "broken-map",
         CleanupClassifier.CandidateKind.HiddenNestedResidue => "hidden-nest",
         CleanupClassifier.CandidateKind.BrokenSymlink => "broken-link",
-        CleanupClassifier.CandidateKind.OrphanCanonicalCopy => "orphan-copy",
         _ => kind.ToString(),
     };
 
@@ -300,32 +297,7 @@ internal static class TuiHelpers
         view.SetScheme(CreateEditableInputScheme());
     }
 
-    /// Key bindings help text for the main window, shared between the
-    /// welcome message and the F1 help dialog. The preview-key list adapts
-    /// to Warp (which intercepts Enter) by promoting Ctrl+J + p/v.
-    internal static string HelpText { get; } =
-        "/  focus the search box\n" +
-        (IsWarpTerminal
-            ? "Ctrl+J, →, p, v  preview when results are focused\n"
-            : "Enter, →, p, v  preview when results are focused\n") +
-        "f  open Discover filters (owner, agent, limit, hidden dirs)\n" +
-        "i  install the selected search result\n" +
-        "o  open the skill (GitHub URL or local folder)\n" +
-        "e  toggle raw / rendered SKILL.md preview\n" +
-        "Rendered markdown  Ctrl+A selects all, Ctrl+C copy selection, click links to open\n" +
-        "l  show or hide logs\n" +
-        "d  open Doctor\n" +
-        "I  open the advanced install wizard\n" +
-        "2  show installed skills\n" +
-        "3  show Issues\n" +
-        "u  open Updates (Check updates checks availability)\n" +
-        "c  review cleanup candidates\n" +
-        "   in Installed: / returns to Discover, f filters, x removes the selected skill\n" +
-        "F1 show this help\n" +
-        "q  quit";
-
-    /// Compact single-line hint shown in the welcome/preview pane. Same
-    /// adaptation as `HelpText`: Warp gets Ctrl+J/p/v, others get →/p/v.
+    /// Compact hint shown before a Discover search or preview.
     internal static string WelcomeHint { get; } =
         "Enter a query and press Enter to search.\n\n"
         + "Press f to edit filters. Press ? for help and all keys.";

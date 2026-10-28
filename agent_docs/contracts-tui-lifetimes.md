@@ -3,6 +3,11 @@
 Read these contracts before changing this subsystem. See [the guide index](README.md)
 for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
 
+- `ActionLabels` supplies pure display metadata for contextual Help, shell hints
+  and corresponding controls. Add labels for existing handlers only; routing,
+  text-input guards, ownership and mutation approval remain in those handlers.
+  Keep review-screen aliases distinct from primary-tab actions.
+
 - Prefer the built `skillview` host binary over `dotnet run` for PTY-driven TUI
   automation. `dotnet run` can add first-run noise and long startup delays,
   especially with sandboxed `HOME`.
@@ -297,7 +302,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   old rows visibly refreshing with copy actions paused. Bound display to 8,192
   rows including headings and omission indication. C (Shift+c) remains global
   check/cancel for observed copies or a running check; an empty Installed view
-  hides Check all updates and consumes C without starting work. c remains Cleanup.
+  hides Check updates (C) and consumes C without starting work. c remains Cleanup.
   The existing Issues copy chooser is separate.
 
 - With no observed Installed copies, show a full-width empty explanation, separate
@@ -395,6 +400,15 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   Refresh retains the selected operation ID when it is still present. History
   work remains owned by the app task tracker after a canceled modal closes.
 
+- B9 typed `CapturedFinding` observations distinguish exact captured copy sets
+  from exact contextual gh records, with explicit navigation allowlists. Issues
+  and Installed's issue facet share this capture/generation through the existing
+  evidence handoff. Remote Updates remain the explicit availability session's
+  observations. Recorded revision/method differences never synthesize upgrades.
+  Issues uses full-width list/detail below 110 columns, preserving selection on
+  Back/refresh. Keep both requests use the selected-view lease; canceled or stale
+  queued completions cannot publish notices, reopen reviews or steal focus.
+
 - History retirement exposes only actions admitted by its current inspection.
   Clear approval on selection/Refresh/Inspect/confirmation/attempt, guard ID and
   request ownership through dispatch, and default each action's confirmation to
@@ -462,3 +476,19 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   version gets the existing safe notice, with no new source resolution; changing
   back only restores anchor eligibility under the existing current context,
   generation and exact G1 verification checks.
+
+- F5 Locations is a main-shell shortcut from text inputs. Its synchronous dialog
+  owns load, directory validation and preference writes through
+  ModalOperationTracker; keep all I/O off the event thread, publish completion
+  only while the modal/app token is active, and cancel linked work before
+  disposing its token registrations. A saved location change advances catalog
+  generation before refreshing the current captured discovery context.
+
+  Locations recovery uses the same modal ownership/linked cancellation and queued
+  completion checks as directory validation and Save. Never perform review,
+  backup, native topology or filesystem work from draw/filter handlers. Enter in
+  Directory/Profile adds or is consumed; Enter in list/read-only Selected cannot
+  bubble to default Cancel. Focused buttons retain Enter. Recovery is Cancel by
+  default, displays full bounded literal errors and stored-versus-session choices,
+  and applies only the reviewed native generation. A failed apply requires a fresh
+  review; leaving either modal cancels work and rejects late publication.

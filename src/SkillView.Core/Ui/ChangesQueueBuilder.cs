@@ -8,9 +8,11 @@ namespace SkillView.Ui;
 internal sealed record ChangesQueueRow(string Kind, string Title, IReadOnlyList<MaintenanceQueueEntry> Entries)
 {
     internal MaintenanceQueueEntry Entry => Entries[0];
+    internal CapturedFinding? Finding { get; init; }
+    internal string Id => Finding?.Id ?? Entry.Id;
     internal UpdateAvailability? Availability { get; init; }
     internal PackageCheckFact? PackageCheck { get; init; }
-    internal bool IsFamily => Entry.IsCopyReview;
+    internal bool IsFamily => Finding is { } finding ? finding.Navigation.Contains(FindingNavigation.InspectCopies) : Entry.IsCopyReview;
     internal IReadOnlyList<string> LocationLabels { get; init; } = [];
 }
 
@@ -21,6 +23,7 @@ internal sealed record ChangesQueueProjection(IReadOnlyList<ChangesQueueRow> Row
 
     // Queue captures do not check upstream availability or establish an update count.
     internal string Counts => $"{Problems} Problems · {UpdatesNotChecked} · {ReviewSuggestions} Review";
+    internal int Informational { get; init; }
 }
 
 /// Pure UI policy over the captured queue. Never classifies paths or performs I/O.
@@ -31,14 +34,14 @@ internal static class ChangesQueueBuilder
 
     internal static ChangesQueueProjection Build(MaintenanceQueue queue, CancellationToken token)
     {
-        var rows = ProjectRows(queue.Entries, token);
+        var rows = queue.Findings.IsDefault ? ProjectRows(queue.Entries, token) : ProjectFindings(queue.Findings, token);
         var shown = new List<ChangesQueueRow>(Math.Min(MaxRows, rows.Count));
         var problems = 0;
         var reviews = 0;
         foreach (var row in rows)
         {
             token.ThrowIfCancellationRequested();
-            if (row.Kind == "Problem") problems++; else reviews++;
+            if (row.Kind == "Problem") problems++; else if (row.Kind == "Review") reviews++;
             if (shown.Count < MaxRows) shown.Add(row);
         }
         var limited = new HashSet<(string Id, string Path)>();
@@ -52,7 +55,45 @@ internal static class ChangesQueueBuilder
         {
             Diagnostics = queue.Diagnostics.Add($"Consumer discovery incomplete for {limited.Count} captured locations; other consumers may exist.")
         };
-        return new(shown, rows.Count - shown.Count, MaintenanceQueueFormatter.RenderDiagnostics(coverage, token), problems, reviews);
+        return new(shown, rows.Count - shown.Count, MaintenanceQueueFormatter.RenderDiagnostics(coverage, token), problems, reviews)
+        { Informational = rows.Count(row => row.Kind is "Info" or "Intent" or "Coverage") };
+    }
+
+    private static IReadOnlyList<ChangesQueueRow> ProjectFindings(IEnumerable<CapturedFinding> findings, CancellationToken token)
+    {
+        var rows = new List<ChangesQueueRow>();
+        var captured = findings.ToArray();
+        var exact = captured.Where(finding => finding.Subject is FindingCopies && !finding.Navigation.Contains(FindingNavigation.InspectCopies))
+            .ToDictionary(finding => finding.Id, StringComparer.Ordinal);
+        rows.AddRange(ProjectRows(exact.Values.SelectMany(finding => finding.Entries), token).Select(row => row with { Finding = exact[row.Entry.Id] }));
+        foreach (var finding in captured)
+        {
+            token.ThrowIfCancellationRequested();
+            var kind = finding.Intentional ? "Intent" : finding.Classification switch
+            { FindingClass.Problem => "Problem", FindingClass.Update => "Updates", FindingClass.Review => "Review", FindingClass.Coverage => "Coverage", _ => "Info" };
+            if (finding.Subject is FindingRegistry)
+            {
+                rows.Add(new(kind, Bound(Clean(finding.Title), 64) + " · gh record (inspect)", []) { Finding = finding });
+                continue;
+            }
+            var copies = ((FindingCopies)finding.Subject).Copies;
+            if (!finding.Navigation.Contains(FindingNavigation.InspectCopies))
+            {
+                continue;
+            }
+            var description = finding.Kind switch
+            {
+                "recorded-revisions" => "recorded revisions differ",
+                "installation-methods" => "installation methods differ",
+                "same-source-copies" => "same source; compare files",
+                _ => "sources differ / unknown"
+            };
+            var paths = DistinguishingPathLabels.Build(copies.Select(copy => copy.Path), finding.Title, 80, token);
+            rows.Add(new(kind, Bound(Clean(finding.Title), 64) + $" · {copies.Select(copy => copy.InstallationId).Distinct().Count()} captured copies · " + description
+                + (finding.Intentional ? " · intentional" : ""), finding.Entries)
+            { Finding = finding, LocationLabels = copies.Select(copy => paths[copy.Path]).ToArray() });
+        }
+        return rows.OrderBy(row => row.Kind == "Problem" ? 0 : row.Kind == "Review" ? 1 : 2).ToArray();
     }
 
     internal static IReadOnlyList<ChangesQueueRow> ProjectRows(IEnumerable<MaintenanceQueueEntry> entries, CancellationToken token)
@@ -108,6 +149,8 @@ internal static class ChangesQueueBuilder
 
     internal static string Render(ChangesQueueRow row, CancellationToken token, bool showDetails, string? homeDirectory)
     {
+        if (row.Finding is { } finding && (finding.Subject is FindingRegistry || row.IsFamily))
+            return CapturedFindingFormatter.Render(row, finding, token, showDetails);
         if (row.PackageCheck is { } package)
             return package.Detail + "\n\n**Enter:** open the retained full report. No repair action is supplied by this check.\n";
         if (row.Availability is { } observation)

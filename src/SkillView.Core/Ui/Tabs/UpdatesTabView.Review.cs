@@ -27,7 +27,7 @@ internal sealed partial class UpdatesTabView
         {
             X = 0,
             Y = Pos.AnchorEnd(8),
-            Text = "I reviewed F2 source changes/omissions (no safety/authenticity claim)",
+            Text = "I reviewed Diff changes/omissions (no safety/authenticity claim)",
             Enabled = false
         };
         _sourceReviewBox.ValueChanged += (_, _) => RefreshReviewControls();

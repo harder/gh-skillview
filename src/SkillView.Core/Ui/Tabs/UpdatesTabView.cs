@@ -11,6 +11,7 @@ using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
+using Terminal.Gui.Editor;
 
 namespace SkillView.Ui.Tabs;
 
@@ -107,6 +108,29 @@ internal sealed partial class UpdatesTabView : FrameView
             Text = "## Update review\n\nSelect an exact copy in Installed or Issues to begin.",
         };
         TuiHelpers.ConfigureMarkdownPane(_preview, SchemeNames.Base);
+        SubViewsLaidOut += (_, _) =>
+        {
+            if (!_resetPreviewTop || _preview.Frame.Width <= 0 || _preview.Frame.Height <= 0) return;
+            _resetPreviewTop = false;
+            TuiHelpers.RestoreMarkdownScroll(_preview, System.Drawing.Point.Empty);
+        };
+        _diffPreview = new Editor
+        {
+            X = 0,
+            Y = 1,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(9),
+            ReadOnly = true,
+            WordWrap = true,
+            Visible = false
+        };
+        TuiHelpers.ConfigureReadOnlyPane(_diffPreview, SchemeNames.Base);
+        // Read-only source evidence uses normal focus traversal, not indentation.
+        _diffPreview.KeyBindings.Remove(Key.Tab);
+        _diffPreview.KeyBindings.Remove(Key.Tab.WithShift);
+        _diffPreview.KeyDown += OnKeyDown;
+        _diffButton = new SingleRowButton { Text = "View source changes (D)", X = 0, Y = Pos.AnchorEnd(7), Visible = false };
+        _diffButton.Accepting += (_, args) => { args.Handled = true; ToggleSourceDiff(); };
 
         _hiddenBox = new CheckBox
         {
@@ -192,6 +216,7 @@ internal sealed partial class UpdatesTabView : FrameView
             _hiddenBox, _unpinBox,
             _status, _spinner, _updateButton, _unpinOnlyButton, _chooseVersionButton, _detailsButton, _reviewHint, _sourceReviewBox, _retainBox, _applyButton, _finishButton);
         Add(_preserveButton);
+        Add(_diffButton, _diffPreview);
         Add(_undoButton, _undoApproval, _confirmUndoButton, _cancelUndoButton);
         _reviewPresentationReady = true;
         SetOperationControlsEnabled(false);
@@ -326,6 +351,7 @@ internal sealed partial class UpdatesTabView : FrameView
         if (key.KeyCode == KeyCode.Esc)
         {
             key.Handled = true;
+            if (_showDiff) { ToggleSourceDiff(); return; }
             if (_undoReview is not null && !_operationCancellations.HasActive) { CancelUndoReview(); return; }
             _onLeaveTab();
             return;
@@ -341,6 +367,12 @@ internal sealed partial class UpdatesTabView : FrameView
         if (key.IsAlt || key.IsCtrl) return;
 
         var rune = key.AsRune.Value;
+        if (rune is 'd' or 'D' && _diffButton.Visible)
+        {
+            key.Handled = true;
+            ToggleSourceDiff();
+            return;
+        }
         if (rune is 'u' or 'U' or 'c')
         {
             key.Handled = true;
@@ -411,6 +443,8 @@ internal sealed partial class UpdatesTabView : FrameView
         _options = null;
         _retainBox.Value = CheckState.UnChecked;
         _sourceReviewBox.Value = CheckState.UnChecked;
+        _showDiff = false;
+        _displayedPlan = completed?.SavedPlan;
         SetBusy(false);
         SetOperationControlsEnabled(true);
     }

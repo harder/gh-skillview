@@ -11,6 +11,7 @@ public sealed partial class SkillViewApp
 {
     private SingleRowButton? _historyButton;
     private long _historyHintGeneration;
+    private string _historyHint = "History (F4)";
     private Func<CancellationToken, Task<ReplacementHistory>>? _historyLoaderForTests;
 
     private ReplacementPlanStore HistoryStore() => new(ReplacementPlanStore.ResolveRoot(_services.Runner), _services.Logger, runner: _services.Runner);
@@ -18,12 +19,21 @@ public sealed partial class SkillViewApp
     private async Task<ReplacementHistory> LoadHistoryAsync(CancellationToken token) =>
         _historyLoaderForTests is { } load
             ? await load(token).ConfigureAwait(false)
-            : await Task.Run(() => HistoryStore().ReadHistory(token, _options.ScanRoots), token).ConfigureAwait(false);
+            : await Task.Run(() => HistoryStore().ReadHistory(token, _workflows.CurrentDiscoveryOptions.ScanRoots), token).ConfigureAwait(false);
 
     private void PublishHistoryHint(ReplacementHistory history)
     {
         if (_historyButton is null) return;
-        _historyButton.Text = HistoryHintText(history);
+        _historyHint = HistoryHintText(history);
+        RefreshHistoryButton();
+    }
+
+    private void RefreshHistoryButton()
+    {
+        if (_historyButton is null) return;
+        var text = (_mainWindow?.Viewport.Width ?? 0) >= 110 ? _historyHint
+            : _historyHint == "History (F4)" ? "History F4" : "History ! F4";
+        if (_historyButton.Text != text) _historyButton.Text = text;
     }
 
     internal static string HistoryHintText(ReplacementHistory history)
@@ -82,8 +92,8 @@ public sealed partial class SkillViewApp
 
     private Task<InventorySnapshot> CaptureHistoryInventoryAsync(CancellationToken token) =>
         _services.InventoryService.CaptureAsync(_ghPath ?? _services.GhLocator.FindOnPath(token),
-            new LocalInventoryService.Options(_options.ScanRoots, true,
-                WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles)
+            new LocalInventoryService.Options(_workflows.CurrentDiscoveryOptions.ScanRoots, true,
+                WorkspaceDirectories: _workflows.CurrentDiscoveryOptions.WorkspaceDirectories, Profiles: _workflows.CurrentDiscoveryOptions.Profiles)
             { BypassGhCache = true }, token);
 
     private async Task<System.Collections.Immutable.ImmutableArray<string>> ActiveHistoryPlanIdsAsync(CancellationToken token)

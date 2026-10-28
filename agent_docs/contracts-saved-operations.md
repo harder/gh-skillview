@@ -300,6 +300,37 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   retain the literal `quota` and History guidance. CLI `replacement-history` lists
   hints; `history` keeps its existing backup verification semantics and wire format.
 
+- Intentional differences are separate private append-only issue preferences,
+  not cleanup suppression or saved-plan approval. They bind filesystem-sensitive
+  captured family addresses and source/revision/owner/topology/exposure evidence;
+  no startup payload hashes. Keep rows visibly intentional and allow Restore.
+  Preserve Problems, owner conflicts, coverage, packages and explicit available
+  updates. Every reader/writer/reset holds the permanent empty writer.lock in a
+  permanent root. Initialize its lock only in an empty held root; a missing lock
+  beside retained entries refuses without recreating it or reviving old choices.
+  Reads are existing-only. At most one random records-* child
+  and one backup-* child are admitted; other entries refuse at their literal
+  path. Version binds the records epoch/native object; pre-reset approvals fail
+  after reset. Latest action per stable family supersedes old evidence and
+  reserves one clear slot; exact evidence is still required for active intent.
+  The finite 512-record/2-MiB log signals 75% capacity, with full literal recovery
+  details. Preference notices retain complete capacity/path/count text within a
+  256-KiB literal display bound; larger hostile diagnostics report the bound and
+  point to Choices for the exact captured store/recovery route. No silent field
+  omission or ErrorSnippet. No automatic compaction/eviction. Explicit Reset defaults to Cancel,
+  revalidates context/held native identities and bounded raw file bytes, preserves
+  <=512 ordinary <=2-KiB records (including malformed bytes) plus a <=512-KiB
+  manifest written last, then uses existing held ownership/RemoveTree on only the
+  records child with an exact allowlist/native identity/size/hash and stop-first-
+  mismatch. Close child handles before removal, check cancellation before native
+  deletion, flush and publish a fresh random generation. Interrupted copies may
+  only extend exact prefixes; interrupted deletion requires an explicit new review
+  and remaining files matching the completed manifest. Unknown/link/mount/size/
+  context changes refuse, never activate old intent. One backup is never deleted;
+  another reset requires external archival outside the root, disclosed up front.
+  `MaintenanceQueue.Findings` is internal/transient: CLI queue schema1, existing
+  fields, saved schemas/hash inputs and native mutation backends remain unchanged.
+
 Retirement must separately prove completion of its own real owner transition:
 private terminal payload topology or an empty journal is insufficient because
 moves precede owner intent publication. Match the last payload-complete step to

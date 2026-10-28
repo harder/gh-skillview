@@ -12,67 +12,21 @@ namespace SkillView.Ui;
 /// with the rest of the app. Dismisses on Esc, Enter, `?`, or button click.
 internal static class HelpOverlay
 {
-    internal static string BuildMarkdown() => """
-## Primary
-
-- **↑ / ↓** — move selection
-- **Enter** — preview the selected search result or open the selected issue
-- **f** — filters in Discover · filter box in Installed
-- **1 / 2 / 3** — switch tabs (← / → also cycle outside Installed)
-- **?** or **F1** — show this help
-
-## Discover
-
-- **/** — focus the Discover query box
-- **i** — install selected via compact confirm
-- **I** — install selected via advanced wizard
-- **A** — discover & pick which skills to install from the selected repo (gh 2.95+)
-- **o** — open the selected repo in the browser
-
-## Installed
-
-- **C** — Check updates / cancel checks (browsing stays available)
-- **Enter** — expand a source group or browse the selected exact copy
-- **← / →** — collapse / expand the selected source group
-- **/** or **f** — search Installed; Esc leaves the field
-- **Esc** — back from full-width detail, then leave Installed
-- **u** or **Review update** — review an update for the selected exact copy
-- **More actions** — open, remove, package check and contextual local-source reviews
-- **F2** — technical evidence for the same copy
-- **c** — Cleanup
-- **x** — remove the selected installed skill
-- **o** — open the selected skill path
-- **G** — cycle scope filter (all / user / project / custom)
-
-## Issues
-
-- **Enter** — review the selected issue without changing files
-- **F2** — switch between the issue summary and technical details
-- Problems are local findings; same-name copies are review suggestions.
-- **C** — Check updates / cancel; results are shared with Installed
-- **u** — review selected finding (alias for Enter)
-- **r** — refresh local inventory (no update check)
-- **c** — open cleanup
-- **d** — open Doctor
-
-## Advanced
-
-- **s / S** — cycle sort in Discover or Installed
-- **P** — cycle Installed pin filter
-- **G** — cycle Installed scope filter (preserves all shared consumers)
-- **e** — toggle raw / rendered preview
-- **l** — show / hide logs
-- **r** — refresh the active tab
-- **Ctrl+Q** — quit from anywhere, including text fields
-- **q** — quit from a top-level list or preview
-- **Esc** — leave a field, go back, or close a modal
-
-_Press **Esc**, **Enter**, or **?** to close._
-""";
+    internal static string BuildMarkdown(ActionScreen screen = ActionScreen.Discover, bool showingLogs = false)
+    {
+        var title = screen == ActionScreen.UpdateReview ? "Update review" : screen.ToString();
+        var primary = new[] { ActionLabels.Selection, ActionLabels.Focus, ActionLabels.Back, ActionLabels.Help, ActionLabels.Locations };
+        var advanced = new[] { ActionLabels.Tabs, ActionLabels.History, ActionLabels.Quit, ActionLabels.ListQuit };
+        return "## " + title + "\n\n" + string.Join("\n", ActionLabels.ScreenActions(screen, showingLogs).Select(action => action.Markdown))
+            + "\n\n## Primary\n\n" + string.Join("\n", primary.Select(action => action.Markdown))
+            + "\n\n## Advanced\n\n" + string.Join("\n", advanced.Select(action => action.Markdown))
+            + "\n\n_Printable shortcuts type into focused text fields. Leave the field first; F1 and Ctrl+Q remain available._"
+            + "\n\n_Press **Esc**, **Enter** (on Close), **F1**, or **?** to close._";
+    }
 
     internal static string MarkdownBodyForTests => BuildMarkdown();
 
-    internal static void Show(IApplication app)
+    internal static void Show(IApplication app, ActionScreen screen, bool showingLogs)
     {
         var dialog = new Dialog
         {
@@ -88,7 +42,7 @@ _Press **Esc**, **Enter**, or **?** to close._
             Y = 0,
             Width = Dim.Fill(2),
             Height = Dim.Fill(2),
-            Text = BuildMarkdown(),
+            Text = BuildMarkdown(screen, showingLogs),
         };
         TuiHelpers.ConfigureMarkdownPane(body, SchemeNames.Dialog);
         dialog.Add(body);

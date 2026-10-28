@@ -98,6 +98,7 @@ public sealed partial class SkillViewApp
     internal StatusStripView? StatusStripForTests => _statusStrip;
 
     internal IReadOnlyList<StatusHint> CurrentHintsForTests => GetCurrentHints();
+    internal string CurrentHelpForTests => HelpOverlay.BuildMarkdown(CurrentActionScreen, _showingLogs);
 
     internal string PreviewTextForTests => _previewPane?.Text.ToString() ?? string.Empty;
 
@@ -140,6 +141,10 @@ public sealed partial class SkillViewApp
         EnterDoctor();
     }
 
+    internal Task DrainBackgroundForTests() => _backgroundTasks.DrainAsync();
+    internal Task<EnvironmentReport> GetLocalEnvironmentForTests(CancellationToken token) => GetOrProbeEnvironmentAsync(token);
+    internal void SetAuthenticationProbeForTests(Func<CancellationToken, Task<SkillView.Gh.GhAuthStatus>> probe) => _authProbeForTests = probe;
+    internal SkillView.Gh.GhAuthStatus? RemoteAuthForTests => _remoteAuth;
     internal void LeaveDoctorForTests() => LeaveDoctor();
 
     internal void SetHistoryLoaderForTests(Func<CancellationToken, Task<SkillView.Maintenance.ReplacementHistory>> load) =>

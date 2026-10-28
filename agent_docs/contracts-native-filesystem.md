@@ -264,3 +264,50 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   guard. Raw bound capture is separate from historical parsed capture. Require
   supported full native metadata and revalidate archive-bound live metadata on
   each transition; no capability refusal may become review-only approval.
+
+### Locations recovery
+
+Locations preferences reuse existing NativeStateDirectory, OwnedDirectoryLease,
+SecurePayloadWalker, RegularFileInspection and SecureRemovalBackend primitives.
+Do not broaden skill move admission or add native capabilities for preferences.
+The permanent locations root and EMPTY writer.lock survive every operation;
+every saved-record read, append, review and recovery holds that same lock.
+An interrupted first initialization without a lock may read as missing ONLY
+when existing-only native enumeration and held identity/generation prove ZERO
+entries. It creates nothing. Any entry/link/unknown stays protected. Save can
+bootstrap expected missing under that permanent lock only after CaptureSet proves
+no records/backup, regardless of which call created the root; a second writer
+serializes and cannot reuse missing after publication.
+There is at most one records-<32 lowercase hex> child and one backup-<records ID>.
+Native context/epoch and raw identity/size/hash evidence bind optimistic versions.
+
+Explicit Cancel-default Reset admits only bounded known regular raw records,
+including malformed/empty bytes; it does not interpret them as valid selections.
+Refuse unknown names, links, subfolders, mounts, unsafe ownership/modes, shared or
+unknown hard-link topology and exceeded bounds. Copy raw files, publish the
+manifest LAST, flush and read back the full backup before removing only the held
+reviewed records child. Use native per-entry allowlists and stop at the first
+identity/size/hash mismatch; check cancellation immediately before deletion.
+Close ownership handles before reporting Windows deletion complete. Never add
+path-recursive or single-file deletion, move fallbacks or automatic backup
+removal. A complete backup of a prior generation blocks another Reset until the
+user externally archives it, using the displayed literal-path/loss procedure.
+
+Partial backup publication resumes exact byte prefixes only while source evidence
+remains intact. Incomplete removal resumes matching manifest/native survivors;
+a verified-empty child can finish after the last unlink without an empty receipt
+ONLY when its stable native SameObject identity matches the COMPLETE verified
+backup manifest/RecordsId, CaptureLog and a separate native walk both have zero
+entries, and coupled root/mount validation passes under the permanent writer.
+Recheck cancellation/context immediately before existing RemoveTree with
+requireEmptyDirectory=true, maxDepth=0 and entryObserved refusing ANY entry.
+Require the root removed with zero failures; close the ownership handle, then
+FlushPublication. This exception never relaxes nonempty generation checks or
+authorizes deletion by names/markers. Diagnostic: records directory is empty;
+backup verified; run Reset to finish.
+Explicit Compact resets then publishes the latest VALID SAVED selection in a
+fresh generation, never CLI-effective values. Its partial publication can append
+only to the matching reviewed prefix. All state outside this store remains
+excluded from recovery authority. Active log limits are 64 records, 128 KiB per
+record, 8 MiB aggregate; backup metadata adds at most two 128 KiB files. No local
+proof establishes native Windows/macOS/AOT behavior.

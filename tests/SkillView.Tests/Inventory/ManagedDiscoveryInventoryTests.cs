@@ -627,8 +627,7 @@ public sealed class ManagedDiscoveryInventoryTests : IDisposable
             Assert.Equal(control, Assert.Single(inventory.Skills).ResolvedPath);
             Assert.Empty(inventory.Skills[0].AllOwnershipClaims);
             var cleanup = CleanupClassifier.ClassifyWithCancellation(inventory, inventory.ScannedRoots, null, Token);
-            Assert.DoesNotContain(cleanup, candidate => candidate.Kind is CleanupClassifier.CandidateKind.Untracked
-                or CleanupClassifier.CandidateKind.SourceOrphaned or CleanupClassifier.CandidateKind.Duplicate);
+            Assert.DoesNotContain(cleanup, candidate => candidate.Kind is CleanupClassifier.CandidateKind.Untracked or CleanupClassifier.CandidateKind.NameCollision);
             if (managedAncestor)
             {
                 Assert.Contains(inventory.ManagedRegions, region => PathIdentity.IsInside(region.Path, inaccessibleCodex));

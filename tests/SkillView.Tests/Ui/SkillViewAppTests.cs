@@ -23,6 +23,95 @@ namespace SkillView.Tests.Ui;
 public sealed class SkillViewAppTests
 {
     [Fact]
+    public async Task HeldDoctorAuthenticationDoesNotOwnLocalInventoryAndStaleCompletionCannotPublish()
+    {
+        var root = Directory.CreateTempSubdirectory("skillview-auth-separation-");
+        try
+        {
+            var home = Directory.CreateDirectory(Path.Combine(root.FullName, "home")).FullName;
+            var work = Directory.CreateDirectory(Path.Combine(root.FullName, "work")).FullName;
+            var scan = Directory.CreateDirectory(Path.Combine(root.FullName, "skills")).FullName;
+            var copy = Directory.CreateDirectory(Path.Combine(scan, "offline")).FullName;
+            File.WriteAllText(Path.Combine(copy, "SKILL.md"), "---\nname: offline\ndescription: Local\n---\nFixture\n");
+            var services = TuiServices.Build(new Logger(), processEnvironment: new Dictionary<string, string>
+            {
+                ["HOME"] = home,
+                ["USERPROFILE"] = home,
+                ["SKILLVIEW_STATE_HOME"] = Path.Combine(root.FullName, "state"),
+                ["CLAUDE_CONFIG_DIR"] = Path.Combine(home, ".claude"),
+                ["CODEX_HOME"] = Path.Combine(home, ".codex"),
+                ["CLAUDE_CODE_PLUGIN_DIRS"] = "",
+                ["CLAUDE_CODE_PLUGIN_SEED_DIR"] = "",
+                ["PI_CODING_AGENT_DIR"] = Path.Combine(home, ".pi"),
+                ["GIT_DIR"] = Path.Combine(work, ".git"),
+                ["GIT_WORK_TREE"] = work,
+                ["GIT_COMMON_DIR"] = Path.Combine(work, ".git"),
+                ["GIT_CONFIG_COUNT"] = "0"
+            }, workingDirectory: work);
+            var app = new SkillViewApp(services, CreateOptions() with { ScanRoots = [scan] });
+            using var window = app.BuildUiForTests();
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource<GhAuthStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            app.SetAuthenticationProbeForTests(async token =>
+            {
+                using var registration = token.Register(() => canceled.TrySetResult());
+                entered.TrySetResult();
+                return await release.Task; // Deliberately ignores cancellation until released.
+            });
+            var report = CreateEnvironmentReport();
+            app.EnterDoctorForTests(report);
+            await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
+            var local = await app.GetLocalEnvironmentForTests(TestContext.Current.CancellationToken);
+            Assert.Same(report, local);
+            var snapshot = await app.CaptureStartupInventoryAsync(report with { GhPath = null }, TestContext.Current.CancellationToken);
+            Assert.Contains(snapshot.Skills, skill => skill.Name == "offline"); Assert.False(release.Task.IsCompleted);
+            app.StopBackgroundAdmissionForTests(); app.LeaveDoctorForTests();
+            await canceled.Task.WaitAsync(TestContext.Current.CancellationToken);
+            release.SetResult(LoggedInAuth("stale.example"));
+            await app.DrainBackgroundForTests();
+            Assert.Null(app.RemoteAuthForTests);
+        }
+        finally { root.Delete(true); }
+    }
+
+    [Fact]
+    public async Task ShutdownCancelsAndDrainsHeldDoctorAuthenticationBeforeDisposingTheApplication()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<GhAuthStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SkillViewApp? subject = null;
+        IApplication? exactApp = null;
+        subject = new SkillViewApp(TuiServices.Build(new Logger()), CreateOptions(), () =>
+        {
+            var application = Application.Create().Init(); exactApp = application;
+            var requested = false;
+            application.Iteration += (_, _) =>
+            {
+                if (requested) return;
+                requested = true;
+                subject!.EnterDoctorForTests(CreateEnvironmentReport());
+                application.RequestStop();
+            };
+            return application;
+        }, probeOnRun: false);
+        subject.SetAuthenticationProbeForTests(async token =>
+        {
+            using var registration = token.Register(() => canceled.TrySetResult());
+            entered.TrySetResult();
+            return await release.Task;
+        });
+        var run = subject.RunAsync(TestContext.Current.CancellationToken);
+        await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await canceled.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.False(run.IsCompleted);
+        release.SetResult(LoggedInAuth("after-shutdown.example"));
+        Assert.Equal(ExitCodes.Success, await run.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Null(subject.RemoteAuthForTests); Assert.NotNull(exactApp); Assert.False(exactApp.Initialized);
+    }
+
+    [Fact]
     public void PagingUsesSubmittedQueryFiltersAndPreservesReturnContext()
     {
         var app = CreateApp();
@@ -857,7 +946,7 @@ public sealed class SkillViewAppTests
 
         var hints = app.CurrentHintsForTests;
 
-        Assert.Equal(4, hints.Count);
+        Assert.Equal(5, hints.Count);
         Assert.Contains(hints, hint => hint.Key == "f" && hint.Label == "Filters");
         Assert.Contains(hints, hint => hint.Key == "1/2/3" && hint.Label == "Tabs");
         Assert.Contains(hints, hint => hint.Key == "?" && hint.Label == "Help");
@@ -878,7 +967,7 @@ public sealed class SkillViewAppTests
         app.ForceActiveTabForTests(SkillViewTab.Installed);
         var hints = app.CurrentHintsForTests;
 
-        Assert.Equal(6, hints.Count);
+        Assert.Equal(7, hints.Count);
         Assert.Contains(hints, hint => hint.Key == "/" && hint.Label == "Search");
         Assert.Contains(hints, hint => hint.Key == "Enter" && hint.Label == "Details/Expand");
         Assert.Contains(hints, hint => hint.Key == "r" && hint.Label == "Refresh");
@@ -887,6 +976,11 @@ public sealed class SkillViewAppTests
         Assert.Contains(hints, hint => hint.Key == "Ctrl+Q" && hint.Label == "Quit");
         Assert.DoesNotContain(hints, hint => hint.Key == "o" && hint.Label == "Open");
         Assert.DoesNotContain(hints, hint => hint.Key == "q" && hint.Label == "Quit");
+        var visible = StatusStripView.TruncateHintsForTests(hints, 80);
+        Assert.Contains(visible, hint => hint is { Key: "C", Label: "Check updates" });
+        Assert.Contains(visible, hint => hint is { Key: "Enter", Label: "Details/Expand" });
+        Assert.Contains(visible, hint => hint is { Key: "?", Label: "Help" });
+        Assert.Contains("**/ / f / F**", app.CurrentHelpForTests);
     }
 
     [Fact]
@@ -1675,6 +1769,30 @@ public sealed class SkillViewAppTests
         Assert.Contains(changesHints, hint => hint is { Key: "c", Label: "Cleanup" });
         Assert.Contains(changesHints, hint => hint is { Key: "d", Label: "Doctor" });
         Assert.DoesNotContain(changesHints, hint => hint.Key is "f" or "x");
+        Assert.Contains("## Issues", app.CurrentHelpForTests);
+        Assert.Contains("**Enter / u / U**", app.CurrentHelpForTests);
+        Assert.DoesNotContain("**i**", app.CurrentHelpForTests);
+        Assert.Contains("**F4**", app.CurrentHelpForTests);
+        Assert.DoesNotContain("2.95", app.CurrentHelpForTests);
+
+        // Log mode belongs to Discover; it must not hide Installed/Issues hints.
+        app.ShowLogPaneForTests();
+        Assert.Contains(app.CurrentHintsForTests, hint => hint is { Key: "Enter", Label: "Review" });
+        app.ForceActiveTabForTests(SkillViewTab.Discover);
+        Assert.Contains(app.CurrentHintsForTests, hint => hint is { Key: "l", Label: "Preview" });
+        Assert.Contains("Preview: return from logs", app.CurrentHelpForTests);
+        app.ResultsTableForTests!.SetFocus();
+        window.NewKeyDownEvent(new Key('l'));
+        Assert.Contains(app.CurrentHintsForTests, hint => hint is { Key: "l", Label: "Logs" });
+        Assert.Contains("Logs: show", app.CurrentHelpForTests);
+
+        app.UpdatesTabForTests!.Visible = true;
+        Assert.DoesNotContain(app.CurrentHintsForTests, hint => hint.Label == "Cleanup");
+        Assert.Contains("## Update review", app.CurrentHelpForTests);
+        Assert.Contains("**u / U / c**", app.CurrentHelpForTests);
+        Assert.Contains("**p**", app.CurrentHelpForTests);
+        Assert.DoesNotContain("Cleanup", app.CurrentHelpForTests);
+        Assert.DoesNotContain("**i**", app.CurrentHelpForTests);
     }
 
     [Fact]

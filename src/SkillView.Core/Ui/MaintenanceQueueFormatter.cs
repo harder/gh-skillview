@@ -41,12 +41,9 @@ internal static class MaintenanceQueueFormatter
         "BrokenSymlink" => "Broken link",
         "BrokenSharedMapping" => "Shared link needs attention",
         "NameCollision" => "Same name, multiple copies",
-        "Duplicate" => "Multiple copies",
         "Untracked" => "Source not recorded",
         "MetadataConflict" => "Conflicting installation records",
         "HiddenNestedResidue" => "Nested files need review",
-        "SourceOrphaned" => "Source needs review",
-        "OrphanCanonicalCopy" => "Shared copy needs review",
         _ => "Installation needs review"
     };
 

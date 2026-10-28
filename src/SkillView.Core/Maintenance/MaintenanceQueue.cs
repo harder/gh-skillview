@@ -18,11 +18,14 @@ public sealed record MaintenanceQueueEntry(string Id, string Issue, string Title
     public string MigrationState => "not-assessed";
     internal CleanupClassifier.Candidate? Cleanup { get; init; }
     internal PinDisplayPolicy? PinDisplay { get; init; }
-    internal bool IsCopyReview => Issue is "NameCollision" or "Duplicate";
+    internal bool IsCopyReview => Issue == "NameCollision";
 }
 
 public sealed record MaintenanceQueue(DateTimeOffset CapturedAt, bool Partial,
-    ImmutableArray<string> Diagnostics, ImmutableArray<MaintenanceQueueEntry> Entries);
+    ImmutableArray<string> Diagnostics, ImmutableArray<MaintenanceQueueEntry> Entries)
+{
+    internal ImmutableArray<CapturedFinding> Findings { get; init; }
+}
 
 public static class MaintenanceQueueBuilder
 {
@@ -63,9 +66,10 @@ public static class MaintenanceQueueBuilder
                 .Select(provider => provider.Provider + ": " + (provider.Error ?? "capture failed")))
             .Concat(snapshot.ConfiguredRootsComplete ? [] : new[] { "Configured-root discovery is incomplete." })
             .Concat(snapshot.PreferenceDiagnostics).ToImmutableArray();
-        return new(snapshot.CapturedAt, snapshot.IsPartial || !snapshot.ConfiguredRootsComplete, diagnostics,
+        var queue = new MaintenanceQueue(snapshot.CapturedAt, snapshot.IsPartial || !snapshot.ConfiguredRootsComplete, diagnostics,
             entries.DistinctBy(entry => entry.Id).OrderBy(entry => entry.Issue, StringComparer.Ordinal)
                 .ThenBy(entry => entry.Subject.Path, StringComparer.Ordinal).ToImmutableArray());
+        return queue with { Findings = CapturedFindingBuilder.Build(snapshot, queue, token) };
     }
 
     internal static InstalledSkill? ResolveInstallation(InventorySnapshot snapshot, OperationSubject selected)

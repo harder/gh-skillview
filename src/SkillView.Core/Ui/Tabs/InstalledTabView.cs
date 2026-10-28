@@ -152,15 +152,15 @@ internal sealed class InstalledTabView : FrameView
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
         Visible = false;
-        _checkUpdates = new SingleRowButton { X = Pos.AnchorEnd(35), Y = 0, Text = "Check all updates (C)", Visible = availability is not null };
-        _reviewUpdate = new SingleRowButton { X = 13, Y = Pos.AnchorEnd(1), Text = "Review update (u)", Visible = onReviewUpdate is not null };
+        _checkUpdates = new SingleRowButton { X = Pos.AnchorEnd(35), Y = 0, Text = ActionLabels.CheckUpdates.ButtonText, Visible = availability is not null };
+        _reviewUpdate = new SingleRowButton { X = 13, Y = Pos.AnchorEnd(1), Text = ActionLabels.ReviewUpdate.ButtonText, Visible = onReviewUpdate is not null };
         _checkUpdates.Accepting += (_, e) => { e.Handled = true; _onCheckUpdates?.Invoke(); };
         _reviewUpdate.Accepting += (_, e) => { e.Handled = true; ReviewSelectedUpdate(); };
         _detailsButton = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Details" };
         _detailsButton.Accepting += (_, e) => { e.Handled = true; OpenSelectedDetail(); };
-        _moreActions = new SingleRowButton { X = 37, Y = Pos.AnchorEnd(1), Text = "More actions" };
+        _moreActions = new SingleRowButton { X = 37, Y = Pos.AnchorEnd(1), Text = ActionLabels.MoreActions.ButtonText };
         _moreActions.Accepting += (_, e) => { e.Handled = true; ShowMoreActions(); };
-        _back = new SingleRowButton { X = 56, Y = Pos.AnchorEnd(1), Text = "Back (Esc)", Visible = false };
+        _back = new SingleRowButton { X = 56, Y = Pos.AnchorEnd(1), Text = ActionLabels.Back.ButtonText, Visible = false };
         _back.Accepting += (_, e) => { e.Handled = true; BackToList(); };
         _searchSkills = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Search skills (1)", Visible = false };
         _searchSkills.Accepting += (_, e) => { e.Handled = true; _onLeaveTab(); };
@@ -1142,7 +1142,7 @@ internal sealed class InstalledTabView : FrameView
         if (captureIssues) CaptureIssueView();
         if (_availability is not null)
         {
-            _checkUpdates.Text = _availability.Running ? "Cancel check (C)" : "Check all updates (C)";
+            _checkUpdates.Text = _availability.Running ? ActionLabels.CancelCheck.ButtonText : ActionLabels.CheckUpdates.ButtonText;
             _checkUpdates.Enabled = !_availability.Stopping;
         }
         RefreshCoverage();

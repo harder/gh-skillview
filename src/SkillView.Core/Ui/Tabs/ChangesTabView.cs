@@ -36,6 +36,16 @@ internal sealed class ChangesTabView : FrameView
     private readonly Action? _onCheckUpdates;
     private readonly Button _checkUpdates;
     private readonly Button _reviewFinding;
+    private readonly Button _keepBoth;
+    private readonly Button _resetChoices;
+    private readonly Func<ChangesSelectionGate.Lease, Task>? _resetIntentional;
+    private readonly Func<CapturedFinding, ChangesSelectionGate.Lease, Task<string>>? _setIntentional;
+    private readonly Func<CapturedFinding, ChangesSelectionGate.Lease, Task>? _activateFinding;
+    private bool _preferenceBusy;
+    private bool _detailOpen;
+    private string? _preferenceNotice;
+    private string? _preferenceNoticeFamily;
+    private bool Narrow => Viewport.Width is > 0 and < 110;
     private readonly Label _updateStatus;
     private InventorySnapshot? _snapshot;
     private bool _disposed;
@@ -74,8 +84,14 @@ internal sealed class ChangesTabView : FrameView
         Func<MaintenanceQueueEntry, ChangesSelectionGate.Lease, Task>? activateEntryAsync = null,
         Action? onRefresh = null, string? homeDirectory = null,
         UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null, Func<long>? catalogGeneration = null,
-        Func<PackageCheckFact?>? packageCheck = null, Action<PackageCheckFact>? onPackageCheck = null)
+        Func<PackageCheckFact?>? packageCheck = null, Action<PackageCheckFact>? onPackageCheck = null,
+        Func<CapturedFinding, ChangesSelectionGate.Lease, Task<string>>? setIntentional = null,
+        Func<CapturedFinding, ChangesSelectionGate.Lease, Task>? activateFinding = null,
+        Func<ChangesSelectionGate.Lease, Task>? resetIntentional = null)
     {
+        _resetIntentional = resetIntentional;
+        _setIntentional = setIntentional;
+        _activateFinding = activateFinding;
         _packageCheck = packageCheck ?? (() => null);
         _onPackageCheck = onPackageCheck;
         _catalogGeneration = catalogGeneration ?? (() => 0);
@@ -97,10 +113,14 @@ internal sealed class ChangesTabView : FrameView
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
         Visible = false;
-        _checkUpdates = new SingleRowButton { X = 0, Y = 0, Text = "Check updates (C)", Visible = availability is not null };
-        _reviewFinding = new SingleRowButton { X = Pos.Right(_checkUpdates) + 1, Y = 0, Text = "Review (Enter)", Visible = availability is not null };
-        _updateStatus = new Label { X = Pos.Right(_reviewFinding) + 1, Y = 0, Width = Dim.Fill(), Text = "Updates not checked", Visible = availability is not null };
-        _checkUpdates.Accepting += (_, e) => { e.Handled = true; _onCheckUpdates?.Invoke(); };
+        _checkUpdates = new SingleRowButton { X = 0, Y = 0, Text = ActionLabels.CheckUpdates.ButtonText, Visible = availability is not null };
+        _reviewFinding = new SingleRowButton { X = Pos.Right(_checkUpdates) + 1, Y = 0, Text = ActionLabels.ReviewIssue.ButtonText, Visible = availability is not null };
+        _keepBoth = new SingleRowButton { X = Pos.Right(_reviewFinding) + 1, Y = 0, Text = ActionLabels.KeepBoth.ButtonText, Visible = setIntentional is not null, Enabled = false };
+        _keepBoth.Accepting += (_, e) => { e.Handled = true; SetIntentional(); };
+        _resetChoices = new SingleRowButton { X = Pos.Right(_keepBoth) + 1, Y = 0, Text = ActionLabels.Choices.ButtonText, Visible = resetIntentional is not null };
+        _resetChoices.Accepting += (_, e) => { e.Handled = true; ResetIntentional(); };
+        _updateStatus = new Label { X = Pos.Right(_resetChoices) + 1, Y = 0, Width = Dim.Fill(), Height = 1, Text = "Updates not checked", Visible = availability is not null };
+        _checkUpdates.Accepting += (_, e) => { e.Handled = true; ClearPreferenceFeedback(); _onCheckUpdates?.Invoke(); };
         _reviewFinding.Accepting += (_, e) => { e.Handled = true; if (!_loading.Visible) ActivateSelectedRow(); };
 
         _table = new TableView
@@ -114,7 +134,7 @@ internal sealed class ChangesTabView : FrameView
         TuiHelpers.DisableTypeToSearch(_table);
         TuiHelpers.ConfigureTableNavigation(_table);
         TuiHelpers.ConfigureTableChrome(_table);
-        _table.ValueChanged += (_, _) => UpdateDetail();
+        _table.ValueChanged += (_, _) => { CancelSelectedRequest(); UpdateDetail(); };
         _table.FrameChanged += (_, _) => RecomputeColumnWidths();
 
         _detail = new Markdown
@@ -159,7 +179,8 @@ internal sealed class ChangesTabView : FrameView
             _status.Text = BuildStatusText();
         };
 
-        Add(_table, _detail, _spinner, _status, _loading, _checkUpdates, _reviewFinding, _updateStatus);
+        Add(_table, _detail, _spinner, _status, _loading, _checkUpdates, _reviewFinding, _keepBoth, _resetChoices, _updateStatus);
+        FrameChanged += (_, _) => ApplyLayout();
         Disposing += (_, _) => { _disposed = true; CancelPendingLoad(); };
     }
 
@@ -169,7 +190,7 @@ internal sealed class ChangesTabView : FrameView
         var selectedRow = _table.GetSelectedRow();
         if (selectedRow >= 0 && selectedRow < _rows.Count)
         {
-            _returnSelectionId = _rows[selectedRow].Entry.Id;
+            _returnSelectionId = _rows[selectedRow].Id;
             _returnRowOffset = _table.RowOffset;
         }
         CancelSelectedRequest();
@@ -242,7 +263,7 @@ internal sealed class ChangesTabView : FrameView
     private void LoadRows(IReadOnlyList<ChangesQueueRow> rows, CancellationToken renderToken = default)
     {
         _rows = rows;
-        _reviewFinding.Enabled = rows.Count > 0;
+        _reviewFinding.Enabled = !_preferenceBusy && rows.Count > 0;
         var source = new EnumerableTableSource<ChangesQueueRow>(
             _rows,
             new Dictionary<string, Func<ChangesQueueRow, object>>
@@ -262,7 +283,7 @@ internal sealed class ChangesTabView : FrameView
         RecomputeColumnWidths();
         _table.Update();
         var restoredRow = rows.Select((row, index) => (row, index))
-            .FirstOrDefault(item => item.row.Entry.Id == _returnSelectionId);
+            .FirstOrDefault(item => item.row.Id == _returnSelectionId);
         _table.SetSelectedRow(restoredRow.row is null ? 0 : restoredRow.index);
         _table.RowOffset = _returnRowOffset;
         _status.Text = BuildStatusText();
@@ -271,7 +292,7 @@ internal sealed class ChangesTabView : FrameView
         SetLoading(false);
         if (_rows.Count > 0)
         {
-            _table.SetFocus();
+            if (Narrow && _detailOpen) _detail.SetFocus(); else _table.SetFocus();
         }
         else
         {
@@ -293,23 +314,27 @@ internal sealed class ChangesTabView : FrameView
         ChangesQueueProjection.UpdatesNotChecked, _availability?.Summary ?? ChangesQueueProjection.UpdatesNotChecked, StringComparison.Ordinal);
 
     private string Counts => _projection is null ? string.Empty
-        : $"{_projection.Problems + _packageProblems} Problems · {ChangesQueueProjection.UpdatesNotChecked} · {_projection.ReviewSuggestions} Review";
+        : $"{_projection.Problems + _packageProblems} Problems · {ChangesQueueProjection.UpdatesNotChecked} · {_projection.ReviewSuggestions} Review · {_projection.Informational} Info";
 
     // Internals ------------------------------------------------------------
 
     private void ActivateSelectedRow()
     {
         var row = _table.GetSelectedRow();
-        if (row < 0 || row >= _rows.Count) return;
+        if (row < 0 || row >= _rows.Count || _preferenceBusy) return;
+        ClearPreferenceFeedback();
+        if (Narrow && !_detailOpen) { _detailOpen = true; ApplyLayout(); _detail.SetFocus(); return; }
+        if (_rows[row].Finding is { Subject: FindingRegistry }) return;
         if (_rows[row].PackageCheck is { } package)
         {
             if (ReferenceEquals(package, _packageCheck())) _onPackageCheck?.Invoke(package);
             return;
         }
-        if (_rows[row].Entry is { } entry)
+        if (_rows[row].Entries.FirstOrDefault() is { } entry)
         {
             if (_activateEntryAsync is not null && _runTask is not null)
             {
+                var selectedFinding = _rows[row].Finding;
                 var generation = Interlocked.Increment(ref _selectionGeneration);
                 _selectionRequests.Cancel();
                 _runTask(async () =>
@@ -319,7 +344,12 @@ internal sealed class ChangesTabView : FrameView
                     if (request is null) return;
                     try
                     {
-                        if (request.IsCurrent) await _activateEntryAsync(entry, request).ConfigureAwait(false);
+                        if (request.IsCurrent)
+                        {
+                            if (selectedFinding is { } finding && finding.Navigation.Contains(FindingNavigation.InspectCopies) && _activateFinding is not null)
+                                await _activateFinding(finding, request).ConfigureAwait(false);
+                            else await _activateEntryAsync(entry, request).ConfigureAwait(false);
+                        }
                     }
                     catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
                 }, "changes.selected-review");
@@ -337,6 +367,9 @@ internal sealed class ChangesTabView : FrameView
         try
         {
             var row = _table.GetSelectedRow();
+            var selectedFinding = row >= 0 && row < _rows.Count ? _rows[row].Finding : null;
+            _keepBoth.Enabled = !_loading.Visible && !_preferenceBusy && selectedFinding?.Difference is not null;
+            _keepBoth.Text = selectedFinding?.Intentional == true ? ActionLabels.RestoreSuggestions.ButtonText : ActionLabels.KeepBoth.ButtonText;
             var detail = row >= 0 && row < _rows.Count
                 ? ChangesQueueBuilder.Render(_rows[row], token, _showDetails, _homeDirectory)
                 : "## Issues\n\n" + (_partial
@@ -345,6 +378,12 @@ internal sealed class ChangesTabView : FrameView
             if (_rows.Count > 0 || _partial) detail += $"\n{ChangesQueueProjection.UpdatesNotChecked}.\n";
             if (_availability is not null)
                 detail = detail.Replace(ChangesQueueProjection.UpdatesNotChecked, _availability.Summary, StringComparison.Ordinal);
+            if (_preferenceNotice is not null && selectedFinding?.Id == _preferenceNoticeFamily)
+            {
+                var notice = MaintenanceQueueFormatter.RenderFields([("Preference operation details", _preferenceNotice)], token, 256 * 1024);
+                detail = (notice.OmittedFields == 0 ? notice.Text
+                    : "Preference operation details exceed the 256 KiB display bound. Use **Choices (K)** to inspect the exact preference store and supported recovery route. Raw state remains preserved.") + "\n\n" + detail;
+            }
             detail += "\nPackage Problems come only from the last explicit check of one exact copy. Other copies remain package not checked for this inventory capture; Reviews stay in Installed/full report. Queue JSON contains captured scan findings only.\n";
             detail += "\n**C:** Check updates / cancel. **Enter / u:** review selected finding. **r:** refresh local inventory. Routine inspection is in **Installed (2)**.\n";
             if (_showDetails) detail += _coverageDetail;
@@ -360,6 +399,7 @@ internal sealed class ChangesTabView : FrameView
     {
         if (_projection is null) return string.Empty;
         return " " + (_partial ? "Scan incomplete · " : "") + Counts.Replace(ChangesQueueProjection.UpdatesNotChecked, _availability?.Summary ?? ChangesQueueProjection.UpdatesNotChecked, StringComparison.Ordinal)
+            + (_snapshot?.IntentionalDifferences.CapacityNotice is not null ? (_snapshot.IntentionalDifferences.NearCapacity ? " · Choices >=75%: K" : " · Choices backup: K") : "")
             + (OmittedRows > 0 ? $" · {_rows.Count} shown, {OmittedRows} omitted" : "")
             + (_rows.Count > 0 || _coverageDetail.Length > 0 ? $" · F2 {(_showDetails ? "Summary" : "Details")}" : "");
     }
@@ -387,12 +427,16 @@ internal sealed class ChangesTabView : FrameView
         if (key.KeyCode == KeyCode.Esc)
         {
             key.Handled = true;
+            if (Narrow && _detailOpen) { CancelSelectedRequest(); _detailOpen = false; ApplyLayout(); _table.SetFocus(); return; }
             _onLeaveTab();
             return;
         }
+        if (key.AsRune.Value == 'K') { key.Handled = true; ResetIntentional(); return; }
+        if (key.AsRune.Value == 'k') { key.Handled = true; SetIntentional(); return; }
         if (key.AsRune.Value == 'C' && _onCheckUpdates is not null)
         {
             key.Handled = true;
+            ClearPreferenceFeedback();
             _onCheckUpdates();
             return;
         }
@@ -439,36 +483,36 @@ internal sealed class ChangesTabView : FrameView
         if (_disposed || _lifetimeToken.IsCancellationRequested) return;
         if (_availability is not null)
         {
-            _checkUpdates.Text = _availability.Running ? "Cancel check (C)" : "Check updates (C)";
+            _checkUpdates.Text = _availability.Running ? ActionLabels.CancelCheck.ButtonText : ActionLabels.CheckUpdates.ButtonText;
             _checkUpdates.Enabled = !_availability.Stopping;
             _updateStatus.Text = _availability.Summary;
         }
-        _reviewFinding.Enabled = !_loading.Visible && _rows.Count > 0;
+        _reviewFinding.Enabled = !_loading.Visible && !_preferenceBusy && _rows.Count > 0;
         if (_loading.Visible || _projection is null) return;
         var selected = _table.GetSelectedRow();
-        var id = selected >= 0 && selected < _rows.Count ? _rows[selected].Entry.Id : null;
+        var id = selected >= 0 && selected < _rows.Count ? _rows[selected].Id : null;
         var offset = _table.RowOffset;
         var detailOffset = _detail.Viewport.Location;
         var rows = AvailabilityRows();
         // Progress/reasons can change without changing any findings.
-        if (!_rows.Select(row => row.Entry.Id).SequenceEqual(rows.Select(row => row.Entry.Id)))
+        if (!_rows.Select(row => row.Id).SequenceEqual(rows.Select(row => row.Id)))
         {
             var hadFocus = _table.HasFocus;
             _rows = rows;
             _table.Table = new EnumerableTableSource<ChangesQueueRow>(_rows, new Dictionary<string, Func<ChangesQueueRow, object>>
             { ["Kind"] = row => row.Kind, ["Title"] = row => row.Title });
-            var restored = rows.Select((row, i) => (row, i)).FirstOrDefault(item => item.row.Entry.Id == id);
+            var restored = rows.Select((row, i) => (row, i)).FirstOrDefault(item => item.row.Id == id);
             _table.SetSelectedRow(restored.row is null ? Math.Clamp(selected, 0, Math.Max(0, rows.Count - 1)) : restored.i);
             _table.RowOffset = offset;
             RecomputeColumnWidths();
             if (hadFocus && rows.Count == 0) _detail.SetFocus();
         }
         else _rows = rows;
-        _reviewFinding.Enabled = _rows.Count > 0;
+        _reviewFinding.Enabled = !_preferenceBusy && _rows.Count > 0;
         _table.Update();
         UpdateDetail();
         var currentRow = _table.GetSelectedRow();
-        if (id is not null && currentRow >= 0 && currentRow < _rows.Count && _rows[currentRow].Entry.Id == id)
+        if (id is not null && currentRow >= 0 && currentRow < _rows.Count && _rows[currentRow].Id == id)
             TuiHelpers.RestoreMarkdownScroll(_detail, detailOffset);
         _status.Text = BuildStatusText();
         _onStateChange?.Invoke();
@@ -486,13 +530,120 @@ internal sealed class ChangesTabView : FrameView
     {
         _loading.SetContentLoading(loading, _table, _table, _detail);
         if (loading) _loading.SetFocus();
+        else ApplyLayout();
+        _keepBoth.Enabled = !loading && !_preferenceBusy && _rows.ElementAtOrDefault(_table.GetSelectedRow())?.Finding?.Difference is not null;
         _spinner.Visible = loading;
         _spinner.AutoSpin = loading;
+    }
+
+    private void ApplyLayout()
+    {
+        if (_loading.Visible) return;
+        if (Narrow)
+        {
+            // Move focus before hiding its owner. Enter opens full-width detail;
+            // Esc returns to the same selected family before leaving the tab.
+            if (_detailOpen && _table.HasFocus) _detail.SetFocus();
+            if (!_detailOpen && _detail.HasFocus) _table.SetFocus();
+            _table.Width = Dim.Fill(); _table.Visible = !_detailOpen;
+            _detail.X = 0; _detail.Width = Dim.Fill(); _detail.Visible = _detailOpen || _rows.Count == 0;
+            if (_rows.Count == 0) { _table.Visible = false; _detail.SetFocus(); }
+        }
+        else
+        {
+            _table.Visible = _detail.Visible = true;
+            _table.Width = Dim.Percent(52); _detail.X = Pos.Right(_table) + 1; _detail.Width = Dim.Fill();
+        }
+    }
+
+    private void SetIntentional()
+    {
+        var selected = _rows.ElementAtOrDefault(_table.GetSelectedRow())?.Finding;
+        if (_loading.Visible || _preferenceBusy || selected?.Difference is null || _setIntentional is null || _runTask is null) return;
+        CancelSelectedRequest();
+        var generation = Interlocked.Read(ref _selectionGeneration);
+        _preferenceBusy = true;
+        _keepBoth.Enabled = _reviewFinding.Enabled = false;
+        _status.Text = selected.Intentional ? " Restoring suggestions…" : " Saving intentional difference…";
+        _runTask(async () =>
+        {
+            using var request = _selectionRequests.Begin(_lifetimeToken);
+            try
+            {
+                if (request is null || !request.IsCurrent || generation != Interlocked.Read(ref _selectionGeneration) || !Visible) return;
+                string message;
+                try { message = await _setIntentional(selected, request).ConfigureAwait(false); }
+                catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { return; }
+                catch (Exception ex) { message = "Preference operation did not complete. " + ex.Message; }
+                await _runOnUi(() =>
+                {
+                    if (_disposed || _lifetimeToken.IsCancellationRequested || !request.IsCurrent || !Visible || generation != Interlocked.Read(ref _selectionGeneration)) return;
+                    _cachedQueue = null;
+                    var expectedLoad = Interlocked.Read(ref _loadGeneration) + 1;
+                    _runTask(async () =>
+                    {
+                        await LoadAsync().ConfigureAwait(false);
+                        await _runOnUi(() =>
+                        {
+                            if (_disposed || _lifetimeToken.IsCancellationRequested || !Visible || Interlocked.Read(ref _loadGeneration) != expectedLoad
+                                || _rows.ElementAtOrDefault(_table.GetSelectedRow())?.Finding?.Id != selected.Id) return;
+                            _preferenceNoticeFamily = selected.Id;
+                            _preferenceNotice = message;
+                            UpdateDetail();
+                        }).ConfigureAwait(false);
+                    }, "issues.preference-refresh");
+                }).ConfigureAwait(false);
+            }
+            finally
+            {
+                await _runOnUi(() =>
+                {
+                    if (_disposed || _lifetimeToken.IsCancellationRequested) return;
+                    _preferenceBusy = false;
+                    _status.Text = BuildStatusText();
+                    _reviewFinding.Enabled = !_loading.Visible && !_preferenceBusy && _rows.Count > 0;
+                    UpdateDetail();
+                }).ConfigureAwait(false);
+            }
+        }, "issues.intentional-difference");
     }
 
     private void CancelSelectedRequest()
     {
         Interlocked.Increment(ref _selectionGeneration);
         _selectionRequests.Cancel();
+        ClearPreferenceFeedback();
+    }
+
+    private void ClearPreferenceFeedback()
+    {
+        var redraw = _preferenceNotice is not null;
+        _preferenceNotice = _preferenceNoticeFamily = null;
+        if (_projection is not null) _status.Text = BuildStatusText();
+        if (redraw && !_disposed) UpdateDetail();
+    }
+
+    private void ResetIntentional()
+    {
+        if (_loading.Visible || _preferenceBusy || _resetIntentional is null || _runTask is null) return;
+        CancelSelectedRequest();
+        var generation = Interlocked.Read(ref _selectionGeneration);
+        _runTask(async () =>
+        {
+            if (_disposed || _lifetimeToken.IsCancellationRequested || !Visible || generation != Interlocked.Read(ref _selectionGeneration)) return;
+            using var request = _selectionRequests.Begin(_lifetimeToken);
+            if (request is null) return;
+            try
+            {
+                await _resetIntentional(request).ConfigureAwait(false);
+                await _runOnUi(() =>
+                {
+                    if (_disposed || _lifetimeToken.IsCancellationRequested || !Visible || !request.IsCurrent) return;
+                    _cachedQueue = null;
+                    _runTask(LoadAsync, "issues.reset-refresh");
+                }).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
+        }, "issues.reset-choices");
     }
 }

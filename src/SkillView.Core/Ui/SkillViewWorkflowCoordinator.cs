@@ -20,7 +20,7 @@ internal sealed partial class SkillViewWorkflowCoordinator
     }
     private long _installHandoffGeneration;
     private readonly TuiServices _services;
-    private readonly AppOptions _options;
+    private AppOptions _options;
     private readonly Func<IApplication?> _getApp;
     private readonly Func<string?> _getGhPath;
     private readonly Func<EnvironmentReport?> _getLastReport;
@@ -53,7 +53,10 @@ internal sealed partial class SkillViewWorkflowCoordinator
         Action refreshActiveTab)
     {
         _services = services;
-        _options = options;
+        _locationContext = services.Runner.WithContext(services.Runner.EffectiveWorkingDirectory, new Dictionary<string, string>());
+        _locationInitialization = new(CancellationCallbackReporter.For(services.Logger, "location initialization"));
+        _originalLocationOptions = options with { ScanRoots = options.ScanRoots.ToImmutableArray(), WorkspaceDirectories = options.WorkspaceDirectories.ToImmutableArray(), Profiles = options.Profiles.ToImmutableArray() };
+        _options = _originalLocationOptions;
         _getApp = getApp;
         _getGhPath = getGhPath;
         _getLastReport = getLastReport;
@@ -352,13 +355,22 @@ internal sealed partial class SkillViewWorkflowCoordinator
     }
 
     internal async Task ShowCopiesAsync(SkillView.Maintenance.MaintenanceQueueEntry selected,
-        ChangesSelectionGate.Lease request, Action<OperationSubject> activateUpdates, CancellationToken lifetimeToken)
+        ChangesSelectionGate.Lease request, Action<OperationSubject> activateUpdates, CancellationToken lifetimeToken,
+        CapturedFinding? finding = null)
     {
         if (_getApp() is not { } app || !request.IsCurrent) return;
         var report = await GetOrProbeReportAsync(request.Token).ConfigureAwait(false);
         var snapshot = await CaptureInventoryAsync(report, request.Token).ConfigureAwait(false);
         var target = SkillView.Maintenance.MaintenanceQueueBuilder.ResolveInstallation(snapshot, selected.Subject);
         var group = target is null ? null : CopiesPresentation.Build(snapshot, target, request.Token);
+        if (finding is not null)
+        {
+            var fresh = MaintenanceQueueBuilder.Build(snapshot, request.Token).Findings
+                .SingleOrDefault(current => current.Id == finding.Id && current.Difference == finding.Difference);
+            var copies = fresh?.Subject is FindingCopies captured ? captured.Copies : [];
+            if (group is null || fresh is null || copies.Any(copy => MaintenanceQueueBuilder.ResolveInstallation(snapshot, copy) is null)) group = null;
+            else group = CopiesPresentation.Build(snapshot, target!, request.Token, copies.Select(copy => (copy.InstallationId, copy.Path)).ToHashSet());
+        }
         if (group is { Copies.Length: > 0 })
         {
             var candidates = CleanupClassifier.ClassifyWithCancellation(snapshot, snapshot.ScannedRoots, null, request.Token);
@@ -829,14 +841,14 @@ internal sealed partial class SkillViewWorkflowCoordinator
     }
 
     private Task<InventorySnapshot> CaptureInventoryCoreAsync(
-        EnvironmentReport report, CancellationToken cancellationToken, bool bypassGhCache = false) =>
-        _services.InventoryService.CaptureAsync(
-            report.GhPath,
-            new LocalInventoryService.Options(
-                ScanRoots: _options.ScanRoots, WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles,
-                AllowHiddenDirs: false)
-            { BypassGhCache = bypassGhCache },
-            cancellationToken);
+        EnvironmentReport report, CancellationToken cancellationToken, bool bypassGhCache = false)
+    {
+        var options = DiscoveryOptions;
+        return _services.InventoryService.CaptureAsync(report.GhPath,
+            new LocalInventoryService.Options(options.ScanRoots, false,
+                WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles)
+            { BypassGhCache = bypassGhCache }, cancellationToken);
+    }
 
     internal async Task<SkillView.Gh.Models.UpdateResult> PrepareUpdatesAsync(string ghPath,
         SkillView.Gh.GhSkillUpdateService.Options options, CancellationToken token)
@@ -884,10 +896,13 @@ internal sealed partial class SkillViewWorkflowCoordinator
         }, token).ConfigureAwait(false);
     }
 
-    private Task<InventorySnapshot> CaptureUpdateInventoryAsync(string? ghPath, bool allowHidden, CancellationToken token) =>
-        _services.InventoryService.CaptureAsync(ghPath,
-            new LocalInventoryService.Options(_options.ScanRoots, allowHidden,
-                WorkspaceDirectories: _options.WorkspaceDirectories, Profiles: _options.Profiles), token);
+    private Task<InventorySnapshot> CaptureUpdateInventoryAsync(string? ghPath, bool allowHidden, CancellationToken token)
+    {
+        var options = DiscoveryOptions;
+        return _services.InventoryService.CaptureAsync(ghPath,
+            new LocalInventoryService.Options(options.ScanRoots, allowHidden,
+                WorkspaceDirectories: options.WorkspaceDirectories, Profiles: options.Profiles), token);
+    }
 
     internal async Task<ReplacementResult> PreserveUpdateAsync(ReplacementResult plan, bool allowHidden, CancellationToken token)
     {

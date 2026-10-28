@@ -14,8 +14,11 @@ internal sealed record InstalledIssueEvidence(InventorySnapshot Snapshot, long G
 {
     internal static InstalledIssueEvidence Capture(InventorySnapshot snapshot, long generation, MaintenanceQueue queue) =>
         new(snapshot, generation, queue.Partial || snapshot.IsPartial || !snapshot.ConfiguredRootsComplete,
-            queue.Entries.Where(e => e.Issue != "installation-review")
-                .GroupBy(e => (e.Subject.InstallationId, e.Subject.Path))
+            (queue.Findings.IsDefault ? queue.Entries.Where(e => e.Issue != "installation-review")
+                .Select(e => (e.Subject.InstallationId, e.Subject.Path, e.Issue))
+                : queue.Findings.Where(f => f.Subject is FindingCopies).SelectMany(f => ((FindingCopies)f.Subject).Copies
+                    .Select(subject => (subject.InstallationId, subject.Path, Issue: f.Intentional ? "intentional-difference" : f.Kind))))
+                .GroupBy(e => (e.InstallationId, e.Path))
                 .ToDictionary(g => g.Key, g => g.Select(e => e.Issue).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray()));
 
     internal bool IsCurrent(InventorySnapshot snapshot, long generation) => ReferenceEquals(snapshot, Snapshot) && Generation == generation;

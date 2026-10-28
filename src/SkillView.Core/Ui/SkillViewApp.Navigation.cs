@@ -46,6 +46,13 @@ public sealed partial class SkillViewApp
             return;
         }
 
+        if (ReferenceEquals(app.TopRunnableView, mainWindow) && key.KeyCode == KeyCode.F5)
+        {
+            OpenLocations();
+            key.Handled = true;
+            return;
+        }
+
         if (ReferenceEquals(app.TopRunnableView, mainWindow) && IsHistoryShortcut(key))
         {
             OpenHistory();
@@ -155,7 +162,7 @@ public sealed partial class SkillViewApp
         if (rune.Value == 'I') { StageInstall(forceAdvanced: true); return true; }
         if (rune.Value == 'i') { StageInstall(forceAdvanced: false); return true; }
         // A → discover the skills in the selected result's repo and pick which
-        // to install (gh ≥ 2.95 non-interactive listing, cli/cli#13548).
+        // to install using the supported non-interactive repository listing.
         if (rune.Value == 'A' && _activeTab == SkillViewTab.Discover) { StageInstallAll(); return true; }
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
         // Open the update workspace directly. Changes rows describe observed
@@ -339,17 +346,9 @@ public sealed partial class SkillViewApp
         if (_changesTab is not null) _changesTab.Visible = false;
         RefreshShellChrome();
 
-        // Make sure the report is fresh — probe lazily if we never have.
-        if (Volatile.Read(ref _lastReport) is { } cachedReport)
-        {
-            _doctorTab.SetReport(cachedReport, _installedTab?.CurrentSnapshot);
-            _doctorTab.Visible = true;
-            _doctorTab.SetFocus();
-            return;
-        }
-
         // Probe in the background; reveal an empty pane in the meantime so
         // the user sees the screen flip even before the report lands.
+        _doctorTab.SetProbing();
         _doctorTab.Visible = true;
         SetBusy("probing environment for Doctor…");
         var doctorGeneration = Interlocked.Read(ref _doctorGeneration);
@@ -415,6 +414,7 @@ public sealed partial class SkillViewApp
     {
         _installedTab?.RefreshAvailability();
         _changesTab?.RefreshAvailability();
+        RefreshShellChrome();
     }
 
     private void CycleTab(int delta)
@@ -460,7 +460,7 @@ public sealed partial class SkillViewApp
     private void ShowHelp()
     {
         if (_app is null) return;
-        HelpOverlay.Show(_app);
+        HelpOverlay.Show(_app, CurrentActionScreen, _showingLogs);
     }
 
     private void FocusSearchFromInstalled()

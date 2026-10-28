@@ -75,7 +75,7 @@ public sealed partial class SkillViewApp
     private bool _inDoctor;
     private SkillViewTab _tabBeforeUpdateReview = SkillViewTab.Discover;
 
-    private const string ItemActionsText = "[Enter] Preview    [i] Install    [o] Open    [?] More";
+    private static string ItemActionsText => ActionLabels.DiscoverLegend(hasResults: true);
 
     private List<SearchResultSkill> _results = new();
     // Original gh-skill-search ordering for the current query — preserved so

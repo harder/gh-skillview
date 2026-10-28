@@ -16,7 +16,8 @@ internal static class CopiesPresentation
 {
     internal const int MaxCopies = 128;
 
-    internal static CopiesGroup Build(InventorySnapshot snapshot, InstalledSkill selected, CancellationToken token)
+    internal static CopiesGroup Build(InventorySnapshot snapshot, InstalledSkill selected, CancellationToken token,
+        IReadOnlySet<(string Id, string Path)>? allowed = null)
     {
         token.ThrowIfCancellationRequested();
         var source = selected.SourceIdentity.Key;
@@ -28,8 +29,9 @@ internal static class CopiesPresentation
             token.ThrowIfCancellationRequested();
             var id = skill.InstallationId;
             counts[id] = counts.GetValueOrDefault(id) + 1;
-            if (skill.Name.Equals(selected.Name, StringComparison.OrdinalIgnoreCase)
-                || source is not null && skill.SourceIdentity.Key == source) related.Add((skill, id));
+            if ((allowed is null || allowed.Contains((id, skill.ResolvedPath)))
+                && (skill.Name.Equals(selected.Name, StringComparison.OrdinalIgnoreCase)
+                || source is not null && skill.SourceIdentity.Key == source)) related.Add((skill, id));
         }
         var groups = related.GroupBy(row => row.Id).ToArray();
         var ambiguous = groups.Count(group => counts[group.Key] != 1);
