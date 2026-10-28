@@ -116,3 +116,41 @@ includes 16→17 admission, stale approval, native substitution, locks, cancella
 partial remnants and shared owner/consumer preservation. Cross-OS execution and
 historical native compatibility are separate evidence; do not claim them from a
 Linux managed run.
+
+## Registry-recorded damaged-original plans
+
+`restore-registry-recorded` retirement keeps the immutable observed damaged
+metadata separate from desired tracking. The first retirement open retains the
+paired raw archive checks. Marker resume independently revalidates the installed
+observed-policy half and candidate desired-policy half for every surviving
+manifest-bound archive; only H2's already-approved whole-slot absence may resume.
+Partial archives and altered blobs or metadata remain protected.
+
+Retirement opens retain the saved catalog memberships' sorted, unique, known-agent,
+same-address, nonlink, user-scope structure, while omitting only fresh catalog
+recomputation equality. Ordinary Inspect/Apply/Undo/Recover still require that
+captured-context equality. Current inventory, placement, native, consumer and
+owner guards remain mandatory for retirement.
+
+An empty retained directory is allowed only for this purpose's exact immutable
+empty original under installed starting topology. Both saved and current entry
+and child lists must be empty, payload/mode must agree, and stable native object
+identity must match. A native retain rename changes the root generation, so never
+compare the pre-rename `Original.Objects` hash to the retained root's current
+hash or rewrite either observation. Existing marker and held-directory checks
+still compare the full current identity/generation, Objects, payload, mode and
+children before every removal and on resume. Every other empty slot stays refused.
+
+`tests/native/prove-registry-recorded-retirement.py` exercises this interoperability
+with genuine installed registry records, both native product hosts and the
+existing proof host's checkpoint mechanism. Its explicitly supplied offline mode
+is only a frozen source transport supplement, never actual gh live mutation.
+Preserve failed fixtures separately from fresh destructive proof fixtures.
+
+The retirement proof host must preserve its original scanner options (null options,
+`AllowHiddenDirs=false`) while using cancellation-aware scanning and carrying
+inaccessible paths and discovery locations into `ScanDiagnostics`. A link into a
+missing-SKILL retained directory is an unsupported linked container, hence partial
+coverage, even when no skill row is emitted. The proof-only `inventory` action
+exposes this observation for comparison with actual product listing. A declared
+complete snapshot built by dropping scanner diagnostics cannot prove admission.

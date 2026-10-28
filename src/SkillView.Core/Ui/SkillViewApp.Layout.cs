@@ -198,6 +198,7 @@ public sealed partial class SkillViewApp
                 _workflows.ShowPackageCheck(snapshot, id, skill, () => _installedTab?.CurrentSnapshot, GetRunLifetimeToken());
                 _installedTab?.RefreshAvailability();
             },
+            onRegistryRestore: skill => _workflows.ShowRegistryRestore(skill, GetRunLifetimeToken()),
             onLocalReimport: skill => _workflows.ShowLocalReimport(skill, GetRunLifetimeToken()),
             onLocalSourceSwitch: skill => _workflows.ShowLocalSourceSwitch(skill, GetRunLifetimeToken()),
             availability: _workflows.Availability,

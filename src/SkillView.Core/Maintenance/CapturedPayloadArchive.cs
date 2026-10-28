@@ -16,13 +16,22 @@ internal sealed partial record CapturedPayloadArchive(PayloadSnapshot Snapshot,
     internal static CapturedPayloadArchive Capture(NativeStateDirectory parent, string name,
         NativeDirectoryMoveLease source, CancellationToken token,
         Action<NativePayloadItem>? inspectMetadata = null)
+        => CaptureCore(parent, name, source, token, inspectMetadata, rawDamaged: false);
+
+    internal static CapturedPayloadArchive CaptureDamagedOriginal(NativeStateDirectory parent, string name,
+        NativeDirectoryMoveLease source, CancellationToken token) => CaptureCore(parent, name, source, token, null, rawDamaged: true);
+
+    private static CapturedPayloadArchive CaptureCore(NativeStateDirectory parent, string name,
+        NativeDirectoryMoveLease source, CancellationToken token, Action<NativePayloadItem>? inspectMetadata, bool rawDamaged)
     {
         token.ThrowIfCancellationRequested();
         using var archive = parent.CreateStagingDirectory(name, token);
         using var authority = PayloadMetadataAuthority.Open(archive, create: true, token);
         var entries = ImmutableArray.CreateBuilder<ArchivedPayloadEntry>();
         long stored = 0; long metadataBytes = 0; PayloadNativeMetadata? rootMetadata = null;
-        var snapshot = source.CaptureInto((item, entry) =>
+        Func<Action<NativePayloadItem, PayloadEntry>, Action<NativePayloadItem>?, CancellationToken, PayloadSnapshot> capture =
+            rawDamaged ? source.CaptureRawInto : source.CaptureInto;
+        var snapshot = capture((item, entry) =>
         {
             token.ThrowIfCancellationRequested();
             inspectMetadata?.Invoke(item);

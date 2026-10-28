@@ -6,10 +6,10 @@ namespace SkillView.Ui;
 /// Shared Markdown evidence for exact saved updates, undo and local reimport.
 public static class UpdateScreen
 {
-    internal static string RenderResult(UpdateResult result, string? skillName = null, bool unpinOnly = false, bool localReimport = false, bool localSourceSwitch = false)
+    internal static string RenderResult(UpdateResult result, string? skillName = null, bool unpinOnly = false, bool localReimport = false, bool localSourceSwitch = false, bool registryRestore = false)
     {
         var sb = new System.Text.StringBuilder();
-        var heading = localSourceSwitch || result.SavedPlan?.LocalSourceSwitch is not null ? "Local source switch results" : localReimport || result.SavedPlan?.LocalImport is not null ? "Local reimport results" : unpinOnly || result.SavedPlan?.PinPolicy is not null ? "Unpin-only results" : "Update results";
+        var heading = registryRestore || result.SavedPlan?.RegistryRestore is not null ? "Registry-recorded restore results" : localSourceSwitch || result.SavedPlan?.LocalSourceSwitch is not null ? "Local source switch results" : localReimport || result.SavedPlan?.LocalImport is not null ? "Local reimport results" : unpinOnly || result.SavedPlan?.PinPolicy is not null ? "Unpin-only results" : "Update results";
         sb.AppendLine($"## {heading}");
         sb.AppendLine();
         if (result.SavedPlan is { } plan) sb.AppendLine(RenderPlan(plan));
@@ -75,7 +75,7 @@ public static class UpdateScreen
     {
         var sb = new System.Text.StringBuilder();
         void Field(string label, string? value) => sb.AppendLine($"**{label}:** {MarkdownTableFormatter.FormatCodeSpan(value ?? "unknown")}  ");
-        sb.AppendLine(plan.LocalSourceSwitch is not null ? "### Saved local source-switch review" : plan.LocalImport is not null ? "### Saved local reimport review" : plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
+        sb.AppendLine(plan.RegistryRestore is not null ? "### Saved registry-recorded restore review" : plan.LocalSourceSwitch is not null ? "### Saved local source-switch review" : plan.LocalImport is not null ? "### Saved local reimport review" : plan.PinPolicy is not null ? "### Saved unpin-only review" : "### Saved update review");
         if (plan.Revision is { } tagRevision && tagRevision.Source.Ref.StartsWith("refs/tags/", StringComparison.Ordinal)
             && !tagRevision.DesiredMetadata.Pinned && tagRevision.DesiredMetadata.PinnedRef is null)
         {
@@ -90,6 +90,20 @@ public static class UpdateScreen
                 || agents.Length > 4 || agents.Take(4).Any(agent => agent != TuiHelpers.Truncate(agent, 24)))
                 sb.AppendLine("Summary shortened; complete refs and affected consumer evidence remain below.");
             sb.AppendLine();
+        }
+        if (plan.RegistryRestore is { } registry)
+        {
+            Field("Purpose", ReplacementPlanStore.RegistryRestorePurpose);
+            Field("Observed original validity", registry.ObservedValidity.ToString());
+            Field("Desired source", registry.DesiredMetadata.Upstream);
+            Field("Desired source path", registry.DesiredMetadata.GithubPath);
+            Field("Recorded Git tree", registry.DesiredMetadata.GithubTreeSha);
+            Field("Source ref", registry.DesiredMetadata.GithubRef ?? "unknown historical ref; absent");
+            Field("Possible gh catalog consumers at this exact address", registry.ExpectedCatalogMemberships.IsDefaultOrEmpty
+                ? "none mapped; other consumers and active sessions remain unknown"
+                : string.Join(", ", registry.ExpectedCatalogMemberships.Select(agent => agent.AgentId)));
+            sb.AppendLine("These placement-derived memberships do not establish installed, enabled or active agents. Observed original consumers remain below.");
+            sb.AppendLine(MarkdownTableFormatter.FormatCodeSpan(ReplacementPlanStore.RegistryRestoreNotice(plan.Subject.Name, registry.HasCorroboration)));
         }
         Field("State", plan.Status);
         Field("Installation", plan.OriginalPath);

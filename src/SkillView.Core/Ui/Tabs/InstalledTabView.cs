@@ -40,6 +40,7 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action? _onStateChange;
     private readonly Action<InventorySnapshot, string, InstalledSkill>? _onPackageCheck;
     private readonly Action<InstalledSkill>? _onLocalReimport;
+    private readonly Action<InstalledSkill>? _onRegistryRestore;
     private readonly Action<InstalledSkill>? _onLocalSourceSwitch;
     private readonly CancellationToken _lifetimeToken;
     private readonly UpdateAvailabilitySession? _availability;
@@ -119,7 +120,7 @@ internal sealed class InstalledTabView : FrameView
         CancellationToken lifetimeToken = default,
         Action<AggregateException>? onCancellationCallbackException = null,
         Action<InventorySnapshot, string, InstalledSkill>? onPackageCheck = null,
-        Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null,
+        Action<InstalledSkill>? onRegistryRestore = null, Action<InstalledSkill>? onLocalReimport = null, Action<InstalledSkill>? onLocalSourceSwitch = null,
         Action<Exception>? onRemovalError = null, Func<string, bool>? openPath = null,
         UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null,
         Action<InstalledSkill>? onReviewUpdate = null, Func<InstalledIssueEvidence?>? capturedIssues = null, Func<long>? catalogGeneration = null, Func<PackageCheckFact?>? packageCheck = null,
@@ -139,6 +140,7 @@ internal sealed class InstalledTabView : FrameView
         _onStateChange = onStateChange;
         _onPackageCheck = onPackageCheck;
         _onLocalReimport = onLocalReimport;
+        _onRegistryRestore = onRegistryRestore;
         _onLocalSourceSwitch = onLocalSourceSwitch;
         _lifetimeToken = lifetimeToken;
         _availability = availability;
@@ -1092,6 +1094,8 @@ internal sealed class InstalledTabView : FrameView
                     && current.Target == replacement.Target) _onResourceReplacement(current.Fact, current.Target);
             }
             ));
+        if (_onRegistryRestore is not null && ReplacementPlanStore.IsRegistryRestoreSubject(skill))
+            actions.Add(("Review registry-recorded replacement", () => _onRegistryRestore(skill)));
         if (skill.FrontMatter.LocalPath is not null)
         {
             if (_onLocalReimport is not null) actions.Add(("Review local reimport", () => _onLocalReimport(skill)));

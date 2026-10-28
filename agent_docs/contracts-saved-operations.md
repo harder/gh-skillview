@@ -310,3 +310,20 @@ torn, ambiguous or unreadable records. Completed local evidence permits subseque
 registry advancement/reversion; readable foreign, absent or satisfied fallback
 state does not require historical terminal equality. Equal transitions require
 no write. Recheck at approval, slots and resume; a marker is not completion proof.
+
+- Dedicated `restore-registry-recorded` plans select a source from exactly one
+  already-attached compatible nonexclusive gh schema3 tree record for an ordinary
+  missing/corrupt copy. Preserve observed damaged Subject separately from desired
+  tracking; no name-based owner attachment or exclusive-placement claim. Its
+  absent-ref branch is purpose-keyed and requires ref absence plus exact record
+  agreement. Ordinary schema1–6 purposes/hashes/admission remain unchanged. Keep
+  independent source/retention approvals, raw damaged native retention, complete
+  supported metadata and exact Undo. See
+  [registry-recorded restore](maintenance-registry-recorded-restore.md).
+  Registry-purpose retirement validates each surviving immutable archive's own
+  observed/desired policy half; ordinary and first-retirement opens retain the
+  paired check. Only retirement skips fresh catalog-membership equality, keeping
+  all stored structural and current placement/native/consumer/owner guards.
+  Empty retained evidence is limited to the immutable empty original in installed
+  topology; preserve stable original identity and separately verify the full
+  current post-rename generation/hash without normalizing saved evidence.
