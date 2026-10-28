@@ -12,10 +12,10 @@ from pathlib import Path
 import shutil
 import stat
 import subprocess
-import threading
 import tempfile
 
 from source_review_proof import acknowledge_frozen_source
+from registry_proof_process import RegistryProofArtifacts, run_checkpoint_child, write_proof_marker
 
 
 def sha(path):
@@ -59,6 +59,8 @@ def main():
     config = os.environ.get('GH_CONFIG_DIR') or str(Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'gh')
     report = dict(proofScriptSha256=sha(Path(__file__)), root=str(root), inputApp=str(input_app), frozenBindings=bindings, app=str(app), appSha256=sha(app), cases=[], status='running')
     # Bind managed hosts to the actual Core and host DLLs, not the apphost alone.
+    artifacts = RegistryProofArtifacts(output)
+    report['rawArtifacts'] = artifacts.summary
     report['managedBindings'] = {p.name: sha(p) for p in sorted(app.parent.glob('*.dll'))}
     output.write_text(json.dumps(report, indent=2))
     sequence = 0
@@ -104,7 +106,7 @@ def main():
                             assert (p.returncode == 0) == (expect == 0), (argv, p.returncode, p.stdout.decode(errors='replace'), p.stderr.decode(errors='replace'))
                         return p
 
-                    (case_root / 'disposable-proof-marker').write_text('SkillView disposable process proof\n')
+                    write_proof_marker(case_root)
                     command(['git', '-C', work, 'init', '--quiet'])
                     env.update(GIT_DIR=str(work / '.git'), GIT_WORK_TREE=str(work), GIT_COMMON_DIR=str(work / '.git'))
                     # A genuine source with nonroot resources supplies corroboration.
@@ -175,19 +177,10 @@ def main():
                     if args.proof_host and damage != 'missing-corroborated':
                         boundary = 'retain-moved' if damage == 'corrupt-yaml' else 'install-moved'
                         argv = [str(args.proof_host.resolve()), str(case_root), str(gh), plan['id'], plan['planFingerprint'], 'apply-registry-restore', boundary]
-                        with (case_root / 'kill.stdout').open('w') as stdout, (case_root / 'kill.stderr').open('w') as stderr:
-                            child = subprocess.Popen(argv, env=env, cwd=case_root, stdout=subprocess.PIPE, stderr=stderr, text=True)
-                            ready = threading.Event()
-                            def read():
-                                for line in child.stdout:
-                                    stdout.write(line); stdout.flush()
-                                    if line.strip() == 'READY ' + boundary: ready.set()
-                            thread = threading.Thread(target=read); thread.start()
-                            try:
-                                assert ready.wait(45), 'Proof host did not reach ' + boundary
-                            finally:
-                                if child.poll() is None: child.kill()
-                                child.wait(timeout=10); thread.join(timeout=10)
+                        case['proofChild'] = {}
+                        run_checkpoint_child(argv, env, case_root, case_root / 'kill.stdout', case_root / 'kill.stderr',
+                                             boundary, case['proofChild'], artifacts, str(case_root), gh=gh,
+                                             ready_timeout=45, failure_message='Proof host did not reach ' + boundary)
                         case['killedAt'] = boundary
                         interrupted = run('registry-restore-inspect', '--id', plan['id'])['operation']
                         applied = run('registry-restore-recover', '--id', plan['id'], '--yes', '--expect', interrupted['reviewFingerprint'])['operation']
