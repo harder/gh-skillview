@@ -813,6 +813,14 @@ jobs:
             dist/old-native-reimport-*-proof-raw/**
             dist/old-native-source-switch-*-proof-raw/**
             dist/source-switch-proof-inputs/**
+            dist/registry-restore-*-proof-raw/**
+            dist/registry-retirement-*-proof-raw/**
+            dist/registry-restore-privileged-*-proof-launch/launch.json
+            dist/registry-restore-privileged-*-proof-launch/stdout.bin
+            dist/registry-restore-privileged-*-proof-launch/stderr.bin
+            dist/registry-retirement-privileged-*-proof-launch/launch.json
+            dist/registry-retirement-privileged-*-proof-launch/stdout.bin
+            dist/registry-retirement-privileged-*-proof-launch/stderr.bin
           if-no-files-found: warn
           retention-days: 14
       - name: Record completed proof family for aggregate gating

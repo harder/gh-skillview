@@ -13,9 +13,9 @@ import shutil
 import stat
 import subprocess
 import tempfile
-import threading
 
 from source_review_proof import acknowledge_frozen_source
+from registry_proof_process import RegistryProofArtifacts, run_checkpoint_child, write_proof_marker
 
 
 def digest(path):
@@ -67,7 +67,7 @@ class Journey:
         root.mkdir(mode=0o700)
         for name in ('home', 'state', 'custom', 'tmp', 'receipts'):
             (root / name).mkdir()
-        (root / 'disposable-proof-marker').write_text('SkillView disposable process proof\n')
+        write_proof_marker(root)
         self.env = environment(root, gh)
         self.env['OFFLINE_GH_LOG'] = str(root / 'offline-gh.jsonl')
         self.sequence = 0
@@ -193,23 +193,18 @@ class Journey:
         prefix = self.root / 'receipts' / f'{self.sequence:04d}'
         argv = list(map(str, [self.proof, '--retained-retirement', self.root, 'retire', self.plan['id'],
                               review['fingerprint'], review['kind'], checkpoint]))
-        ready = threading.Event()
-        with prefix.with_suffix('.stdout').open('wb') as stdout, prefix.with_suffix('.stderr').open('wb') as stderr:
-            child = subprocess.Popen(argv, cwd=self.root, env=self.env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=stderr)
-            def drain():
-                for line in child.stdout:
-                    stdout.write(line); stdout.flush()
-                    if line.strip() == ('READY ' + checkpoint).encode():
-                        ready.set()
-            thread = threading.Thread(target=drain)
-            thread.start()
-            reached = ready.wait(45)
-            if child.poll() is None:
-                child.kill()
-            code = child.wait(timeout=10)
-            thread.join(timeout=10)
-            prefix.with_suffix('.json').write_text(json.dumps(dict(argv=argv, reached=reached, killed=True, exit=code)))
-            assert reached and not thread.is_alive(), 'Native checkpoint was not reached: ' + checkpoint
+        child_record = {}
+        self.proof_children.append(child_record)
+        try:
+            run_checkpoint_child(argv, self.env, self.root, prefix.with_suffix('.stdout'), prefix.with_suffix('.stderr'),
+                                 checkpoint, child_record, self.artifacts, str(self.root), gh=self.gh,
+                                 ready_timeout=45, failure_message='Native checkpoint was not reached: ' + checkpoint)
+        finally:
+            # Metadata only; publication failure must not mask the proof result.
+            try:
+                prefix.with_suffix('.json').write_text(json.dumps(child_record))
+            except Exception as ex:
+                child_record['diagnosticError'] = ('private-outcome: ' + type(ex).__name__)[:512]
 
     def successful_retirement(self, interrupt=False):
         live = native(self.payload)
@@ -287,6 +282,8 @@ def main():
         if kind == 'app': app = frozen / binary.name
         else: proof = frozen / binary.name
     a.output.parent.mkdir(parents=True, exist_ok=True)
+    artifacts = RegistryProofArtifacts(a.output)
+    report['rawArtifacts'] = artifacts.summary
     def save(): a.output.write_text(json.dumps(report, indent=2) + '\n')
     save()
     try:
@@ -312,7 +309,8 @@ def main():
         for index, scenario in enumerate(a.scenario or scenarios):
             damage = 'corrupt-yaml' if scenario == 'consumer-readable' or scenario.startswith('surviving-installed-') else 'missing-nonempty' if 'nonempty' in scenario and scenario != 'nonempty-immutable' else 'corrupt-yaml' if 'corrupt' in scenario else 'invalid-metadata' if 'invalid' in scenario else 'missing-empty'
             j = Journey(root / scenario, app, proof, gh, evidence, damage, pinned=(index % 2 == 0 or damage == 'invalid-metadata') and damage != 'missing-nonempty')
-            case = dict(name=scenario, root=str(j.root), id=j.plan['id'], damage=damage, status='running')
+            j.artifacts, j.proof_children = artifacts, []
+            case = dict(proofChildren=j.proof_children, name=scenario, root=str(j.root), id=j.plan['id'], damage=damage, status='running')
             report['cases'].append(case); save()
             installed = scenario not in ('abandon-empty', 'abandon-corrupt', 'abandon-invalid', 'abandon-nonempty', 'resume-ready', 'context-ready', 'empty-candidate')
             if installed: j.apply()
