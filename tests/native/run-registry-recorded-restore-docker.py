@@ -22,6 +22,7 @@ def main():
     parser.add_argument('--dotnet-root', type=Path)
     parser.add_argument('--old-app', type=Path)
     parser.add_argument('--proof-host', type=Path)
+    parser.add_argument('--retirement', action='store_true', help='Run the dedicated F1/H2 interoperability proof instead')
     parser.add_argument('--image', default='mcr.microsoft.com/dotnet/sdk:10.0.113')
     args = parser.parse_args()
     app = args.app.resolve()
@@ -35,6 +36,11 @@ def main():
                '--env', 'GH_TOKEN', '--env', 'GITHUB_TOKEN']
     proof = ['python3', '/proof-tools/prove-registry-recorded-restore.py', '--app', '/proof-app/' + app.name,
              '--output', '/proof-output/result.json']
+    if args.retirement:
+        if not args.proof_host or len(args.gh) != 1 or args.old_app:
+            parser.error('--retirement requires one --gh and --proof-host, without --old-app')
+        proof = ['python3', '/proof-tools/prove-registry-recorded-retirement.py', '--app', '/proof-app/' + app.name,
+                 '--output', '/proof-output/result.json']
     for i, item in enumerate(args.gh):
         gh = item.resolve()
         command += ['--mount', f'type=bind,src={gh.parent},dst=/proof-gh-{i},readonly']
@@ -43,7 +49,7 @@ def main():
         if item:
             item = item.resolve()
             command += ['--mount', f'type=bind,src={item.parent},dst=/proof-{key},readonly']
-            proof += ['--' + key, f'/proof-{key}/{item.name}']
+            proof += ['--proof' if args.retirement and key == 'proof-host' else '--' + key, f'/proof-{key}/{item.name}']
     if args.gh_config_dir:
         command += ['--mount', f'type=bind,src={args.gh_config_dir.resolve()},dst=/proof-gh-config',
                     '--env', 'GH_CONFIG_DIR=/proof-gh-config']
@@ -58,7 +64,7 @@ def main():
               'mkdir -m 700 /proof-private; export TMPDIR=/proof-private; set +e; '
               + shlex.join(proof) + '; result=$?; '
               'mkdir -p /proof-output/private-originals; '
-              'tar -C /proof-private --exclude="*/frozen-host" -cf - . | tar -xf - -C /proof-output/private-originals; '
+              'tar -C /proof-private --exclude="*/frozen-host" --exclude="*/frozen-app" --exclude="*/frozen-proof" -cf - . | tar -xf - -C /proof-output/private-originals; '
               f'chown -R {os.getuid()}:{os.getgid()} /proof-output; exit "$result"')
     command += [args.image, 'bash', '-c', script]
     (output / 'invocation.json').write_text(json.dumps(command, indent=2))

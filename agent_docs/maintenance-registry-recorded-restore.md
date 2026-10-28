@@ -92,3 +92,13 @@ must actually omit SKILL.md; malformed UTF-8 stays raw unparsable evidence. Reje
 malformed policy collections/pin members rather than admitting a synthetic subject.
 The catalog-membership binding and preservation of all old purpose behavior are
 mandatory independent safety-review topics.
+
+History retirement uses the separate private-evidence inspection and explicit
+Abandon/Discard approval. It may abandon an unapplied damaged-original review or
+discard retained Undo data for an installed/restored operation only after all
+retirement guards pass. Retiring a review never changes its live copy or registry.
+The saved catalog structure remains bound, but historical catalog context drift
+does not prevent private retirement; ordinary Inspect/Apply/Undo/Recover keep their
+full original context checks. Raw surviving archives are independently validated,
+and only the exact immutable empty original may use retirement's narrow empty-slot
+rule. See [retirement](maintenance-operation-retirement.md).

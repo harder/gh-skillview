@@ -277,7 +277,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   earlier cleanup rows and continue independent targets; low-level removal APIs
   still throw, and unrelated cancellation must not be labeled owned cancellation.
 
-- Retained replacement History is an existing-only, read-only view of the same
+- Retained replacement History listing is an existing-only, read-only view of the same
   16-operation store. Bound root enumeration to 18 entries (lock plus operations
   plus overflow), display at most 16, and report omissions/counts as lower bounds.
   Unknown, unreadable, partial and historical merge entries remain protected and
@@ -286,9 +286,12 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   processes, stage sources or create state. Metadata/name hints confer no
   mutation authority. Owner-journal presence conservatively means recovery may
   be needed even when completion filenames exist. Only explicit Inspect runs
-  fresh inventory and existing full Observe/schema/hash checks. Keep current
+  fresh inventory and schema/hash checks. Retirement uses its narrow private-evidence
+  inspector and current-live capture; ordinary specialist Observe/Admit stays unchanged. Keep current
   inspection fingerprints separate from immutable plan fingerprints. History
-  provides no resume/undo/retire action or quota-release promise. Preflight new
+  offers only the separately inspected and explicitly approved actions described
+  in [retirement](maintenance-operation-retirement.md). Listing/ordinary Inspect
+  fingerprints never grant retirement approval. Preflight new
   reviews before source resolution/private staging, except same-source local
   reimport: its allocation-free no-op requires the existing bounded held capture,
   metadata checks and actual private gh preview even at full capacity. Source
@@ -296,6 +299,17 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   allocation quota check before creating any final operation. Quota refusals
   retain the literal `quota` and History guidance. CLI `replacement-history` lists
   hints; `history` keeps its existing backup verification semantics and wire format.
+
+Retirement must separately prove completion of its own real owner transition:
+private terminal payload topology or an empty journal is insufficient because
+moves precede owner intent publication. Match the last payload-complete step to
+the later direction-bound owner intent/complete and finished raw journal write;
+otherwise use only a bounded native read of the exact saved registry address and
+selector in captured child context. Refuse installed+before/restored+desired,
+torn, ambiguous or unreadable records. Completed local evidence permits subsequent
+registry advancement/reversion; readable foreign, absent or satisfied fallback
+state does not require historical terminal equality. Equal transitions require
+no write. Recheck at approval, slots and resume; a marker is not completion proof.
 
 - Dedicated `restore-registry-recorded` plans select a source from exactly one
   already-attached compatible nonexclusive gh schema3 tree record for an ordinary
@@ -306,3 +320,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   independent source/retention approvals, raw damaged native retention, complete
   supported metadata and exact Undo. See
   [registry-recorded restore](maintenance-registry-recorded-restore.md).
+  Registry-purpose retirement validates each surviving immutable archive's own
+  observed/desired policy half; ordinary and first-retirement opens retain the
+  paired check. Only retirement skips fresh catalog-membership equality, keeping
+  all stored structural and current placement/native/consumer/owner guards.
+  Empty retained evidence is limited to the immutable empty original in installed
+  topology; preserve stable original identity and separately verify the full
+  current post-rename generation/hash without normalizing saved evidence.

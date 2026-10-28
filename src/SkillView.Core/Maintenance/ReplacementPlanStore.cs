@@ -11,8 +11,8 @@ using SkillView.Threading;
 namespace SkillView.Maintenance;
 
 /// Saved, exact-payload replacement. Both old and displaced directories are
-/// retained by exclusive native rename. Only never-published, verified unchanged
-/// private staging operations may be removed; installed payloads are never deleted.
+/// retained by exclusive native rename. Explicit terminal-operation retirement
+/// removes only verified private retained evidence; live payloads are never deleted.
 internal sealed partial class ReplacementPlanStore(string root, Logger logger, Action<string>? checkpoint = null, ProcessRunner? runner = null,
     Action? beforeStateOpenForTests = null, Action<OperationImpact>? subjectObserved = null, bool sourceReviewRequired = false)
 {
@@ -332,6 +332,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         {
             var admitted = Observe(plan, session.Operation, inventory, token, owner);
             if (admitted != current) throw new IOException("Owner or payload evidence changed before owner publication.");
+            checkpoint?.Invoke("owner-publish-reviewed");
             var snapshot = owner!.Held.Read(token);
             if (snapshot.ContentHash != admitted.Owner!.Hash || snapshot.Identity != admitted.Owner.Identity)
                 throw new IOException("Registry changed after transition review; inspect again.");
@@ -712,7 +713,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
         return JsonSerializer.Deserialize(bytes, type) ?? throw new IOException("Empty replacement journal.");
     }
 
-    private Session Open(string id, InventorySnapshot inventory, CancellationToken token)
+    private Session Open(string id, InventorySnapshot inventory, CancellationToken token, bool retirement = false)
     {
         token.ThrowIfCancellationRequested();
         if (!QuarantineStore.ValidId(id)) throw new IOException("A lowercase 32-character plan ID is required.");
@@ -726,6 +727,8 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             operation = NativeStateDirectory.OpenOrCreate(Path.Combine(state.CanonicalPath, id), Exclusions(inventory), token, allowCreate: false);
             operationWriter = operation.OpenExistingFile("writer.lock", true, token); CheckWriter(operationWriter);
             var operationNames = operation.EnumerateEntries(token).Take(MaxSteps + 12 + 2 * MaxMergeAttempts + MaxSourceReviewEntries).Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
+            var retiring = operationNames.Contains("retiring.json");
+            if (retiring && !retirement) throw new IOException("Retirement was started; use History Inspect and explicit retirement approval. Recovery/apply/undo remain closed.");
             var attemptCount = 0;
             while (attemptCount < MaxMergeAttempts && (operationNames.Contains($"merged-{attemptCount:D2}")
                 || operationNames.Contains($"merge-plan-{attemptCount:D2}.json"))) attemptCount++;
@@ -748,7 +751,12 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                     hasMergePlan = false;
                 }
             }
-            var plan = mergedPlan ?? Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token);
+            ReplacementPlan plan;
+            try { plan = mergedPlan ?? Read(operation, "plan.json", ReplacementJsonContext.Default.ReplacementPlan, token); }
+            catch (Exception ex) when (retiring && ex is IOException or JsonException)
+            {
+                throw new IOException("Retirement cleanup left an unavailable saved plan. Small-file progress cannot be proved safely; preserve this operation for specialist inspection at " + operation.CanonicalPath + ". " + ex.Message, ex);
+            }
             if (!((plan.RegistryRestore is null && plan.LocalSourceSwitch is null && plan.LocalImport is null && (plan.SchemaVersion == 1 && plan.Purpose == "restore-recorded" && plan.Revision is null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
                     || plan.SchemaVersion == 2 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is null && plan.PinPolicy is null && !hasMergePlan
                     || plan.SchemaVersion == 3 && plan.Purpose == "update-revision" && plan.Revision is not null && plan.LocalDisposition is not null && plan.PinPolicy is null && hasMergePlan
@@ -773,7 +781,7 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 || plan.Subject.Owners.Any(owner => owner is null))
                 throw new IOException("Replacement plan schema, fingerprint or address binding is invalid.");
             ValidateEvidence(plan.Original, allowEmpty: plan.Purpose == RegistryRestorePurpose); ValidateEvidence(plan.Candidate);
-            ValidateRegistryRestore(plan, token);
+            ValidateRegistryRestore(plan, token, verifyCatalogContext: !retirement);
             if (plan.LocalDisposition is { } local)
             {
                 if (local.SourceCandidate is null) throw new IOException("Merged plan lacks immutable source candidate evidence.");
@@ -795,10 +803,16 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             }
             subjectObserved?.Invoke(PlanImpact(plan));
             ValidateRevision(plan, operation.CanonicalPath, token);
-            ValidatePinPolicy(plan, operation, token);
-            ValidateLocalImport(plan, operation, token);
-            ValidateSourceReview(plan, operation, token);
-            ValidateRegistryArchivePolicy(plan, operation, token);
+            // Only retirement can read a marker-bearing operation whose approved
+            // archives may already be gone. It verifies all surviving native
+            // evidence separately; this grants no apply/recovery authority.
+            if (!retiring)
+            {
+                ValidatePinPolicy(plan, operation, token);
+                ValidateLocalImport(plan, operation, token);
+                ValidateSourceReview(plan, operation, token);
+                ValidateRegistryArchivePolicy(plan, operation, token);
+            }
             var stepCount = 0;
             ReplacementStep? latestOwnerStep = null;
             var ownerWriteIds = new HashSet<string>(StringComparer.Ordinal);
@@ -837,14 +851,15 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
                 }
                 stepCount++;
             }
-            if (names.Contains("installed-capture") != (plan.PinPolicy is not null || plan.LocalImport is not null)) throw new IOException("Installed capture presence disagrees with the saved plan.");
-            if (new[] { "local-source-capture", "gh-input-capture", "gh-output-capture" }.Any(name => names.Contains(name) != (plan.LocalImport is not null)))
+            if (!retiring && names.Contains("installed-capture") != (plan.PinPolicy is not null || plan.LocalImport is not null)) throw new IOException("Installed capture presence disagrees with the saved plan.");
+            if (!retiring && new[] { "local-source-capture", "gh-input-capture", "gh-output-capture" }.Any(name => names.Contains(name) != (plan.LocalImport is not null)))
                 throw new IOException("Local source witness presence disagrees with the saved plan.");
-            if (names.Contains("recorded-base") != (plan.Revision is not null)) throw new IOException("Recorded base presence disagrees with the saved plan.");
+            if (!retiring && names.Contains("recorded-base") != (plan.Revision is not null)) throw new IOException("Recorded base presence disagrees with the saved plan.");
             if (names.Contains("owner-journal") && EffectiveOwner(plan) is null) throw new IOException("Unexpected owner journal for this plan.");
             if (plan.LocalDisposition is not null && !names.Contains("local-review")) throw new IOException("Merged plan lacks its immutable local review.");
             if ((names.Any(IsMergeSlot) || names.Any(IsMergePlan)) && !names.Contains("local-review")) throw new IOException("Unexpected merged stage without local review.");
             if (names.Any(name => name is not ("writer.lock" or "plan.json" or "candidate" or "original" or "displaced" or "undo-recovery" or "recorded-base" or "owner-journal" or "local-review" or "installed-capture" or "local-source-capture" or "gh-input-capture" or "gh-output-capture")
+                && !(retiring && name == "retiring.json")
                 && !(plan.SourceReview is not null && IsSourceReviewEntry(name) || legacyReviewArchives.Contains(name))
                 && !IsMergeSlot(name) && !IsMergePlan(name)
                 && !Enumerable.Range(0, stepCount).Any(index => name == $"step-{index:D4}.json")))
@@ -928,6 +943,9 @@ internal sealed partial class ReplacementPlanStore(string root, Logger logger, A
             }
             catch { recovery.Dispose(); throw; }
         }
+        internal FileStream OperationWriter => operationWriter;
+        internal NativeStateDirectory State => state;
+        internal void CloseOperation() { operationWriter.Dispose(); Operation.Dispose(); }
         public void Dispose() { recoveryWriter?.Dispose(); RecoveryJournal?.Dispose(); operationWriter.Dispose(); Operation.Dispose(); writer.Dispose(); state.Dispose(); }
     }
 }

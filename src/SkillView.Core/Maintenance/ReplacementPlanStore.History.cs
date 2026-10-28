@@ -15,7 +15,7 @@ internal sealed record ReplacementHistoryEntry(string Id, string Hint, bool MayN
 internal sealed record ReplacementHistory(ImmutableArray<ReplacementHistoryEntry> Entries,
     int ObservedCount, bool HasOmissions, string? Error = null)
 {
-    internal const string LimitGuidance = "History quota has reached the read-only limit of 16 retained operations. Open History (F4) to inspect retained evidence. This version cannot retire operations or free this capacity.";
+    internal const string LimitGuidance = "History quota has reached the limit of 16 retained operations. Open History (F4), Inspect a finished or unapplied review, then explicitly retire it using Abandon unapplied review or Discard Undo data to release capacity. Protected evidence cannot be retired.";
     internal string Summary => Error is not null ? "History unavailable: " + Error
         : $"{ObservedCount}{(HasOmissions ? "+" : "")} retained operations; "
             + $"{Entries.Count(entry => entry.MayNeedRecovery)} shown may need recovery (hint)."
@@ -95,7 +95,7 @@ internal sealed partial class ReplacementPlanStore
         var entries = state.EnumerateEntries(token).Take(MaxPlans + 2).ToArray();
         if (entries.Length > MaxPlans) throw new IOException(ReplacementHistory.LimitGuidance);
         if (entries.Any(entry => entry.Name != "writer.lock" && !QuarantineStore.ValidId(entry.Name)))
-            throw new IOException("New reviews are blocked by unknown retained state entries. Open History (F4) to inspect. This read-only version cannot retire operations.");
+            throw new IOException("New reviews are blocked by unknown retained state entries. Open History (F4) to inspect. Unknown entries remain protected; inspect them before creating another review.");
     }
 
     private static ReplacementHistoryEntry ReadHistoryEntry(NativeStateDirectory operation, string id, CancellationToken token)
@@ -125,8 +125,9 @@ internal sealed partial class ReplacementPlanStore
         var candidate = names.Contains("candidate"); var original = names.Contains("original"); var displaced = names.Contains("displaced");
         // Owner-journal presence is deliberately conservative: even matching
         // completion filenames cannot prove a completed owner transition.
-        var recovery = candidate && names.Any(name => name.StartsWith("step-", StringComparison.Ordinal)) || names.Contains("undo-recovery") || names.Contains("owner-journal") || original && (candidate || displaced);
-        var hint = unknown || historical ? "Protected — Inspect to verify"
+        var retiring = names.Contains("retiring.json");
+        var recovery = retiring || candidate && names.Any(name => name.StartsWith("step-", StringComparison.Ordinal)) || names.Contains("undo-recovery") || names.Contains("owner-journal") || original && (candidate || displaced);
+        var hint = retiring ? "Protected — retirement started; Inspect to verify" : unknown || historical ? "Protected — Inspect to verify"
             : recovery ? "May need recovery (hint) — Inspect to verify"
             : candidate && !original && !displaced ? "Unapplied review (hint) — Inspect to verify"
             : original && !candidate && !displaced ? "Applied / Undo data retained (hint) — Inspect to verify"
@@ -142,6 +143,7 @@ internal sealed partial class ReplacementPlanStore
         return new(id, hint, recovery || unknown, plan.Subject.Name, plan.Purpose, plan.CreatedAt,
             plan.Subject.Metadata.LocalPath ?? plan.Subject.Metadata.Upstream, plan.OriginalPath, size,
             "Saved metadata and entry-name hints only; live locations, payloads and owner state are unverified."
+                + (retiring ? " Retirement intent retained; no automatic deletion or resume. Inspect for explicit approval or protected-remnant guidance." : "")
                 + (historical ? " Historical merge evidence remains protected." : "")
                 + (names.Contains("owner-journal") ? " Owner journal retained; completion is unknown until Inspect." : ""), slots, operation.CanonicalPath, plan.RootPath);
     }

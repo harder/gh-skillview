@@ -46,3 +46,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   Unsubscribe instance/session handlers in finally; do not leave facade handlers
   on an abandoned creation thread. Use held-work gates and a dedicated UI thread
   for deterministic drain handoffs rather than sleeps or repeated runs.
+
+- Seeded ANSI repeated-key tests must verify every selection/focus transition and
+  paint both boundary states. Send each direction as one repeat burst and gate
+  direction/quit on actual draw completion; avoid imposing a many-paint throughput
+  quota through an unrelated event-loop watchdog. Keep the watchdog and exact
+  counts/boundary assertions. Isolate startup History via the existing app-owned
+  loader seam, and record the quit-request time separately from total teardown.

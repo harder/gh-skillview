@@ -121,7 +121,7 @@ internal sealed partial class ReplacementPlanStore
         return surviving.Any(entry => entry.Kind == "file");
     }
 
-    private void ValidateRegistryRestore(ReplacementPlan plan, CancellationToken token)
+    private void ValidateRegistryRestore(ReplacementPlan plan, CancellationToken token, bool verifyCatalogContext = true)
     {
         token.ThrowIfCancellationRequested();
         if (plan.Purpose != RegistryRestorePurpose)
@@ -140,7 +140,12 @@ internal sealed partial class ReplacementPlanStore
             || plan.Candidate.Entries.Any(entry => Path.GetFileName(entry.Path) is ".skill-lock.json" or "skills-lock.json" or ".git"))
             throw new IOException("Registry restore policy, source review or ordinary topology is invalid.");
         if (restore.ExpectedCatalogMemberships.IsDefault
-            || !restore.ExpectedCatalogMemberships.SequenceEqual(RegistryCatalogMemberships(Subject(plan), token)))
+            || restore.ExpectedCatalogMemberships.Any(agent => agent is null
+                || agent != new AgentMembership(agent.AgentId, plan.OriginalPath, false, Scope.User)
+                || !GhPlacementCatalog.Entries.Any(entry => entry.Id == agent.AgentId))
+            || !restore.ExpectedCatalogMemberships.Select(agent => agent.AgentId).SequenceEqual(
+                restore.ExpectedCatalogMemberships.Select(agent => agent.AgentId).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
+            || verifyCatalogContext && !restore.ExpectedCatalogMemberships.SequenceEqual(RegistryCatalogMemberships(Subject(plan), token)))
             throw new IOException("The possible gh catalog memberships or captured placement context changed.");
         RequireRegistryTracking(ExecutionSubject(plan), restore.ResolvedPin);
         if (restore.ObservedValidity == ValidityState.InvalidMetadata) SameTracking(plan.Subject.Metadata, restore.DesiredMetadata);
@@ -150,45 +155,63 @@ internal sealed partial class ReplacementPlanStore
 
     private static void ValidateRegistryArchivePolicy(ReplacementPlan plan, NativeStateDirectory operation, CancellationToken token)
     {
-        if (plan.RegistryRestore is not { } restore) return;
+        if (plan.RegistryRestore is null) return;
         var review = plan.SourceReview ?? throw new IOException("Registry restore requires source review archives.");
         using var beforeState = OpenArchive(operation, review.InstalledArchive, token);
         using var afterState = OpenArchive(operation, review.CandidateArchive, token);
         var before = CapturedPayloadArchive.Load(beforeState, review.InstalledManifest, token).Archive;
         var after = CapturedPayloadArchive.Load(afterState, review.CandidateManifest, token).Archive;
-        RequireRegistryArchiveMetadata(before); RequireRegistryArchiveMetadata(after);
-        var (desired, candidateParsed) = Read(after, afterState);
-        if (!candidateParsed || !desired.Diagnostics.IsEmpty || !SameParsedMetadata(restore.DesiredMetadata, desired)
+        ValidateRegistryCandidateArchive(plan, after, afterState, token);
+        ValidateRegistryInstalledArchive(plan, before, beforeState, token);
+    }
+
+    // Retirement reuses each half only after loading that surviving archive
+    // against its immutable manifest. Marker JSON supplies no metadata authority.
+    private static void ValidateRegistryCandidateArchive(ReplacementPlan plan, CapturedPayloadArchive archive,
+        NativeStateDirectory state, CancellationToken token)
+    {
+        var restore = plan.RegistryRestore ?? throw new IOException("Missing registry restore policy.");
+        RequireRegistryArchiveMetadata(archive);
+        var (desired, parsed) = ReadRegistryArchiveMetadata(archive, state, token);
+        if (!parsed || !desired.Diagnostics.IsEmpty || !SameParsedMetadata(restore.DesiredMetadata, desired)
             || desired.Name != plan.Subject.Name)
             throw new IOException("Saved desired metadata is not the parsed immutable candidate.");
-        var missing = !before.Entries.Any(item => item.Entry.Path == "SKILL.md");
-        var (observed, parsed) = missing ? (SkillFrontMatter.Empty, false) : Read(before, beforeState);
+    }
+
+    private static void ValidateRegistryInstalledArchive(ReplacementPlan plan, CapturedPayloadArchive archive,
+        NativeStateDirectory state, CancellationToken token)
+    {
+        var restore = plan.RegistryRestore ?? throw new IOException("Missing registry restore policy.");
+        RequireRegistryArchiveMetadata(archive);
+        var missing = !archive.Entries.Any(item => item.Entry.Path == "SKILL.md");
+        var (observed, parsed) = missing ? (SkillFrontMatter.Empty, false) : ReadRegistryArchiveMetadata(archive, state, token);
         var validityMatches = restore.ObservedValidity switch
         {
             ValidityState.MissingSkillMd => missing,
             ValidityState.UnparsableFrontMatter => !missing && !parsed,
-            ValidityState.InvalidMetadata => !missing && parsed && !observed.Diagnostics.IsEmpty && observed.Name == desired.Name,
+            ValidityState.InvalidMetadata => !missing && parsed && !observed.Diagnostics.IsEmpty && observed.Name == restore.DesiredMetadata.Name,
             _ => false
         };
         if (!validityMatches)
             throw new IOException("Saved original validity disagrees with the raw immutable damaged archive.");
         if (!SameParsedMetadata(plan.Subject.Metadata, observed))
             throw new IOException("Saved observed metadata disagrees with the raw damaged original.");
+    }
 
-        (SkillFrontMatter Metadata, bool Parsed) Read(CapturedPayloadArchive archive, NativeStateDirectory state)
+    private static (SkillFrontMatter Metadata, bool Parsed) ReadRegistryArchiveMetadata(CapturedPayloadArchive archive,
+        NativeStateDirectory state, CancellationToken token)
+    {
+        var entry = archive.Entries.SingleOrDefault(item => item.Entry.Path == "SKILL.md");
+        if (entry is null || entry.Entry.Kind != "file" || entry.Entry.Bytes > PayloadSnapshot.MaxSkillBytes)
+            throw new IOException("Registry archive root metadata is missing, nonregular or exceeds its budget.");
+        using var bytes = new MemoryStream();
+        archive.CopyEntry(state, "SKILL.md", bytes, token);
+        try
         {
-            var entry = archive.Entries.SingleOrDefault(item => item.Entry.Path == "SKILL.md");
-            if (entry is null || entry.Entry.Kind != "file" || entry.Entry.Bytes > PayloadSnapshot.MaxSkillBytes)
-                throw new IOException("Registry archive root metadata is missing, nonregular or exceeds its budget.");
-            using var bytes = new MemoryStream();
-            archive.CopyEntry(state, "SKILL.md", bytes, token);
-            try
-            {
-                var (_, metadata, valid) = FrontMatterParser.Parse(new UTF8Encoding(false, true).GetString(bytes.GetBuffer(), 0, checked((int)bytes.Length)));
-                return (metadata, valid);
-            }
-            catch (DecoderFallbackException) { return (SkillFrontMatter.Empty, false); }
+            var (_, metadata, valid) = FrontMatterParser.Parse(new UTF8Encoding(false, true).GetString(bytes.GetBuffer(), 0, checked((int)bytes.Length)));
+            return (metadata, valid);
         }
+        catch (DecoderFallbackException) { return (SkillFrontMatter.Empty, false); }
     }
 
     private static void RequireRegistryArchiveMetadata(CapturedPayloadArchive archive)

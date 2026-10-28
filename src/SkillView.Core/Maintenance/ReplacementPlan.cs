@@ -88,6 +88,8 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? SourceReviewWarning { get; init; }
     [JsonIgnore]
+    internal RetirementReview? Retirement { get; init; }
+    [JsonIgnore]
     internal bool AcknowledgeSourceReview { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ReplacementRegistryRestore? RegistryRestore { get; init; }

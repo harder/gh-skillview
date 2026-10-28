@@ -9,12 +9,16 @@ using SkillView.Ui;
 // have no pause/fault switches. Recovery runs through the actual CLI on restart.
 try
 {
+    if (args.Length >= 3 && args[0] == "--retained-retirement")
+        return await RetainedRetirementProof.RunAsync(args[1..]);
     if (args.Length == 2 && args[0] == "--exposure-lifetime-proof")
         return ExposureLifetimeProof.Run(args[1]);
     if (args.Length == 2 && args[0] == "--exposure-link-roundtrip")
         return ExposureLinkProof.Run(args[1]);
     if (args.Length == 2 && args[0] == "--retained-history-fixture")
         return await RetainedHistoryProof.CreateAsync(args[1]);
+    if (args.Length == 2 && args[0] == "--retained-retirement-fixture")
+        return await RetainedHistoryProof.CreateAsync(args[1], revision: true);
     Console.Error.WriteLine("maintenance-proof phase: started");
     var checkDiskFullRoot = args.Length == 2 && args[0] == "--check-disk-full-root";
     if (!checkDiskFullRoot && args.Length != 6)

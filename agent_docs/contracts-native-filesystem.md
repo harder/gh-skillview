@@ -235,6 +235,28 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   existing-only opens and existing locks for coherent History reads; contention,
   missing locks, access failures and unknown state remain unverified.
 
+- Explicit retirement removes only exact held private operation/slot identities,
+  under root→operation writers, after full admission and fresh inspection. Keep
+  strict `retiring.json` native evidence and independent surviving-archive
+  validation; whole missing approved slots may resume only after new approval.
+  Partial trees, unknown children or changed native generations remain protected.
+  See [retirement](maintenance-operation-retirement.md). Regular-file captures
+  may borrow the already-held writer FileStream: Windows byte locks require
+  same-handle reads. Never use directory identity capture for file evidence.
+  Retirement-only admission captures the CURRENT live tree independently of
+  historical replacement context/registry state. Reject overlaps with all private
+  roots, descendants and small files; hold/revalidate the live root and parent at
+  destructive calls. Missing live data permits only a provably never-started
+  review's abandonment. Version-2 markers retain that current evidence; supported
+  version-1 markers keep their exact legacy resume evidence.
+
+- Registry parent and owned-directory fingerprints have different Windows capture
+  domains. A registry lease validates its namespace-only witness; an owned lease
+  validates its full policy witness before/after inspection. Compare all native
+  identity/generation/address fields across those leases, but do not compare the
+  two fingerprint hashes to each other. Retain both independent repeated witness
+  checks, same-file raw reads and the real registry data-file lock.
+
 - Only dedicated registry-recorded restore may open a missing-SKILL original via
   `OpenRegistryDamaged`. Its caller binds the complete raw damaged original and
   one already-attached compatible record; ordinary relocation still requires
