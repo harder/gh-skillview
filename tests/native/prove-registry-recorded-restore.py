@@ -61,6 +61,11 @@ def main():
     # Bind managed hosts to the actual Core and host DLLs, not the apphost alone.
     artifacts = RegistryProofArtifacts(output)
     report['rawArtifacts'] = artifacts.summary
+    report['commandDiagnostics'] = dict(
+        directGhCommands=dict(skillInstall=0, api=0, other=0),
+        scope='Attempted direct gh subprocess.run invocations by this script only',
+        productGhApiCommands=None, httpRequests=None,
+        unknownReason='No existing product debug request log; gh-internal HTTP and other proofs are unknown')
     report['managedBindings'] = {p.name: sha(p) for p in sorted(app.parent.glob('*.dll'))}
     output.write_text(json.dumps(report, indent=2))
     sequence = 0
@@ -89,6 +94,9 @@ def main():
 
                     def command(argv, expect=0, timeout=45, process_environment=None, process_cwd=None):
                         nonlocal sequence
+                        if str(argv[0]) == str(gh):
+                            category = 'skillInstall' if tuple(argv[1:3]) == ('skill', 'install') else 'api' if tuple(argv[1:2]) == ('api',) else 'other'
+                            report['commandDiagnostics']['directGhCommands'][category] += 1
                         sequence += 1
                         prefix = receipt_dir / f'{sequence:04d}'
                         try:

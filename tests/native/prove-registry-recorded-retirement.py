@@ -232,7 +232,7 @@ class Journey:
         self.write('refusal-native.json', dict(retained=before, live=live, registry=native(self.registry), peer=native(self.peer)))
 
 
-def prepare_live_evidence(root, gh):
+def prepare_live_evidence(root, gh, gh_counts):
     evidence = root / 'evidence'
     evidence.mkdir()
     for key, pinned, source, name in [('unpinned', False, 'skills/gh-skill', 'gh-skill'),
@@ -247,6 +247,7 @@ def prepare_live_evidence(root, gh):
         if pinned:
             argv.append('--pin=v2.103.2')
         argv += ['--', 'cli/cli', source]
+        gh_counts['skillInstall'] += 1
         p = subprocess.run(argv, cwd=base, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=180)
         (base / 'install.stdout').write_bytes(p.stdout); (base / 'install.stderr').write_bytes(p.stderr)
         assert p.returncode == 0, (argv, p.returncode, p.stderr)
@@ -284,10 +285,15 @@ def main():
     a.output.parent.mkdir(parents=True, exist_ok=True)
     artifacts = RegistryProofArtifacts(a.output)
     report['rawArtifacts'] = artifacts.summary
+    report['commandDiagnostics'] = dict(
+        directGhCommands=dict(skillInstall=0, api=0, other=0),
+        scope='Attempted direct gh subprocess.run invocations by this script only',
+        productGhApiCommands=None, httpRequests=None,
+        unknownReason='No existing product debug request log; gh-internal HTTP and other proofs are unknown')
     def save(): a.output.write_text(json.dumps(report, indent=2) + '\n')
     save()
     try:
-        evidence = a.offline_evidence.resolve() if a.offline_evidence else prepare_live_evidence(root, gh)
+        evidence = a.offline_evidence.resolve() if a.offline_evidence else prepare_live_evidence(root, gh, report['commandDiagnostics']['directGhCommands'])
         if a.offline_evidence:
             manifest = json.loads((evidence / 'evidence-manifest.json').read_text())
             for entry in manifest['files']:
