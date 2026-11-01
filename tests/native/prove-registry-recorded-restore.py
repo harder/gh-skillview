@@ -70,7 +70,7 @@ def main():
     report['managedBindings'] = {p.name: sha(p) for p in sorted(app.parent.glob('*.dll'))}
     output.write_text(json.dumps(report, indent=2))
     product_counts = ProductCommands(report['commandDiagnostics'])
-    templates = InstallTemplates(root / 'install-templates')
+    templates = InstallTemplates(root / 'install-templates', report['commandDiagnostics'])
     sequence = 0
     try:
         for tool in args.gh:

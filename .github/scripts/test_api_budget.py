@@ -33,7 +33,7 @@ APPROVED_PROOF_ADDITIONS = {'tests/native/prove-registry-recorded-restore.py': [
                                                       '    product_counts = '
                                                       "ProductCommands(report['commandDiagnostics'])\n"
                                                       '    templates = InstallTemplates(root / '
-                                                      "'install-templates')\n"),
+                                                      "'install-templates', report['commandDiagnostics'])\n"),
                                                      ('',
                                                       '                        role = cli_role(argv[0], app, '
                                                       'args.old_app, args.proof_host)\n'
@@ -431,6 +431,16 @@ class ProofAndWorkflowGuards(unittest.TestCase):
         self.assertEqual(text.count(RESTORE_COUNT), 1)
         restored = text.replace(DIAGNOSTICS, '').replace(RESTORE_COUNT, '')
         self.assertEqual(hashlib.sha256(restored.encode()).hexdigest(), BASE_HASHES[name])
+
+    def test_restore_delta_from_published_head_is_constructor_only(self):
+        text = (ROOT / 'tests/native/prove-registry-recorded-restore.py').read_text()
+        old = "InstallTemplates(root / 'install-templates')"
+        new = "InstallTemplates(root / 'install-templates', report['commandDiagnostics'])"
+        self.assertEqual(text.count(new), 1)
+        self.assertEqual(text.count(old), 0)
+        restored = text.replace(new, old)
+        self.assertEqual(hashlib.sha256(restored.encode()).hexdigest(),
+                         'd3299c27425bfaab10433dd564de019bd02f664610b13970f68e11eda9299485')
 
     def test_retirement_cases_plans_negatives_hashes_markers_and_native_guards_unchanged(self):
         name = 'tests/native/prove-registry-recorded-retirement.py'
