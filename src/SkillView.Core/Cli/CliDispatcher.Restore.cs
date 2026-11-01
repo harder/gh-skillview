@@ -13,12 +13,13 @@ public static partial class CliDispatcher
     private static async Task<int> RestoreAsync(AppOptions options, TuiServices services, CancellationToken token)
     {
         var requestedCommand = options.SubcommandName!;
+        var registryRestore = requestedCommand.StartsWith("registry-restore-", StringComparison.Ordinal);
         var sourceSwitch = requestedCommand.StartsWith("source-switch-", StringComparison.Ordinal);
         var localReimport = requestedCommand.StartsWith("reimport-", StringComparison.Ordinal);
         var unpinOnly = requestedCommand.StartsWith("unpin-", StringComparison.Ordinal);
-        var command = sourceSwitch ? "restore-" + requestedCommand[14..] : requestedCommand.StartsWith("update-", StringComparison.Ordinal)
+        var command = registryRestore ? "restore-" + requestedCommand[17..] : sourceSwitch ? "restore-" + requestedCommand[14..] : requestedCommand.StartsWith("update-", StringComparison.Ordinal)
             ? "restore-" + requestedCommand[7..] : unpinOnly ? "restore-" + requestedCommand[6..] : localReimport ? "restore-" + requestedCommand[9..] : requestedCommand;
-        var expectedPurpose = sourceSwitch ? ReplacementPlanStore.LocalSourceSwitchPurpose : localReimport ? "local-reimport" : unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
+        var expectedPurpose = registryRestore ? ReplacementPlanStore.RegistryRestorePurpose : sourceSwitch ? ReplacementPlanStore.LocalSourceSwitchPurpose : localReimport ? "local-reimport" : unpinOnly ? "unpin-only" : requestedCommand.StartsWith("update-", StringComparison.Ordinal) ? "update-revision" : "restore-recorded";
         var latest = requestedCommand == "update-plan";
         var args = options.SubcommandArgs;
         string? path = null, installId = null, id = null, expected = null, disposition = null, newSource = null, sourceReview = null, tag = null;
@@ -125,6 +126,7 @@ public static partial class CliDispatcher
                     }
                     result = preparation.Plan!;
                 }
+                else if (registryRestore) result = await Task.Run(() => store.PlanRegistryRestoreAsync(gh!, target, inventory, token), token).ConfigureAwait(false);
                 else result = await Task.Run(() => store.PlanAsync(target, inventory, async (destination, ct) =>
                 {
                     await new GhRecordedTreeStager(services.Runner).StageIntoAsync(gh!, target.FrontMatter.Upstream!, target.TreeSha!, destination, bytes =>
@@ -146,6 +148,11 @@ public static partial class CliDispatcher
             if (json) WriteJson(w =>
             {
                 w.WriteStartObject(); w.WriteNumber("schemaVersion", 1); w.WriteString("sessionState", "unknown"); w.WriteBoolean("securityIsolation", false);
+                if (registryRestore)
+                {
+                    w.WriteString("purpose", ReplacementPlanStore.RegistryRestorePurpose);
+                    w.WriteString("postAttemptInventory", "not-performed; native saved-location verification is separate; refresh inventory");
+                }
                 w.WriteString("status", result.Canceled ? "canceled" : result.Succeeded ? result.Status : result.MutationObserved ? "partial" : "refused");
                 w.WriteString("reason", result.Message); w.WriteBoolean("partial", !result.Succeeded || result.Canceled);
                 if (tag is not null) w.WriteString("versionSelection", VersionUpdateGuidance.ExplicitTagChoice);
@@ -166,6 +173,8 @@ public static partial class CliDispatcher
             else Console.WriteLine(TerminalEscapeSanitizer.Sanitize(
                 $"{result.Id}  {result.Status}  {result.OriginalPath}\nPlan: {result.PlanFingerprint}\nReview: {result.ReviewFingerprint}\nRetained: {result.RetainedPath}\nManifest: {result.PlanPath}\nRoot mode: {result.OriginalRootMode} -> {result.CandidateRootMode}\n"
                 + string.Join("\n", result.ChangedPaths.Take(128).Select(change => "Changed: " + change)) + (result.ChangedPaths.Length > 128 ? $"\nOmitted changed paths: {result.ChangedPaths.Length - 128}; complete list in the saved plan." : "") + "\n" + result.Message));
+            if (!json && registryRestore)
+                Console.WriteLine("Purpose: " + ReplacementPlanStore.RegistryRestorePurpose + "\nNative saved-location verification and inventory verification are separate. Refresh inventory after an attempt.");
             if (!json && result.Revision is { } revision)
             {
                 Console.WriteLine(TerminalEscapeSanitizer.Sanitize($"Source ref: {revision.Source.Ref}\nCommit: {revision.Source.Commit}\nGit tree: {revision.Source.Tree}"));

@@ -55,6 +55,7 @@ jobs:
         run: |
           node --test .github/scripts/ci-change-scope.test.js
           python3 -m unittest discover -s .github/scripts -p test_native_proof_inputs.py
+          python3 -m unittest discover -s .github/scripts -p test_api_budget.py
       - name: Test native proof fixture contracts
         run: python3 -m unittest discover -s tests/native -p 'test_*.py'
 
@@ -376,6 +377,12 @@ jobs:
             shard: owners
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Observe API budget at native job start
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage job-start --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
@@ -402,7 +409,15 @@ jobs:
         run: |
           python tests/native/prove-retained-retirement.py --app 'dist/app/skillview${{ matrix.ext }}' --proof 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --output dist/retirement-app-proof.json
           python tests/native/prove-retained-retirement.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --output dist/retirement-extension-proof.json
+      - name: Observe API budget before 01
+        if: matrix.shard == 'owners'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-01 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Verify repository API access and retain response evidence
+        id: api_primary_01
         if: matrix.shard == 'owners'
         shell: bash
         env:
@@ -421,7 +436,22 @@ jobs:
           assert result['ref'] == 'refs/tags/v2.102.0'
           assert re.fullmatch(r'[0-9a-f]{40}', result['object']['sha'])
           PYREF
+      - name: Observe API budget after 01
+        if: always() && (matrix.shard == 'owners') && steps.api_primary_01.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-01 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_01.outcome }}'
+      - name: Observe API budget before 02
+        if: matrix.shard == 'inspection-unpin'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-02 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove external cleanup suppression without payload mutations
+        id: api_primary_02
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
@@ -429,6 +459,13 @@ jobs:
         run: |
           python tests/native/prove-cleanup-suppression.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/suppression-app-proof.json
           python tests/native/prove-cleanup-suppression.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/suppression-extension-proof.json
+      - name: Observe API budget after 02
+        if: always() && (matrix.shard == 'inspection-unpin') && steps.api_primary_02.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-02 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_02.outcome }}'
       - name: Prove native backup evidence and unchanged installed copies
         if: matrix.shard == 'inspection-unpin'
         shell: bash
@@ -480,7 +517,15 @@ jobs:
         run: |
           python tests/native/prove-quarantine-undo.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/quarantine-app-proof.json
           python tests/native/prove-quarantine-undo.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/quarantine-extension-proof.json
+      - name: Observe API budget before 03
+        if: matrix.shard == 'inspection-unpin'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-03 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove actual gh tracking metadata round trips through native hosts
+        id: api_primary_03
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
@@ -488,7 +533,22 @@ jobs:
         run: |
           python tests/native/prove-tracking-roundtrip.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/tracking-app-proof.json
           python tests/native/prove-tracking-roundtrip.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/tracking-extension-proof.json
+      - name: Observe API budget after 03
+        if: always() && (matrix.shard == 'inspection-unpin') && steps.api_primary_03.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-03 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_03.outcome }}'
+      - name: Observe API budget before 04
+        if: matrix.shard == 'owners'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-04 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove update outcomes, same-tree repairs and no-op object preservation
+        id: api_primary_04
         if: matrix.shard == 'owners'
         shell: bash
         env:
@@ -496,7 +556,22 @@ jobs:
         run: |
           python tests/native/prove-update-outcomes.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/update-outcomes-app-proof.json
           python tests/native/prove-update-outcomes.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/update-outcomes-extension-proof.json
+      - name: Observe API budget after 04
+        if: always() && (matrix.shard == 'owners') && steps.api_primary_04.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-04 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_04.outcome }}'
+      - name: Observe API budget before 05
+        if: matrix.shard == 'owners'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-05 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove recorded restoration and undo with real gh and native hosts
+        id: api_primary_05
         if: matrix.shard == 'owners'
         shell: bash
         env:
@@ -504,7 +579,22 @@ jobs:
         run: |
           python tests/native/prove-recorded-replacement.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/replacement-app-proof.json
           python tests/native/prove-recorded-replacement.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/replacement-extension-proof.json
+      - name: Observe API budget after 05
+        if: always() && (matrix.shard == 'owners') && steps.api_primary_05.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-05 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_05.outcome }}'
+      - name: Observe API budget before 06
+        if: matrix.shard == 'owners'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-06 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove immutable revision updates with native hosts
+        id: api_primary_06
         if: matrix.shard == 'owners'
         shell: bash
         env:
@@ -512,7 +602,22 @@ jobs:
         run: |
           python tests/native/prove-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/revision-app-proof.json
           python tests/native/prove-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/revision-extension-proof.json
+      - name: Observe API budget after 06
+        if: always() && (matrix.shard == 'owners') && steps.api_primary_06.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-06 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_06.outcome }}'
+      - name: Observe API budget before 07
+        if: matrix.shard == 'owners'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-07 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove shared owner updates and torn-registry repair after process death
+        id: api_primary_07
         if: matrix.shard == 'owners'
         shell: bash
         env:
@@ -521,7 +626,22 @@ jobs:
           proof_gh_path="$(command -v gh)"
           python tests/native/prove-shared-revision-update.py --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-app-proof.json
           python tests/native/prove-shared-revision-update.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-owner-extension-proof.json
+      - name: Observe API budget after 07
+        if: always() && (matrix.shard == 'owners') && steps.api_primary_07.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-07 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_07.outcome }}'
+      - name: Observe API budget before 08
+        if: matrix.shard == 'owners' && (runner.os != 'Linux')
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-08 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove saved schema3 shared-owner merges and restart repair
+        id: api_primary_08
         if: matrix.shard == 'owners' && (runner.os != 'Linux')
         shell: bash
         env:
@@ -531,7 +651,22 @@ jobs:
           proof_gh_path="$(command -v gh)"
           python tests/native/prove-shared-revision-update.py --merged --old-app "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-app-proof.json
           python tests/native/prove-shared-revision-update.py --merged --old-app "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_path" --output dist/shared-local-merge-extension-proof.json
+      - name: Observe API budget after 08
+        if: always() && (matrix.shard == 'owners' && (runner.os != 'Linux')) && steps.api_primary_08.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-08 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_08.outcome }}'
+      - name: Observe API budget before 09
+        if: matrix.shard == 'inspection-unpin'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-09 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove standalone unpin without source access on both native hosts
+        id: api_primary_09
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
@@ -549,6 +684,13 @@ jobs:
           }
           prove_unpin --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/unpin-app-proof.json
           prove_unpin --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_minimum" --gh "$proof_gh_current" --output dist/unpin-extension-proof.json
+      - name: Observe API budget after 09
+        if: always() && (matrix.shard == 'inspection-unpin') && steps.api_primary_09.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-09 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_09.outcome }}'
       - name: Prove captured local reimport and restart recovery on both native hosts
         if: matrix.shard == 'sources'
         shell: bash
@@ -589,6 +731,134 @@ jobs:
               --legacy-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
               --output "dist/local-reimport-privileged-$proof_name-proof" --platform linux/amd64
           done
+      - name: Prepare exact registry-restore gh compatibility target
+        if: matrix.shard == 'sources'
+        shell: bash
+        run: python tests/native/prepare-gh-proof-tool.py --version 2.103.2 --rid '${{ matrix.rid }}' --output '.ci-native/gh-registry-current'
+      - name: Observe API budget before 10
+        if: matrix.shard == 'sources'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-10 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
+      - name: Prove bounded registry-recorded restore and raw damaged Undo on both hosts
+        id: api_primary_10
+        if: matrix.shard == 'sources'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prove_registry() {
+            if [ '${{ matrix.rid }}' = linux-x64 ]; then
+              python tests/native/prove-registry-recorded-restore.py --expect-metadata-refusal CAP_SYS_ADMIN "$@"
+            else
+              python tests/native/prove-registry-recorded-restore.py "$@"
+            fi
+          }
+          for host in app/skillview ext/gh-skillview; do
+            proof_name="${host%%/*}"
+            prove_registry --app "dist/$host${{ matrix.ext }}" \
+              --gh ".ci-native/gh-minimum/gh${{ matrix.ext }}" --gh ".ci-native/gh-registry-current/gh${{ matrix.ext }}" \
+              --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' \
+              --old-app "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT/dist/app/skillview${{ matrix.ext }}" \
+              --output "dist/registry-restore-$proof_name-proof.json"
+          done
+      - name: Observe API budget after 10
+        if: always() && (matrix.shard == 'sources') && steps.api_primary_10.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-10 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_10.outcome }}'
+      - name: Observe API budget before 11
+        if: matrix.shard == 'sources' && matrix.rid == 'linux-x64'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-11 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
+      - name: Prove privileged Linux registry restore and restart recovery
+        id: api_primary_11
+        if: matrix.shard == 'sources' && matrix.rid == 'linux-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for host in app/skillview ext/gh-skillview; do
+            proof_name="${host%%/*}"
+            python tests/native/run-registry-recorded-restore-docker.py --app "dist/$host" \
+              --gh '.ci-native/gh-minimum/gh' --gh '.ci-native/gh-registry-current/gh' \
+              --proof-host tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof \
+              --old-app "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT/dist/app/skillview" \
+              --output "dist/registry-restore-privileged-$proof_name-proof"
+          done
+      - name: Observe API budget after 11
+        if: always() && (matrix.shard == 'sources' && matrix.rid == 'linux-x64') && steps.api_primary_11.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-11 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_11.outcome }}'
+      - name: Observe API budget before 12
+        if: matrix.shard == 'sources' && matrix.rid != 'linux-x64'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-12 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
+      - name: Prove registry-restore retirement and whole-slot restart on both hosts
+        id: api_primary_12
+        if: matrix.shard == 'sources' && matrix.rid != 'linux-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for host in app/skillview ext/gh-skillview; do
+            proof_name="${host%%/*}"
+            python tests/native/prove-registry-recorded-retirement.py --app "dist/$host${{ matrix.ext }}" \
+              --proof 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' \
+              --gh '.ci-native/gh-minimum/gh${{ matrix.ext }}' --output "dist/registry-retirement-$proof_name-proof.json"
+          done
+      - name: Observe API budget after 12
+        if: always() && (matrix.shard == 'sources' && matrix.rid != 'linux-x64') && steps.api_primary_12.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-12 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_12.outcome }}'
+      - name: Observe API budget before 13
+        if: matrix.shard == 'sources' && matrix.rid == 'linux-x64'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-13 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
+      - name: Prove privileged Linux registry-restore retirement on both hosts
+        id: api_primary_13
+        if: matrix.shard == 'sources' && matrix.rid == 'linux-x64'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for host in app/skillview ext/gh-skillview; do
+            proof_name="${host%%/*}"
+            python tests/native/run-registry-recorded-restore-docker.py --retirement --app "dist/$host" \
+              --gh '.ci-native/gh-minimum/gh' \
+              --proof-host tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof \
+              --output "dist/registry-retirement-privileged-$proof_name-proof"
+          done
+      - name: Observe API budget after 13
+        if: always() && (matrix.shard == 'sources' && matrix.rid == 'linux-x64') && steps.api_primary_13.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-13 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_13.outcome }}'
       - name: Prove local source switching and actual schema5/6 recovery on both native hosts
         if: matrix.shard == 'sources'
         shell: bash
@@ -652,7 +922,15 @@ jobs:
           cp tests/native/prove-local-source-switch.py tests/native/prove-old-native-reimport.py \
             tests/native/prove-local-reimport.py tests/native/source_review_proof.py tests/native/run-local-source-switch-docker.py \
             tests/SkillView.MaintenanceProof/Program.cs dist/source-switch-proof-inputs/
+      - name: Observe API budget before 14
+        if: matrix.shard == 'sources'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-14 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove actual previous native saved plans survive the new schema boundary
+        id: api_primary_14
         if: matrix.shard == 'sources'
         shell: bash
         env:
@@ -669,7 +947,22 @@ jobs:
           }
           prove_legacy --old-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-app-proof.json
           prove_legacy --old-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary install-moved --output dist/old-native-extension-proof.json
+      - name: Observe API budget after 14
+        if: always() && (matrix.shard == 'sources') && steps.api_primary_14.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-14 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_14.outcome }}'
+      - name: Observe API budget before 15
+        if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-15 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove privileged Linux unpin and native schema compatibility on private tmpfs
+        id: api_primary_15
         if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
         shell: bash
         env:
@@ -686,7 +979,22 @@ jobs:
               --legacy-app "$SKILLVIEW_LEGACY_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_LEGACY_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
               --output "dist/unpin-privileged-$proof_name-proof" --platform linux/amd64
           done
+      - name: Observe API budget after 15
+        if: always() && (matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')) && steps.api_primary_15.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-15 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_15.outcome }}'
+      - name: Observe API budget before 16
+        if: matrix.shard == 'inspection-unpin'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-16 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove historical local dispositions and frozen resolutions
+        id: api_primary_16
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         env:
@@ -703,7 +1011,22 @@ jobs:
           }
           prove_local_merge --app 'dist/app/skillview${{ matrix.ext }}' --output dist/local-merge-app-proof.json
           prove_local_merge --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/local-merge-extension-proof.json
+      - name: Observe API budget after 16
+        if: always() && (matrix.shard == 'inspection-unpin') && steps.api_primary_16.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-16 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_16.outcome }}'
+      - name: Observe API budget before 17
+        if: matrix.shard == 'inspection-unpin' && (runner.os != 'Linux')
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-17 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove merged payload restart recovery at every directory move
+        id: api_primary_17
         if: matrix.shard == 'inspection-unpin' && (runner.os != 'Linux')
         shell: bash
         env:
@@ -716,7 +1039,22 @@ jobs:
               --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' \
               --kill-boundary "$boundary" --output "dist/local-merge-killed-${boundary}-proof.json"
           done
+      - name: Observe API budget after 17
+        if: always() && (matrix.shard == 'inspection-unpin' && (runner.os != 'Linux')) && steps.api_primary_17.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-17 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_17.outcome }}'
+      - name: Observe API budget before 18
+        if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage before-18 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result 'before'
       - name: Prove real disk-full recovery on isolated bounded tmpfs
+        id: api_primary_18
         if: matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')
         shell: bash
         env:
@@ -729,6 +1067,13 @@ jobs:
             --proof-host-dir tests/SkillView.MaintenanceProof/bin/Release/net10.0 \
             --legacy-app "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_REVIEWED_MERGE_CHECKOUT" \
             --gh "$proof_gh_path" --output dist/disk-full-proof --platform linux/amd64
+      - name: Observe API budget after 18
+        if: always() && (matrix.shard == 'inspection-unpin' && (runner.os == 'Linux')) && steps.api_primary_18.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/api_budget.py --stage after-18 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_18.outcome }}'
       - name: Retain native verification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -738,6 +1083,7 @@ jobs:
           path: |
             dist/*-proof.json
             dist/gh-api-access.txt
+            dist/api-budget/api-budget-*.json
             dist/disk-full-proof/**
             dist/unpin-privileged-*-proof/**
             dist/local-reimport-privileged-*-proof/**
@@ -745,6 +1091,14 @@ jobs:
             dist/old-native-reimport-*-proof-raw/**
             dist/old-native-source-switch-*-proof-raw/**
             dist/source-switch-proof-inputs/**
+            dist/registry-restore-*-proof-raw/**
+            dist/registry-retirement-*-proof-raw/**
+            dist/registry-restore-privileged-*-proof-launch/launch.json
+            dist/registry-restore-privileged-*-proof-launch/stdout.bin
+            dist/registry-restore-privileged-*-proof-launch/stderr.bin
+            dist/registry-retirement-privileged-*-proof-launch/launch.json
+            dist/registry-retirement-privileged-*-proof-launch/stdout.bin
+            dist/registry-retirement-privileged-*-proof-launch/stderr.bin
           if-no-files-found: warn
           retention-days: 14
       - name: Record completed proof family for aggregate gating

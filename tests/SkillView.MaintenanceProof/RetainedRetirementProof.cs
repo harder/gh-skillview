@@ -11,7 +11,7 @@ internal static class RetainedRetirementProof
 {
     internal static async Task<int> RunAsync(string[] args)
     {
-        if (args.Length is not (3 or 4 or 6)) throw new IOException("root inspect|retire|ordinary-inspect|ordinary-undo|supersede|edit-live|add-consumer|missing-live|registry-advanced id [fingerprint kind checkpoint]");
+        if (args.Length is not (3 or 4 or 6)) throw new IOException("root inventory|inspect|retire|ordinary-inspect|ordinary-undo|supersede|edit-live|add-consumer|missing-live|registry-advanced id [fingerprint kind checkpoint]");
         var root = Path.GetFullPath(args[0]);
         if (Environment.CurrentDirectory != root || Environment.GetEnvironmentVariable("HOME") != Path.Combine(root, "home")
             || Environment.GetEnvironmentVariable("SKILLVIEW_STATE_HOME") != Path.Combine(root, "state")
@@ -33,9 +33,17 @@ internal static class RetainedRetirementProof
             var diagnostics = new List<LockReadDiagnostic>();
             var owners = new SkillLockFileReader(services.Logger).LoadObservations(roots.Select(item => item.Path), token,
                 new(Path.Combine(root, "home"), Path.Combine(root, "xdg-state")), diagnostics);
+            var inaccessible = new List<string>();
+            var locations = new List<DiscoveryLocation>();
+            // Keep Scan's original null-options/default AllowHiddenDirs=false.
+            // A convenience Scan discards coverage diagnostics; retirement must
+            // never turn an unsupported linked container into complete evidence.
+            var skills = new LocalSkillScanner(services.Logger).ScanWithCancellation(roots, null, token, inaccessible, locations);
             return Task.FromResult(InventorySnapshot.Empty with
             {
-                Skills = LocalInventoryService.EnrichOwnership(new LocalSkillScanner(services.Logger).Scan(roots).ToImmutableArray(), owners, token),
+                Skills = LocalInventoryService.EnrichOwnership(skills, owners, token),
+                CapturedAt = DateTimeOffset.UtcNow,
+                Diagnostics = new() { InaccessiblePaths = inaccessible.ToImmutableArray(), Locations = locations.ToImmutableArray() },
                 OwnershipRecords = owners.Select(item => item.Package).ToImmutableArray(),
                 OwnershipReadDiagnostics = diagnostics.ToImmutableArray(),
                 ScannedRoots = roots,
@@ -44,6 +52,14 @@ internal static class RetainedRetirementProof
         }
         if (args[1].StartsWith("owner-", StringComparison.Ordinal))
             return await RetainedOwnerRetirementProof.RunAsync(args, store.Root, services.Logger, services.Runner, Capture);
+        if (args[1] == "inventory")
+        {
+            var inventory = await Capture(CancellationToken.None);
+            Console.WriteLine(JsonSerializer.Serialize(new RetirementProofInventory(inventory.IsPartial,
+                inventory.CapturedAt, inventory.Diagnostics.InaccessiblePaths, inventory.Diagnostics.Locations),
+                RetirementProofJsonContext.Default.RetirementProofInventory));
+            return 0;
+        }
         if (args[1] == "ordinary-inspect")
         {
             Console.WriteLine(JsonSerializer.Serialize(store.Inspect(args[2], await Capture(CancellationToken.None), CancellationToken.None), ReplacementJsonContext.Default.ReplacementResult));
@@ -118,3 +134,10 @@ internal static class RetainedRetirementProof
         }
     }
 }
+
+internal sealed record RetirementProofInventory(bool IsPartial, DateTimeOffset CapturedAt,
+    ImmutableArray<string> InaccessiblePaths, ImmutableArray<DiscoveryLocation> Locations);
+
+[System.Text.Json.Serialization.JsonSourceGenerationOptions(PropertyNamingPolicy = System.Text.Json.Serialization.JsonKnownNamingPolicy.CamelCase)]
+[System.Text.Json.Serialization.JsonSerializable(typeof(RetirementProofInventory))]
+internal partial class RetirementProofJsonContext : System.Text.Json.Serialization.JsonSerializerContext;

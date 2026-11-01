@@ -262,6 +262,11 @@ internal sealed partial class ReplacementPlanStore
             if (!present.Contains(name)) return;
             using var state = OpenArchive(operation, name, token);
             var archive = CapturedPayloadArchive.Load(state, fingerprint, token).Archive;
+            if (plan.Purpose == RegistryRestorePurpose && plan.RegistryRestore is not null && plan.SourceReview is { } registryReview)
+            {
+                if (name == registryReview.InstalledArchive) ValidateRegistryInstalledArchive(plan, archive, state, token);
+                else if (name == registryReview.CandidateArchive) ValidateRegistryCandidateArchive(plan, archive, state, token);
+            }
             if (expected is not null)
             {
                 if (exactOriginal) VerifyUnpinOriginal(expected, archive, token);
@@ -343,7 +348,8 @@ internal sealed partial class ReplacementPlanStore
             || (marker.CurrentLive is null) != (marker.Before.Original is null)))
             throw new IOException("Retirement live evidence is inconsistent; preserve this marker unchanged.");
         foreach (var name in marker.Files.Select(file => file.Name).Concat(marker.Directories.Select(item => item.Name))) NativeStateDirectory.CheckName(name);
-        foreach (var directory in marker.Directories) ValidateEvidence(directory.Evidence);
+        foreach (var directory in marker.Directories)
+            ValidateRetirementDirectoryEvidence(plan, directory, marker.Before.Topology);
 
         using var owned = session.Operation.CaptureOwnership(token);
         var operation = owned.Capture(token).Identity;
@@ -401,6 +407,22 @@ internal sealed partial class ReplacementPlanStore
             throw new IOException("Discard Undo requires a current live copy; the retained original may be the only copy.");
         RequireUnsharedRetirementChildren(live.Evidence, marker.Directories, marker.Files.Add(CaptureRetirementFile(session, RetirementName, token)));
         return marker.Before;
+    }
+
+    internal static void ValidateRetirementDirectoryEvidence(ReplacementPlan plan, RetirementDirectory directory, string topology)
+    {
+        // The immutable empty original survives a native retain rename. Its
+        // current generation/Objects are checked by VerifyRetirementDirectory,
+        // separately from the immutable stable object and empty payload binding.
+        var allowEmptyOriginal = plan.Purpose == RegistryRestorePurpose && plan.RegistryRestore is not null
+            && directory.Name == "original" && topology == "installed"
+            && plan.Original.Entries.IsEmpty && plan.Original.Children.IsEmpty
+            && directory.Evidence.Entries.IsEmpty && directory.Evidence.Children.IsEmpty
+            && directory.Evidence.Payload == plan.Original.Payload
+            && directory.Evidence.Mode == plan.Original.Mode
+            && NativeDirectoryMoveLease.SameObject(directory.Evidence.Identity, plan.Original.Identity)
+            && directory.Evidence.Identity.IsDirectory && !directory.Evidence.Identity.IsReparsePoint;
+        ValidateEvidence(directory.Evidence, allowEmpty: allowEmptyOriginal);
     }
 
     private static ReplacementEvidence? MarkerLive(ReplacementPlan plan, RetirementMarker marker)

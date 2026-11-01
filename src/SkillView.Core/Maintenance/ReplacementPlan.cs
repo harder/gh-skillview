@@ -54,7 +54,12 @@ internal sealed record ReplacementPlan(int SchemaVersion, string Id, string Purp
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementPinPolicy? PinPolicy = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalImport? LocalImport = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementLocalSourceSwitch? LocalSourceSwitch = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SourceReviewEvidence? SourceReview = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] SourceReviewEvidence? SourceReview = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReplacementRegistryRestore? RegistryRestore = null);
+
+internal sealed record ReplacementRegistryRestore(ValidityState ObservedValidity, SkillFrontMatter DesiredMetadata,
+    ResolvedSkillRevision? ResolvedPin, bool HasCorroboration,
+    ImmutableArray<AgentMembership> ExpectedCatalogMemberships = default);
 
 internal sealed record ReplacementSlot(string Path, string Payload, string Objects, int? Mode, SecureFileIdentity Identity);
 
@@ -86,6 +91,8 @@ internal sealed record ReplacementResult(string Id, string Status, bool Succeede
     internal RetirementReview? Retirement { get; init; }
     [JsonIgnore]
     internal bool AcknowledgeSourceReview { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ReplacementRegistryRestore? RegistryRestore { get; init; }
     [JsonIgnore]
     internal OperationImpact? Impact { get; init; }
     [JsonIgnore]

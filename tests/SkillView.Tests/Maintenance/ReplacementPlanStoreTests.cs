@@ -140,6 +140,24 @@ public sealed partial class ReplacementPlanStoreTests : IDisposable
         Assert.True(noop.Succeeded); Assert.False(noop.MutationObserved);
     }
 
+    [Fact]
+    public async Task OrdinaryRestoreAndRevisionPurposesStillRefuseAbsentRef()
+    {
+        var file = Path.Combine(Payload, "SKILL.md");
+        File.WriteAllText(file, File.ReadAllText(file).Replace("  github-ref: refs/heads/main\n", "", StringComparison.Ordinal));
+        var inventory = Inventory();
+        var target = Assert.Single(inventory.Skills);
+        var staged = false;
+        await Assert.ThrowsAsync<IOException>(() => Store().PlanAsync(target, inventory, (directory, token) =>
+        { staged = true; return Stage(directory, token); }, Token));
+        Assert.False(staged);
+        Assert.False(Directory.Exists(State));
+        var latest = await Assert.ThrowsAsync<IOException>(() => Store().PlanLatestAsync("must-not-launch", target, inventory, false, Token));
+        Assert.Contains("historical source ref is absent", latest.Message);
+        await Assert.ThrowsAsync<IOException>(() => Store().PlanTagAsync("must-not-launch", target, inventory, "v1", Token));
+        Assert.False(Directory.Exists(State));
+    }
+
     [Theory]
     [InlineData("source")]
     [InlineData("tree")]

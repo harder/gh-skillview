@@ -112,7 +112,7 @@ internal sealed partial class ReplacementPlanStore
             || string.IsNullOrWhiteSpace(plan.Subject.Name) || string.IsNullOrWhiteSpace(plan.OriginalPath) || string.IsNullOrWhiteSpace(plan.RootPath)
             || !Path.IsPathFullyQualified(plan.OriginalPath) || !Path.IsPathFullyQualified(plan.RootPath) || plan.Original?.Entries.IsDefault != false || plan.Candidate?.Entries.IsDefault != false)
             throw new IOException("Saved metadata is incomplete or unsupported; Inspect to verify.");
-        var knownPurpose = (plan.SchemaVersion, plan.Purpose) is (1, "restore-recorded") or (2, "update-revision")
+        var knownPurpose = (plan.SchemaVersion, plan.Purpose) is (1, "restore-recorded") or (1, RegistryRestorePurpose) or (2, "update-revision")
             or (3, "update-revision") or (4, "unpin-only") or (5, "local-reimport") or (6, LocalSourceSwitchPurpose);
         var historical = plan.SchemaVersion == 3 || names.Contains("local-review") || names.Any(name => IsMergeSlot(name) || IsMergePlan(name));
         var directoryNames = new[] { "candidate", "original", "displaced", "recorded-base", "owner-journal", "undo-recovery", "local-review", "installed-capture", "local-source-capture", "gh-input-capture", "gh-output-capture" };

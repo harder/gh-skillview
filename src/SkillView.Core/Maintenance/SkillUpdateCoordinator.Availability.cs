@@ -36,7 +36,7 @@ public sealed partial class SkillUpdateCoordinator
             var m = target.FrontMatter;
             if (string.IsNullOrWhiteSpace(m.Upstream) || string.IsNullOrWhiteSpace(m.GithubRef)
                 || string.IsNullOrWhiteSpace(m.GithubTreeSha) || m.LocalPath is not null)
-                return Result(UpdateAvailabilityStatus.Unsupported, "No complete recorded GitHub source/ref/tree. Local copies use reimport; managed copies use their owning tool.");
+                return Result(UpdateAvailabilityStatus.Unsupported, "No complete recorded GitHub source/ref/tree. When the historical ref is absent, remove and reinstall where admitted. Local copies use reimport; managed copies use their owning tool.");
             var parent = Directory.GetParent(target.ResolvedPath)?.FullName
                 ?? throw new IOException("The selected copy has no containing directory.");
             if (!SecureRemovalBackend.TryCaptureDirectoryValidationWithinRoot(parent, target.ResolvedPath,

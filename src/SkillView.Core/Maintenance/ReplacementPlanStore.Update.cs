@@ -38,6 +38,8 @@ internal sealed partial class ReplacementPlanStore
         if (target.Pinned && !unpin) throw new IOException(tag is null
             ? "Exact pin retained; updating this installation requires explicit unpin review."
             : "Exact pin retained. Use the separately reviewed unpin operation before choosing a version.");
+        if (string.IsNullOrWhiteSpace(target.FrontMatter.GithubRef))
+            throw new IOException("The historical source ref is absent. SkillView update/version choice is unsupported; remove and reinstall where admitted.");
         var process = runner ?? throw new IOException("Latest update planning requires a captured process context.");
         var resolver = new GhRevisionResolver(process, ghPath);
         var repository = target.FrontMatter.Upstream ?? throw new IOException("No observed remote source.");
