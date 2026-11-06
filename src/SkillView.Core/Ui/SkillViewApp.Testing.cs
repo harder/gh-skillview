@@ -8,6 +8,13 @@ namespace SkillView.Ui;
 public sealed partial class SkillViewApp
 {
 
+    private Func<string, SkillView.Gh.GhSkillSearchService.Options, CancellationToken, Task<SkillView.Gh.SearchResponse>>? _searchForTests;
+    internal void SetSearchAdapterForTests(Func<string, SkillView.Gh.GhSkillSearchService.Options, CancellationToken, Task<SkillView.Gh.SearchResponse>> search)
+    {
+        _ghPath ??= "search-fixture";
+        _searchForTests = search;
+    }
+    internal void SubmitSearchForTests() => SubmitSearch();
     internal void LoadSearchResultsForTests(IReadOnlyList<SearchResultSkill> results)
     {
         ReplaceSearchResults(results);
@@ -22,6 +29,7 @@ public sealed partial class SkillViewApp
     internal SkillView.Ui.Tabs.DiscoverTabView? DiscoverTabForTests => _discoverTab;
     internal string DiscoverActionsForTests => _detailPane?.ItemActionsLabel.Text ?? string.Empty;
     internal void SetStatusForTests(string text, TuiHelpers.NotificationLevel level) => SetStatus(text, level);
+    internal Func<bool> CaptureStatusAutoClearForTests() => CreateStatusAutoClearCallback();
 
     internal LatestRequestGate.Lease BeginPreviewRequestForTests()
     {
@@ -133,6 +141,9 @@ public sealed partial class SkillViewApp
     }
 
     internal void LeaveDoctorForTests() => LeaveDoctor();
+
+    internal void SetHistoryLoaderForTests(Func<CancellationToken, Task<SkillView.Maintenance.ReplacementHistory>> load) =>
+        _historyLoaderForTests = load;
 
     internal void RunBackgroundForTests(Func<CancellationToken, Task> work, string operation) =>
         RunBackground(work, operation);

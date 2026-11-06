@@ -22,30 +22,122 @@ namespace SkillView.Tests.Ui;
 [Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class SkillViewAppTests
 {
+    [Fact]
+    public void PagingUsesSubmittedQueryFiltersAndPreservesReturnContext()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var seen = new List<(string Query, string? Owner, int Page)>();
+        app.SetSearchAdapterForTests((query, options, _) =>
+        {
+            seen.Add((query, options.Owner, options.Page));
+            return Task.FromResult(new SearchResponse(options.Page == 3 ? [] : [new(null, null, "skills/demo", "owner/repo", "page" + options.Page, 1)], 0, null));
+        });
+        app.QueryFieldForTests!.Text = "submitted";
+        app.OwnerFieldForTests!.Text = "original-owner";
+        app.SubmitSearchForTests();
+        app.QueryFieldForTests.Text = "unsubmitted";
+        app.OwnerFieldForTests.Text = "other-owner";
+        var tab = app.DiscoverTabForTests!;
+        tab.NextPage.InvokeCommand(Command.Accept);
+        Assert.Equal(("submitted", "original-owner", 2), seen[^1]);
+        Assert.Equal("page2", app.ResultsTableForTests!.Table![0, 1]);
+        app.StopBackgroundAdmissionForTests();
+        var row = app.ResultsTableForTests!.GetSelectedRow();
+        var offset = app.ResultsTableForTests!.RowOffset;
+        app.ActivateTabForTests(SkillViewTab.Installed);
+        app.ActivateTabForTests(SkillViewTab.Discover);
+        Assert.Equal("unsubmitted", app.QueryFieldForTests.Text);
+        Assert.Contains("Page 2", tab.PageStatus.Text);
+        Assert.Equal(row, app.ResultsTableForTests.GetSelectedRow());
+        Assert.Equal(offset, app.ResultsTableForTests.RowOffset);
+        Assert.Equal(2, seen.Count);
+    }
+
+    [Theory]
+    [InlineData("empty")]
+    [InlineData("failed")]
+    [InlineData("canceled")]
+    public async Task NewPageClearsTargetsAndPreviousRecoversUsingSubmittedState(string outcome)
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var pending = new TaskCompletionSource<SearchResponse>();
+        app.SetSearchAdapterForTests((_, options, _) => options.Page == 1
+            ? Task.FromResult(new SearchResponse([new(null, null, "skills/demo", "owner/repo", "first", 1)], 0, null)) : pending.Task);
+        app.QueryFieldForTests!.Text = "submitted";
+        app.SubmitSearchForTests();
+        app.QueryFieldForTests.Text = "unsubmitted";
+        var tab = app.DiscoverTabForTests!;
+        tab.NextPage.InvokeCommand(Command.Accept);
+        Assert.Equal(0, app.ResultsTableForTests!.Table!.Rows);
+        Assert.DoesNotContain("Install", app.DiscoverActionsForTests);
+        if (outcome == "canceled")
+        {
+            app.ActivateTabForTests(SkillViewTab.Installed);
+            app.ActivateTabForTests(SkillViewTab.Discover);
+        }
+        pending.SetResult(new([], outcome == "failed" ? 1 : 0, outcome == "failed" ? "page failure" : null));
+        // Completion runs inline on the editor-owning thread in this direct-dispatch fixture.
+        await Task.CompletedTask;
+        Assert.True(tab.PreviousPage.Enabled);
+        if (outcome == "empty") Assert.False(tab.NextPage.Enabled);
+        else Assert.Contains(outcome == "failed" ? "Search failed" : "Search canceled", app.PreviewTextForTests);
+        app.CaptureStatusAutoClearForTests()();
+        tab.PreviousPage.InvokeCommand(Command.Accept);
+        Assert.Equal(1, app.ResultsTableForTests.Table!.Rows);
+        Assert.Contains("Page 1", tab.PageStatus.Text);
+        Assert.Equal("first", app.ResultsTableForTests.Table![0, 1]);
+        Assert.Equal("unsubmitted", app.QueryFieldForTests.Text);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task FailedSearchRestoresPreviousResultsAndActions(bool throws)
+    public async Task FailedDifferentQueryKeepsEmptyFailureStateAfterStatusExpires(bool throws)
     {
         var app = CreateApp();
         using var window = app.BuildUiForTests();
         var previous = new SearchResultSkill("Previous", "description", null, "owner/repo", "old", null);
         app.LoadSearchResultsForTests([previous]);
-        var actions = app.DiscoverActionsForTests;
-        var preview = app.PreviewTextForTests;
-        var pending = new TaskCompletionSource<SearchResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var search = app.RunSearchForTestsAsync("new query", _ => pending.Task);
+        app.QueryFieldForTests!.Text = "different query";
+        // BuildUiForTests dispatches directly: complete on the editor-owning thread.
+        var pending = new TaskCompletionSource<SearchResponse>();
+        var search = app.RunSearchForTestsAsync("different query", _ => pending.Task);
         Assert.False(app.ResultsTableForTests!.Visible);
-        Assert.Equal(1, app.ResultsTableForTests.Table!.Rows);
+        Assert.Equal(0, app.ResultsTableForTests.Table!.Rows);
+        Assert.DoesNotContain("Install", app.DiscoverActionsForTests);
         if (throws) pending.SetException(new IOException("search-failed-sentinel"));
         else pending.SetResult(new([], 1, "search-failed-sentinel"));
         await search;
         Assert.True(app.ResultsTableForTests.Visible);
-        Assert.Equal(1, app.ResultsTableForTests.Table!.Rows);
-        Assert.Equal(actions, app.DiscoverActionsForTests);
-        Assert.Equal(preview, app.PreviewTextForTests);
+        Assert.Equal(0, app.ResultsTableForTests.Table!.Rows);
+        Assert.DoesNotContain("Install", app.DiscoverActionsForTests);
+        Assert.Contains("Search failed", app.PreviewTextForTests);
         Assert.Contains("search-failed-sentinel", app.StatusTextForTests);
         Assert.False(app.StatusStripForTests!.IsBusyForTests);
+        app.CaptureStatusAutoClearForTests()();
+        Assert.Equal(app.DefaultStatusForTests, app.StatusTextForTests);
+        Assert.Contains("Search failed", app.PreviewTextForTests);
+        Assert.Equal("different query", app.QueryFieldForTests.Text);
+        Assert.Equal(0, app.ResultsTableForTests.Table.Rows);
+        Assert.DoesNotContain("owner/repo", app.DiscoverTabForTests!.DetailPane.MetadataPane.Text);
+        app.StopBackgroundAdmissionForTests();
+        app.ActivateTabForTests(SkillViewTab.Installed);
+        app.ActivateTabForTests(SkillViewTab.Discover);
+        Assert.Contains("Search failed", app.PreviewTextForTests);
+        Assert.DoesNotContain("Install", app.DiscoverActionsForTests);
+        app.ResultsTableForTests.SetFocus();
+        app.ResultsTableForTests.NewKeyDownEvent(new Key('i'));
+        Assert.Equal("no results to install", app.StatusTextForTests);
+        app.ResultsTableForTests.NewKeyDownEvent(new Key('/'));
+        Assert.True(app.QueryFieldForTests.HasFocus);
+        app.QueryFieldForTests.NewKeyDownEvent(new Key('q'));
+        Assert.Equal("q", app.QueryFieldForTests.Text);
+        await app.RunSearchForTestsAsync("retry", _ => Task.FromResult(new SearchResponse([previous], 0, null)));
+        Assert.Equal(1, app.ResultsTableForTests.Table.Rows);
+        Assert.Contains("Install", app.DiscoverActionsForTests);
+        Assert.DoesNotContain("Search failed", app.PreviewTextForTests);
     }
 
     [Fact]
@@ -60,26 +152,124 @@ public sealed class SkillViewAppTests
         Assert.False(app.StatusStripForTests!.IsBusyForTests);
     }
 
-    [Fact]
-    public async Task SupersededSearchCannotRestoreOldResultsOrEndNewerLoadingFeedback()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SupersededSearchCannotRestoreOldResultsOrEndNewerLoadingFeedback(bool fails)
     {
         var app = CreateApp();
         using var window = app.BuildUiForTests();
         app.LoadSearchResultsForTests([new("Previous", null, null, "owner/repo", "old", null)]);
-        var old = new TaskCompletionSource<SearchResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var current = new TaskCompletionSource<SearchResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var old = new TaskCompletionSource<SearchResponse>();
+        var current = new TaskCompletionSource<SearchResponse>();
         var first = app.RunSearchForTestsAsync("first", _ => old.Task);
         var second = app.RunSearchForTestsAsync("second", _ => current.Task);
-        old.SetResult(new([new("Obsolete", null, null, "owner/repo", "obsolete", null)], 0, null));
+        if (fails) old.SetException(new IOException("obsolete failure"));
+        else old.SetResult(new([new("Obsolete", null, null, "owner/repo", "obsolete", null)], 0, null));
         await first;
         Assert.False(app.ResultsTableForTests!.Visible);
         Assert.True(app.StatusStripForTests!.IsBusyForTests);
+        Assert.DoesNotContain("obsolete failure", app.StatusTextForTests);
+        Assert.Equal(0, app.ResultsTableForTests.Table!.Rows);
         current.SetResult(new([new("Current", null, null, "owner/repo", "current", null)], 0, null));
         await second;
         Assert.True(app.ResultsTableForTests.Visible);
         Assert.Equal(1, app.ResultsTableForTests.Table!.Rows);
         Assert.Contains("Current", app.PreviewTextForTests);
         Assert.False(app.StatusStripForTests.IsBusyForTests);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LeavingPendingSearchKeepsCanceledStateOnReturnAndDropsLateCompletion(bool fails)
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.StopBackgroundAdmissionForTests();
+        app.LoadSearchResultsForTests([new("Previous", null, null, "owner/repo", "old", null)]);
+        var pending = new TaskCompletionSource<SearchResponse>();
+        CancellationToken token = default;
+        app.QueryFieldForTests!.Text = "pending query";
+        var search = app.RunSearchForTestsAsync("pending query", ct => { token = ct; return pending.Task; });
+        app.ActivateTabForTests(SkillViewTab.Installed);
+        Assert.True(token.IsCancellationRequested);
+        Assert.False(app.StatusStripForTests!.IsBusyForTests);
+        Assert.DoesNotContain("searching", app.StatusTextForTests);
+        app.SetStatusForTests("installed feedback", TuiHelpers.NotificationLevel.Info);
+        app.ActivateTabForTests(SkillViewTab.Discover);
+        if (fails) pending.SetException(new OperationCanceledException(token));
+        else pending.SetResult(new([new("Obsolete", null, null, "owner/repo", "obsolete", null)], 0, null));
+        await search;
+        Assert.Equal("installed feedback", app.StatusTextForTests);
+        Assert.Contains("Search canceled", app.PreviewTextForTests);
+        Assert.Equal("pending query", app.QueryFieldForTests.Text);
+        Assert.Equal(0, app.ResultsTableForTests!.Table!.Rows);
+        Assert.DoesNotContain("Install", app.DiscoverActionsForTests);
+        Assert.False(app.DiscoverTabForTests!.IsLoading);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DiscoverOutcomeDoesNotFollowTabOrLetItsOldTimerEraseNewStatus(bool fails)
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.StopBackgroundAdmissionForTests();
+        await app.RunSearchForTestsAsync("query", _ => Task.FromResult(fails
+            ? new SearchResponse([], 1, "fixture failure")
+            : new SearchResponse([new(null, null, null, "owner/repo", "skill", null)], 0, null)));
+        var oldTimer = app.CaptureStatusAutoClearForTests();
+        Assert.Contains(fails ? "search failed" : "1 result(s)", app.StatusTextForTests);
+        app.ActivateTabForTests(SkillViewTab.Installed);
+        Assert.Equal(app.DefaultStatusForTests, app.StatusTextForTests);
+        app.SetStatusForTests("new tab feedback", TuiHelpers.NotificationLevel.Error);
+        oldTimer();
+        Assert.Equal("new tab feedback", app.StatusTextForTests);
+        app.CaptureStatusAutoClearForTests()();
+        Assert.Equal(app.DefaultStatusForTests, app.StatusTextForTests);
+    }
+
+    [Fact]
+    public async Task LeavingDiscoverPreservesOtherBusyOwnerAndItsProgress()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.StopBackgroundAdmissionForTests();
+        var other = app.BeginBusyOperationForTests("checking updates…");
+        var pending = new TaskCompletionSource<SearchResponse>();
+        var search = app.RunSearchForTestsAsync("query", _ => pending.Task);
+        app.ActivateTabForTests(SkillViewTab.Installed);
+        Assert.Equal("checking updates…", app.StatusTextForTests);
+        Assert.True(app.StatusStripForTests!.IsBusyForTests);
+        app.CaptureStatusAutoClearForTests()();
+        Assert.Equal("checking updates…", app.StatusTextForTests);
+        pending.SetResult(new([], 0, null));
+        await search;
+        Assert.True(app.StatusStripForTests.IsBusyForTests);
+        Assert.Equal("checking updates…", app.StatusTextForTests);
+        app.EndBusyOperationForTests(other);
+        Assert.False(app.StatusStripForTests.IsBusyForTests);
+    }
+
+    [Fact]
+    public async Task LeavingPendingDiscoverPreservesGlobalErrorAndItsTimer()
+    {
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        app.StopBackgroundAdmissionForTests();
+        var pending = new TaskCompletionSource<SearchResponse>();
+        var search = app.RunSearchForTestsAsync("query", _ => pending.Task);
+        app.SetStatusForTests("update failed", TuiHelpers.NotificationLevel.Error);
+        var timer = app.CaptureStatusAutoClearForTests();
+        app.ActivateTabForTests(SkillViewTab.Installed);
+        pending.SetResult(new([], 0, null));
+        await search;
+        Assert.Equal("update failed", app.StatusTextForTests);
+        Assert.False(app.StatusStripForTests!.IsBusyForTests);
+        timer();
+        Assert.Equal(app.DefaultStatusForTests, app.StatusTextForTests);
     }
 
     [Fact]
@@ -467,12 +657,9 @@ public sealed class SkillViewAppTests
         IApplication? created = null;
         IApplication? disposed = null;
 
-        void HandleDisposed(object? _, EventArgs<IApplication> e)
+        void HandleDisposed(object? sender, EventArgs<bool> e)
         {
-            if (ReferenceEquals(e.Value, created))
-            {
-                disposed = e.Value;
-            }
+            if (!e.Value && ReferenceEquals(sender, created)) disposed = (IApplication)sender!;
         }
 
         var app = new SkillViewApp(
@@ -481,12 +668,12 @@ public sealed class SkillViewAppTests
             () =>
             {
                 created = Application.Create().Init();
+                created.InitializedChanged += HandleDisposed;
                 cancellation.Cancel();
                 return created;
             },
             probeOnRun: false);
 
-        Application.InstanceDisposed += HandleDisposed;
         try
         {
             var exitCode = await app.RunAsync(cancellation.Token);
@@ -494,10 +681,13 @@ public sealed class SkillViewAppTests
             Assert.Equal(ExitCodes.Cancelled, exitCode);
             Assert.NotNull(created);
             Assert.Same(created, disposed);
+            Assert.False(created.Initialized);
+            Assert.Null(created.Driver);
+            Assert.Null(created.MainThreadId);
         }
         finally
         {
-            Application.InstanceDisposed -= HandleDisposed;
+            if (created is not null) created.InitializedChanged -= HandleDisposed;
         }
     }
 
@@ -1230,33 +1420,33 @@ public sealed class SkillViewAppTests
         IApplication? created = null;
         IApplication? disposed = null;
 
-        void HandleCreated(object? _, EventArgs<IApplication> e)
+        void HandleDisposed(object? sender, EventArgs<bool> e)
         {
-            created = e.Value;
-            e.Value.StopAfterFirstIteration = true;
+            if (!e.Value && ReferenceEquals(sender, created)) disposed = (IApplication)sender!;
         }
 
-        void HandleDisposed(object? _, EventArgs<IApplication> e)
-        {
-            disposed = e.Value;
-        }
-
-        Application.InstanceCreated += HandleCreated;
-        Application.InstanceDisposed += HandleDisposed;
         try
         {
-            var app = CreateApp(probeOnRun: false);
+            var app = new SkillViewApp(TuiServices.Build(new Logger(LogLevel.Debug)), CreateOptions(), () =>
+            {
+                created = Application.Create().Init();
+                created.InitializedChanged += HandleDisposed;
+                created.StopAfterFirstIteration = true;
+                return created;
+            }, probeOnRun: false);
 
             var exitCode = app.Run();
 
             Assert.Equal(ExitCodes.Success, exitCode);
             Assert.NotNull(created);
             Assert.Same(created, disposed);
+            Assert.False(created.Initialized);
+            Assert.Null(created.Driver);
+            Assert.Null(created.MainThreadId);
         }
         finally
         {
-            Application.InstanceCreated -= HandleCreated;
-            Application.InstanceDisposed -= HandleDisposed;
+            if (created is not null) created.InitializedChanged -= HandleDisposed;
         }
     }
 
@@ -1266,33 +1456,33 @@ public sealed class SkillViewAppTests
         IApplication? created = null;
         IApplication? disposed = null;
 
-        void HandleCreated(object? _, EventArgs<IApplication> e)
+        void HandleDisposed(object? sender, EventArgs<bool> e)
         {
-            created = e.Value;
-            e.Value.StopAfterFirstIteration = true;
+            if (!e.Value && ReferenceEquals(sender, created)) disposed = (IApplication)sender!;
         }
 
-        void HandleDisposed(object? _, EventArgs<IApplication> e)
-        {
-            disposed = e.Value;
-        }
-
-        Application.InstanceCreated += HandleCreated;
-        Application.InstanceDisposed += HandleDisposed;
         try
         {
-            var app = CreateApp(probeOnRun: false);
+            var app = new SkillViewApp(TuiServices.Build(new Logger(LogLevel.Debug)), CreateOptions(), () =>
+            {
+                created = Application.Create().Init();
+                created.InitializedChanged += HandleDisposed;
+                created.StopAfterFirstIteration = true;
+                return created;
+            }, probeOnRun: false);
 
             var exitCode = await app.RunAsync(TestContext.Current.CancellationToken);
 
             Assert.Equal(ExitCodes.Success, exitCode);
             Assert.NotNull(created);
             Assert.Same(created, disposed);
+            Assert.False(created.Initialized);
+            Assert.Null(created.Driver);
+            Assert.Null(created.MainThreadId);
         }
         finally
         {
-            Application.InstanceCreated -= HandleCreated;
-            Application.InstanceDisposed -= HandleDisposed;
+            if (created is not null) created.InitializedChanged -= HandleDisposed;
         }
     }
 

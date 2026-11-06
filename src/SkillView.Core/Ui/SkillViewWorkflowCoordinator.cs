@@ -12,6 +12,12 @@ namespace SkillView.Ui;
 internal sealed partial class SkillViewWorkflowCoordinator
 {
     private readonly DisplayInventoryCache _displayInventory;
+    internal DiscoverInstalledObservation? DiscoverObservation => _displayInventory.Observation;
+    internal event Action? DisplayObservationChanged
+    {
+        add => _displayInventory.ObservationChanged += value;
+        remove => _displayInventory.ObservationChanged -= value;
+    }
     private long _installHandoffGeneration;
     private readonly TuiServices _services;
     private readonly AppOptions _options;
@@ -85,75 +91,102 @@ internal sealed partial class SkillViewWorkflowCoordinator
             return;
         }
 
-        // A mutating dialog may fail after starting; retire earlier observations
-        // before handing over control, even when its eventual result is partial.
-        _services.ListAdapter.Invalidate();
-
+        var attempts = CreateInstallAttemptRun(report);
         if (!forceAdvanced)
         {
-            var compact = new InstallConfirmModal(
-                app,
-                _services.InstallService,
-                _services.Logger,
-                ghPath,
-                request,
-                findInstalled: (evidence, token) => CaptureInstallHandoffAsync(evidence, report, token),
-                canPublish: found => IsInstallHandoffCurrent(found) && isOwnerActive?.Invoke() == true);
-            var compactResult = compact.Show();
-            switch (compactResult.Outcome)
+            var compact = new InstallConfirmModal(app, _services.InstallService, _services.Logger, ghPath, request,
+                findInstalled: (evidence, token) => CaptureInstallHandoffAsync(evidence, report, token, attempts.Last),
+                canPublish: found => IsInstallHandoffCurrent(found) && isOwnerActive?.Invoke() == true,
+                attempts: attempts,
+                browseInstalled: token => CaptureRepositoryHandoffAsync(request.Repo,
+                    SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner), attempts.Last, token));
+            var result = compact.Show();
+            if (result.Handoff is { } handoff && IsInstallHandoffCurrent(handoff) && isOwnerActive?.Invoke() == true)
             {
-                case InstallConfirmModal.Outcome.Installed when compactResult.Install is { Succeeded: true }:
-                    if (compactResult.Handoff is { } handoff && IsInstallHandoffCurrent(handoff) && isOwnerActive?.Invoke() == true)
-                    {
-                        revealInstalled?.Invoke(handoff);
-                        return;
-                    }
-                    _services.ListAdapter.Invalidate();
-                    _setStatusWithLevel("Install completed", TuiHelpers.NotificationLevel.Success);
-                    return;
-                case InstallConfirmModal.Outcome.Failed when compactResult.Install is { } f:
-                    _setStatusWithLevel(
-                        $"install failed (exit {f.ExitCode}) — see logs (l)",
-                        TuiHelpers.NotificationLevel.Error);
-                    return;
-                case InstallConfirmModal.Outcome.Cancelled:
-                    return;
-                case InstallConfirmModal.Outcome.EscalateToAdvanced:
-                    // Fall through to the advanced wizard below.
-                    break;
+                revealInstalled?.Invoke(handoff);
+                return;
+            }
+            if (result.Outcome != InstallConfirmModal.Outcome.EscalateToAdvanced)
+            {
+                ReportInstallAttempts(attempts);
+                return;
             }
         }
+        var screen = new InstallScreen(app, _services.InstallService, _services.Logger, ghPath, request, attempts,
+            (evidence, token) => CaptureInstallHandoffAsync(evidence, report, token, attempts.Last),
+            found => IsInstallHandoffCurrent(found) && isOwnerActive?.Invoke() == true);
+        screen.Show();
+        if (screen.Handoff is { } advancedHandoff && IsInstallHandoffCurrent(advancedHandoff) && isOwnerActive?.Invoke() == true)
+        {
+            revealInstalled?.Invoke(advancedHandoff);
+            return;
+        }
+        ReportInstallAttempts(attempts);
+    }
 
-        var installScreen = new InstallScreen(
-            app,
-            _services.InstallService,
-            _services.Logger,
-            ghPath,
-            request);
-        installScreen.Show();
-        if (installScreen.LastResult is { Succeeded: true } result)
+    internal InstallAttemptRun CreateInstallAttemptRun(EnvironmentReport report)
+    {
+        var context = SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner);
+        return new(summary => ReconcileInstallAttemptAsync(summary, report, context));
+    }
+
+    internal async Task<InstallAttemptReceipt> ReconcileInstallAttemptAsync(
+        SkillView.Gh.Models.InstallAttemptSummary summary, EnvironmentReport report, string context)
+    {
+        if (!summary.MayHaveChangedFiles) return new(summary, InstallRefreshState.NotNeeded);
+        if (context != SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner))
+            return new(summary, InstallRefreshState.Failed, Error: "The installation context changed; refresh that context explicitly.");
+        // Invalidate even if delivery was canceled. No modal token or disposed
+        // controls participate in this bounded, owned reconciliation.
+        _services.ListAdapter.Invalidate();
+        var generation = _services.ListAdapter.Generation;
+        if (summary.Results.Any(result => result.MayHaveChangedFiles && !result.ChildDrained))
+            return new(summary, InstallRefreshState.WriterUnverified);
+        using var deadline = new CancellationSource(TimeSpan.FromSeconds(10),
+            CancellationCallbackReporter.For(_services.Logger, "install reconciliation"));
+        try
         {
-            _services.ListAdapter.Invalidate();
-            _setStatusWithLevel(
-                $"installed {result.Repo}{(result.SkillName is null ? "" : "/" + result.SkillName)} — rescanning…",
-                TuiHelpers.NotificationLevel.Success);
-            QueueInventoryRescan(
-                report,
-                successStatus: $"installed — inventory now {{0}} skill(s)");
+            if (context != SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner))
+                throw new IOException("The installation context changed; refresh Installed explicitly.");
+            var snapshot = await CaptureInventoryCoreAsync(report, deadline.Token, bypassGhCache: true).ConfigureAwait(false);
+            deadline.Token.ThrowIfCancellationRequested();
+            if (context != SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner))
+                throw new IOException("The installation context changed during refresh.");
+            _displayInventory.PublishFresh(snapshot, generation);
+            if (generation != _services.ListAdapter.Generation)
+                return new(summary, InstallRefreshState.Failed, snapshot,
+                    "A newer inventory generation superseded this refresh; refresh Installed explicitly.", generation);
+            return new(summary, snapshot.IsPartial || !snapshot.ConfiguredRootsComplete
+                ? InstallRefreshState.Partial : InstallRefreshState.Completed, snapshot, CatalogGeneration: generation);
         }
-        else if (installScreen.LastResult is { } failed)
+        catch (Exception ex)
         {
-            _setStatusWithLevel($"install failed (exit {failed.ExitCode}) — see logs (l)", TuiHelpers.NotificationLevel.Error);
+            _services.Logger.Warn("install.reconcile", ex.ToString());
+            return new(summary, InstallRefreshState.Failed, Error: ex.Message);
         }
+    }
+
+    private void ReportInstallAttempts(InstallAttemptRun attempts)
+    {
+        if (attempts.Last is not { } receipt) return;
+        var succeeded = receipt.Summary.Succeeded;
+        _setStatusWithLevel(succeeded && receipt.Refresh == InstallRefreshState.Completed
+            ? "Install completed; Installed refreshed."
+            : receipt.Guidance, succeeded && receipt.Refresh == InstallRefreshState.Completed
+                ? TuiHelpers.NotificationLevel.Success : TuiHelpers.NotificationLevel.Warn);
+        // Tabs consume the fresh display snapshot on activation. Do not call
+        // explicit Refresh here: it invalidates again and resubmits Discover.
     }
 
 
     internal async Task<InstalledInstallHandoff> CaptureInstallHandoffAsync(
-        SkillView.Gh.InstallNavigationEvidence evidence, EnvironmentReport report, CancellationToken token)
+        SkillView.Gh.InstallNavigationEvidence evidence, EnvironmentReport report, CancellationToken token, InstallAttemptReceipt? receipt = null)
     {
         var request = Interlocked.Increment(ref _installHandoffGeneration);
-        _services.ListAdapter.Invalidate();
+        if (receipt is null) _services.ListAdapter.Invalidate();
         var generation = _services.ListAdapter.Generation;
+        if (receipt is not null && (receipt.CatalogGeneration != generation || receipt.Snapshot is null))
+            throw new IOException("The post-install inventory is unavailable or changed; refresh Installed explicitly.");
         async Task<IReadOnlyList<IReadOnlyList<string>>> CheckContextAsync()
         {
             token.ThrowIfCancellationRequested();
@@ -171,7 +204,7 @@ internal sealed partial class SkillViewWorkflowCoordinator
             return folders;
         }
         var agentFolders = await CheckContextAsync().ConfigureAwait(false);
-        var snapshot = await CaptureInventoryAsync(report, token, bypassGhCache: true).ConfigureAwait(false);
+        var snapshot = receipt?.Snapshot ?? await CaptureInventoryAsync(report, token, bypassGhCache: true).ConfigureAwait(false);
         var overview = await Task.Run(() => InstalledOverview.Build(snapshot, token), token).ConfigureAwait(false);
         var latestFolders = await CheckContextAsync().ConfigureAwait(false);
         if (agentFolders.Count != latestFolders.Count || agentFolders.Zip(latestFolders).Any(pair =>
@@ -206,7 +239,7 @@ internal sealed partial class SkillViewWorkflowCoordinator
     internal bool IsInstallHandoffCurrent(InstalledInstallHandoff handoff) =>
         handoff.CatalogGeneration == _services.ListAdapter.Generation
         && handoff.RequestGeneration == Interlocked.Read(ref _installHandoffGeneration)
-        && handoff.Evidence?.ContextKey == SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner);
+        && (handoff.Evidence?.ContextKey ?? handoff.BrowseContextKey) == SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner);
 
     /// Open the "install every skill in a repo" flow (gh 2.94 `--all`,
     /// cli/cli#13471). Reuses the compact modal's scope/agent pickers in
@@ -222,113 +255,72 @@ internal sealed partial class SkillViewWorkflowCoordinator
             return;
         }
 
-        // A mutating dialog may fail after starting; retire earlier observations
-        // before handing over control, even when its eventual result is partial.
-        _services.ListAdapter.Invalidate();
-
-        var modal = new InstallConfirmModal(
-            app,
-            _services.InstallService,
-            _services.Logger,
-            ghPath,
-            request,
-            installAll: true);
-        var result = modal.Show();
-        switch (result.Outcome)
-        {
-            case InstallConfirmModal.Outcome.Installed when result.Install is { Succeeded: true } r:
-                _services.ListAdapter.Invalidate();
-                _setStatusWithLevel(
-                    $"installed all skills from {r.Repo} — rescanning…",
-                    TuiHelpers.NotificationLevel.Success);
-                QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
-                return;
-            case InstallConfirmModal.Outcome.Failed when result.Install is { } f:
-                _setStatusWithLevel(
-                    $"install-all failed (exit {f.ExitCode}) — see logs (l)",
-                    TuiHelpers.NotificationLevel.Error);
-                return;
-            default:
-                return;
-        }
+        var attempts = CreateInstallAttemptRun(report);
+        var modal = new InstallConfirmModal(app, _services.InstallService, _services.Logger, ghPath,
+            request, installAll: true, attempts: attempts);
+        modal.Show();
+        ReportInstallAttempts(attempts);
     }
 
-    /// Discover the skills a repo offers (gh ≥ 2.97.0, cli/cli#13548) and let
-    /// the user pick a subset to install via <see cref="RepoSkillPickerModal"/>.
-    /// Discovery is a read-only `gh skill install <repo>` (no skill, no --all)
-    /// run off the UI thread; on success the populated picker opens. If
-    /// discovery fails or the repo lists no skills, falls back to the blunt
-    /// install-all modal so the `A` shortcut never dead-ends.
-    public void OpenRepoDiscoveryDialog(InstallRequest request)
+    /// List repository skills in an owned, retryable modal before opening the
+    /// subset picker. Listing failures never widen the request to install-all.
+    public void OpenRepoDiscoveryDialog(InstallRequest request, Func<bool>? isOwnerActive = null,
+        CancellationToken lifetimeToken = default, Action<InstalledInstallHandoff>? revealInstalled = null)
     {
         var app = _getApp();
         var ghPath = _getGhPath();
         var report = _getLastReport();
-        if (app is null || ghPath is null || report is null)
+        if (app is null || ghPath is null || report is null) return;
+        var context = _services.InstallService.CaptureContext();
+        var contextKey = SkillView.Gh.InstallNavigationEvidence.Context(context);
+        bool IsCurrent() => !lifetimeToken.IsCancellationRequested && isOwnerActive?.Invoke() != false
+            && ReferenceEquals(app, _getApp()) && ghPath == _getGhPath()
+            && contextKey == SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner);
+        var install = new SkillView.Gh.GhSkillInstallService(context, _services.Logger);
+        var listing = RepoDiscoveryModal.Show(app, _services.Logger, request.Repo,
+            token => install.ListRepoSkillsAsync(ghPath, request.Repo, version: null, request.AllowHiddenDirs, token),
+            IsCurrent, lifetimeToken);
+        if (listing is null || !IsCurrent()) return;
+
+        var attempts = CreateInstallAttemptRun(report);
+        var picker = new RepoSkillPickerModal(app, install, _services.Logger, ghPath, request, listing.Skills, attempts,
+            token => CaptureRepositoryHandoffAsync(request.Repo, contextKey, attempts.Last, token),
+            found => IsCurrent() && IsInstallHandoffCurrent(found));
+        var result = picker.Show();
+        if (result.Handoff is { } handoff && IsCurrent() && IsInstallHandoffCurrent(handoff))
         {
+            revealInstalled?.Invoke(handoff);
             return;
         }
-
-        _setBusy($"discovering skills in {request.Repo}…");
-        _runBackground(async cancellationToken =>
-        {
-            var listing = await _services.InstallService
-                .ListRepoSkillsAsync(ghPath, request.Repo, version: null, request.AllowHiddenDirs, cancellationToken)
-                .ConfigureAwait(false);
-            await _invokeAsync(
-                () =>
-                {
-                    _clearBusy();
-                    if (!listing.Succeeded)
-                    {
-                        _setStatusWithLevel(
-                            $"could not list skills in {request.Repo} (exit {listing.ExitCode}) — opening install-all",
-                            TuiHelpers.NotificationLevel.Warn);
-                        OpenInstallAllDialog(request);
-                        return;
-                    }
-                    if (listing.Skills.IsDefaultOrEmpty)
-                    {
-                        _setStatusWithLevel(
-                            $"no skills discovered in {request.Repo}",
-                            TuiHelpers.NotificationLevel.Warn);
-                        return;
-                    }
-
-                    var picker = new RepoSkillPickerModal(
-                        app,
-                        _services.InstallService,
-                        _services.Logger,
-                        ghPath,
-                        request,
-                        listing.Skills);
-                    _services.ListAdapter.Invalidate();
-                    var result = picker.Show();
-                    if (result.Outcome == RepoSkillPickerModal.Outcome.Installed && result.InstalledCount > 0)
-                    {
-                        _services.ListAdapter.Invalidate();
-                        var suffix = result.FailedCount > 0 ? $" ({result.FailedCount} failed)" : string.Empty;
-                        _setStatusWithLevel(
-                            $"installed {result.InstalledCount} skill(s) from {request.Repo}{suffix} — rescanning…",
-                            result.FailedCount > 0 ? TuiHelpers.NotificationLevel.Warn : TuiHelpers.NotificationLevel.Success);
-                        QueueInventoryRescan(report, successStatus: "installed — inventory now {0} skill(s)");
-                    }
-                    else if (result.Outcome == RepoSkillPickerModal.Outcome.Failed)
-                    {
-                        _setStatusWithLevel(
-                            $"install failed — {TuiHelpers.ErrorSnippet(result.FirstError)}".TrimEnd(),
-                            TuiHelpers.NotificationLevel.Error);
-                    }
-                    else
-                    {
-                        // Cancelled (or nothing selected): clear the lingering
-                        // "discovering skills in …" busy status the spinner left.
-                        _setStatus($"{request.Repo}: no skills installed");
-                    }
-                },
-                cancellationToken).ConfigureAwait(false);
-        }, "discover");
+        ReportInstallAttempts(attempts);
     }
+
+    internal async Task<InstalledInstallHandoff> CaptureRepositoryHandoffAsync(string repo, string context,
+        InstallAttemptReceipt? receipt, CancellationToken token)
+    {
+        var generation = _services.ListAdapter.Generation;
+        if (receipt is not { Summary.Succeeded: true, Snapshot: { } snapshot }
+            || receipt.CatalogGeneration != generation || context != SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner))
+            throw new IOException("A current post-install observation is unavailable. Refresh Installed explicitly.");
+        var anchor = SkillView.Gh.InstallNavigationEvidence.SourceAnchor(repo, "")
+            ?? throw new IOException("Repository identity is unknown; browse Installed manually.");
+        var overview = await Task.Run(() => InstalledOverview.Build(snapshot, token), token).ConfigureAwait(false);
+        if (!snapshot.Skills.Any(skill => RepositoryBrowseMatches(skill, anchor.Origin!)))
+            throw new IOException("No source with this repository was verified in the observed inventory. Custom folders may need an explicit scan root.");
+        token.ThrowIfCancellationRequested();
+        return new(snapshot, overview, "", [])
+        {
+            BrowseOnly = true,
+            BrowseRepository = anchor.Origin,
+            BrowseContextKey = context,
+            CatalogGeneration = generation,
+            RequestGeneration = Interlocked.Increment(ref _installHandoffGeneration),
+        };
+    }
+
+    internal static bool RepositoryBrowseMatches(InstalledSkill skill, string repository) =>
+        skill.SourceIdentity is { Provider: "repository", Key: not null } source && source.Origin == repository
+        && skill.MetadataConflicts.IsEmpty && skill.OwnershipDiagnostics.IsEmpty;
 
     public void ShowCleanupScreen()
     {

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using SkillView.Bootstrapping;
 using SkillView.Inventory.Models;
 using SkillView.Logging;
+using SkillView.Maintenance;
 using SkillView.Ui;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
@@ -11,7 +12,7 @@ using Xunit;
 
 namespace SkillView.IntegrationTests.Ui;
 
-public sealed class SkillViewAppIntegrationTests
+public sealed partial class SkillViewAppIntegrationTests
 {
     [Theory]
     [InlineData(80, 24)]
@@ -80,9 +81,10 @@ public sealed class SkillViewAppIntegrationTests
         var listFocused = false;
         var elapsed = Stopwatch.StartNew();
         var boundaryChecked = false;
+        TimeSpan? quitRequestedAt = null;
         string Progress() => $"phase={(keysSent < count * 2 + 10 ? "down" : "up")}; ticks={ticks}; keys={keysSent}; "
             + $"expected={expectedRow}; observed={observedName}; focused={listFocused}; "
-            + $"draws={downDraws}/{upDraws}; elapsed={elapsed.Elapsed}";
+            + $"draws={downDraws}/{upDraws}; quitRequestedAt={quitRequestedAt}; elapsed={elapsed.Elapsed}";
         var options = new AppOptions(
             InvocationMode.Standalone, DispatchMode.Tui, false, AppTheme.Default, [], null, []);
         skillview = new SkillViewApp(TuiServices.Build(new Logger(LogLevel.Debug)), options, () =>
@@ -104,20 +106,24 @@ public sealed class SkillViewAppIntegrationTests
                     skillview.ForceActiveTabForTests(SkillViewTab.Installed);
                     installed.FocusList();
                 }
+                if (keysSent == count * 2 + 10 && downDraws == 0) return true;
                 if (keysSent == 2 * (count * 2 + 10))
                 {
+                    if (upDraws == 0) return true;
                     observedName = installed.GetSelectedSkill()?.Name;
                     listFocused = installed.TableHasFocusForTests;
                     Assert.True(observedName is null && listFocused, Progress());
                     Assert.True(downDraws > 0 && upDraws > 0, Progress());
                     boundaryChecked = true;
+                    quitRequestedAt = elapsed.Elapsed;
                     terminal.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Q | KeyCode.CtrlMask));
                     return false;
                 }
-                // A terminal can deliver several repeat keys before one draw.
-                // Keep every key and both boundary checks without requiring 101
-                // full redraws to fit the watchdog on a loaded Windows runner.
-                for (var repeat = 0; repeat < 5; repeat++)
+                // Exercise one terminal repeat burst per direction. Every key
+                // still verifies selection/focus, and each boundary must actually
+                // draw before changing direction/quitting. Five-key batches tied
+                // selection checks to 36 timer batches and many full paints.
+                for (var repeat = 0; repeat < count * 2 + 10; repeat++)
                 {
                     var down = keysSent < count * 2 + 10;
                     terminal.Keyboard.RaiseKeyDownEvent(new Key(down ? KeyCode.CursorDown : KeyCode.CursorUp));
@@ -133,8 +139,11 @@ public sealed class SkillViewAppIntegrationTests
             });
             return terminal;
         }, probeOnRun: false);
-        // This watchdog bounds a stalled event loop, not rendering performance.
-        // Loaded Windows runners need time to paint both 50-key phases.
+        // Keep startup History in the app-owned lifecycle without consulting
+        // ambient runner state in this seeded keyboard/rendering fixture.
+        skillview.SetHistoryLoaderForTests(_ => Task.FromResult(new ReplacementHistory([], 0, false)));
+        // This watchdog bounds a stalled event loop. Two full ANSI boundary
+        // paints suffice; all 180 key/selection/focus assertions remain.
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         var exitCode = await skillview.RunAsync(deadline.Token);
@@ -171,12 +180,11 @@ public sealed class SkillViewAppIntegrationTests
         IApplication? created = null;
         IApplication? disposed = null;
 
-        void HandleDisposed(object? _, EventArgs<IApplication> e)
+        // Terminal.Gui 2.5's facade event is thread-local. Shutdown can resume
+        // off the creation thread after draining app-owned work.
+        void HandleDisposed(object? sender, EventArgs<bool> e)
         {
-            if (ReferenceEquals(e.Value, created))
-            {
-                disposed = e.Value;
-            }
+            if (!e.Value && ReferenceEquals(sender, created)) disposed = (IApplication)sender!;
         }
 
         var services = TuiServices.Build(new Logger(LogLevel.Debug));
@@ -199,6 +207,7 @@ public sealed class SkillViewAppIntegrationTests
                 var application = Application.Create();
                 application.Init("ansi");
                 created = application;
+                application.InitializedChanged += HandleDisposed;
                 application.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
                 {
                     cancellationCallbackRan = true;
@@ -209,7 +218,6 @@ public sealed class SkillViewAppIntegrationTests
             },
             probeOnRun: false);
 
-        Application.InstanceDisposed += HandleDisposed;
         try
         {
             var exitCode = await app
@@ -221,10 +229,13 @@ public sealed class SkillViewAppIntegrationTests
             Assert.Equal(ExitCodes.Cancelled, exitCode);
             Assert.NotNull(created);
             Assert.Same(created, disposed);
+            Assert.False(created.Initialized);
+            Assert.Null(created.Driver);
+            Assert.Null(created.MainThreadId);
         }
         finally
         {
-            Application.InstanceDisposed -= HandleDisposed;
+            if (created is not null) created.InitializedChanged -= HandleDisposed;
         }
     }
 

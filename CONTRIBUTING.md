@@ -89,6 +89,52 @@ absolute-only paths and exit 0; confirm selection using reports or diagnostics.
 Always run the full solution formatting check above before finishing. See
 [scoped formatting](agent_docs/running-tests.md#scoped-formatting) for details.
 
+### Offline inventory measurements
+
+Use Python 3 and a built current host; the PTY observer supports Linux/macOS.
+Keep the SDK/runtime pins and lock files unchanged. Run sequentially:
+
+```bash
+dotnet restore --locked-mode
+dotnet build src/SkillView.App/SkillView.App.csproj -c Release --no-restore
+python3 tools/measure_inventory.py \
+  --app src/SkillView.App/bin/Release/net10.0/linux-x64/skillview \
+  --expect-head "$(git rev-parse HEAD)" --samples 5
+```
+
+Adjust the built host RID/path for your machine. The default creates and prints
+a private results location under `/var/tmp` on Linux; `--output` must name a new
+directory outside checkout/ancestor `.git` markers. Read `report.json`, the CLI
+JSON/stderr, and PTY ANSI/screen/log files. Results identify dirty source and
+exact binaries; they do not certify release budgets. No credentials or network
+cohort is required: local gh list is real, auth status is an explicit offline stub.
+For a CLI-only timing correction, add `--cli-only` and retain any earlier PTY
+receipt separately with its original hash. Schema-2 CLI receipts include direct
+host start/exit-observation counters and hashes for the raw sample artifacts;
+messy/large CLI timings each represent one observation, not a distribution.
+
+Generate just the reusable story or workload without launching any processes:
+
+```bash
+python3 tools/inventory_fixture.py --kind messy
+python3 tools/inventory_fixture.py --kind performance --copies 200 --roots 50
+python3 -m unittest discover -s tools/tests -p 'test_*.py'
+```
+
+Each generated root retains `fixture.json`, `environment.json`, and a relative
+content/mode manifest. The harness verifies CLI evidence for the messy story,
+complete workload coverage/counts, and unchanged fixture input identities/bytes/
+modes. Unsupported links or permission denial are labelled explicitly. Keep the
+private mode-000 location intact while inspecting coverage; permission-bypassing
+identities do not prove inaccessible discovery.
+
+In a clean dedicated checkout, the existing opt-in `tools/test_once.py` also
+accepts `--inventory-performance` alongside its normal `--expect-commit` and
+`--output` arguments. That broader runner still performs its existing proofs;
+use the standalone measurement command for this read-only slice alone. See the
+[method and limits](agent_docs/inventory-performance.md#disposable-workloads-and-opt-in-measurements)
+and [Linux baseline](agent_docs/inventory-performance-linux-baseline.md).
+
 ### Run locally
 
 ```bash
@@ -132,3 +178,40 @@ Merge lifecycle fixtures use the source-reviewed last creator at `27efe94`,
 while `prove-old-native-plans.py` keeps the separate `0dba59be` pre-source-review
 shape. CI binds both exact producers through the existing native-input receipts;
 reviewed merge proofs require source acknowledgement before any current apply.
+
+The read-only retained-operation History proof needs no gh authentication or
+network. After building, run the native proof host and TUI together through:
+
+```sh
+TMPDIR=/var/tmp python3 tests/native/prove-retained-history.py \
+  --app src/SkillView.App/bin/Debug/net10.0/linux-x64/skillview \
+  --proof tests/SkillView.MaintenanceProof/bin/Debug/net10.0/SkillView.MaintenanceProof \
+  --output /tmp/skillview-history-proof
+```
+
+Use the corresponding built host paths on other native platforms. Without
+`--retirement`, the PTY tool creates fresh marked private fixtures, retains them
+for review, and verifies 80×24/120×36 keyboard browsing, restart hints, explicit
+Inspect and unchanged payload/state bytes, modes and native identities. These
+are local regression proofs, not human release acceptance. Avoid `/tmp` fixture
+ancestry in sandboxes that mount a Git marker there; keep the placement guard intact.
+
+Pass `--retirement` to that PTY command to additionally test fresh inspection,
+Cancel by default, explicit retirement and History refresh at both terminal sizes.
+It uses a read-only offline gh provider stub and audits live and peer objects.
+Use `--superseded` to exercise an actual later saved update at 80 columns and a
+stale unapplied review at 120 columns, including the already-unavailable Undo
+disclosure. Either product host can be supplied through `--app`.
+For native process-kill/restart retirement evidence on any supported platform:
+
+```sh
+python3 tests/native/prove-retained-retirement.py \
+  --app /absolute/path/to/skillview \
+  --proof /absolute/path/to/SkillView.MaintenanceProof \
+  --output /tmp/retirement-proof.json
+```
+
+Use a private `TMPDIR` under `/var/tmp` on POSIX. `--old-app` optionally checks an
+actual H1 baseline binary's protected listing and inspection refusal with markers.
+Mid-tree and final-small-file remnants remain protected; this is not a manual
+cleanup tool. See [the retirement contract](agent_docs/maintenance-operation-retirement.md).

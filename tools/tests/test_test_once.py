@@ -125,7 +125,7 @@ class TestOnceTests(unittest.TestCase):
 
             with patch.object(runner, 'ROOT', repo), patch.object(runner, 'execute', side_effect=fake_execute), \
                     patch.object(runner.shutil, 'which', return_value='fixture-gh'), contextlib.redirect_stdout(io.StringIO()):
-                code = runner.main(['--expect-commit', 'a' * 40, '--output', str(root / 'results'), '--aot', '--diagnostic-tests'])
+                code = runner.main(['--expect-commit', 'a' * 40, '--output', str(root / 'results'), '--aot', '--diagnostic-tests', '--inventory-performance'])
             self.assertEqual(2, code)  # Live proofs were deliberately not requested.
             restores = [command for command in commands if command[1] == 'restore']
             self.assertEqual([runner.PROJECTS['unit'], runner.PROJECTS['integration']], [command[2] for command in restores])
@@ -142,6 +142,11 @@ class TestOnceTests(unittest.TestCase):
                 self.assertIn('--long-running', command)
                 self.assertIn('--diagnostic', command)
                 self.assertNotIn('--', command)  # MTP flags are forwarded directly.
+            performance = [command for command in commands if 'measure_inventory.py' in str(command)]
+            self.assertEqual(1, len(performance))
+            suffix = '.exe' if os.name == 'nt' else ''
+            self.assertEqual(str(root / ('results/app/skillview' + suffix)), performance[0][performance[0].index('--app') + 1])
+            self.assertEqual('a' * 40, performance[0][performance[0].index('--expect-head') + 1])
 
     def test_timeout_stops_the_owned_descendant_before_it_writes(self):
         with tempfile.TemporaryDirectory() as temporary:

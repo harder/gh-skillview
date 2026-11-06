@@ -37,19 +37,48 @@ The main "discover and inspect" loop:
 4. Press `e` to flip the detail pane between rendered markdown and raw, `o` to open the repo in a browser, or `l` to inspect logs.
 5. Press `i` to stage an install, or `I` for the advanced wizard.
 
+Submitting a search clears the previous results. If it fails, times out, or is
+canceled by leaving Discover, the detail pane keeps the explanation until you
+search again. Search feedback in the footer clears when you leave Discover.
+
+Use the visible **Previous** and **Next** buttons (Tab, then Enter) to browse gh
+search pages. They retain the submitted query and filters even while you type a
+new query. Submitting starts at page 1. Page counts are unknown; an empty page
+still permits Previous. A failed or canceled page clears install targets and
+keeps its explanation. Agent filtering and the result cap apply within each page.
+
+A **✓** beside stars means the captured inventory observed that repository and
+source subpath. **?** means no matching observation or an unknown source path;
+the detail pane distinguishes these and reports incomplete coverage. A matching
+name alone never counts. These observations cover captured locations only and
+never bypass install checks.
+
 In the compact review, **Project** uses the displayed project base; **User**
 uses your home across projects. The default is Project when this Git project
-already has a known skills folder, otherwise User. Review the scope and base,
-then press Enter on **Install**. Tab reaches **Advanced…** and **Cancel**;
-Escape cancels, including while an install is running.
+already has a known skills folder, otherwise User. Choose **Review placement** to read the current source, unresolved/default or
+selected version, selected agents, catalog destinations and existing-copy or
+ownership conflicts in a scrollable pane. Catalog alternatives and unknown
+repository-wide targets are labeled explicitly. This is guidance; install rechecks
+admission and refuses shared-selector or managed/ownership conflicts. Then press
+Enter on **Install**. Tab reaches **Advanced…**, **Review placement** and **Cancel**;
+Escape cancels, including while an install is running. If installation is refused,
+choose **Details** to read the full bounded explanation and captured output.
 
-Agent checkboxes select gh's installation folders. With none checked,
+Press **A** on a Discover result to list repository skills and choose a subset.
+If listing fails, the dialog retains the explanation with **Retry** and **Cancel**.
+Cancel is the default; retrying lists skills again without installing them.
+
+Agent checkboxes select gh's installation folders. Detected configuration folders
+come first; detection does not establish a running or enabled client. **More agents**
+exposes the full catalog without changing selections. Selected agents remain in
+the collapsed list. The advanced form scrolls and keeps behavior flags behind
+**More options**. With none checked,
 **Universal** installs into the shared `.agents/skills` folder under the
 displayed base. **Custom path** requires an explicit folder and overrides
 the scope and agent folders.
 
 After a named Discover install succeeds, the review says **Install completed**.
-Choose **View installed skill** to find it with a fresh scan. A verified single
+Choose **View installed skill** to verify it using the single post-install inventory observation. A verified single
 copy opens its Installed detail when the selected agents each have one known
 folder. Multiple copies open their source group so you can choose a copy.
 Some agents have more than one possible folder, including Codex at User scope
@@ -64,8 +93,20 @@ filters and says **Adjusted Installed filters to show this result.** When browsi
 possible agent folders, the choose-copy notice follows that adjustment notice.
 Sort and Discover search state stay as they were. If the source, folder or scan coverage
 cannot be verified, the completed review explains why and stays open. Automatic
-navigation covers named remote skills at User or Project scope; custom folders,
-install-all and advanced flows retain their existing paths. A custom folder
+navigation covers unchanged named remote Discover skills at User or Project scope
+in compact and advanced reviews. Repository picker success offers **Browse repository**:
+it shows observed sources from that repository without selecting an arbitrary copy.
+A persistent **Repository: owner/repo — Clear shows all** indicator identifies this
+restriction through reloads and explicit refresh, including when no rows match.
+**Clear** removes it along with the ordinary filters. A verified exact install
+result clears an earlier repository restriction before revealing that copy.
+Changing Advanced's version drops the original Discover source-path anchor, so
+that request shows a safe notice instead of claiming an exact installed copy.
+Returning to the original version restores eligibility for the existing exact
+verification; it does not bypass its context or inventory checks.
+Compact custom, unnamed or install-all success offers the same safe browse where
+current source observations exist, otherwise a truthful notice. No browse result
+claims which copy a repository-wide child wrote. A custom folder
 outside the current scan needs an explicit scan root to appear in Installed.
 
 The same operations are available from the CLI; see [CLI usage](#cli-usage).
@@ -129,6 +170,8 @@ and Updates mark pins with `p`, conflicting pin records with `!`, and unknown pi
 state with `?`; details explain the state before review.
 
 Source headings count distinct observed physical copies, with separate counts for update states. Two known differing recorded Git refs can say **refs differ**; missing refs remain incomplete evidence. Authored, Git and distributor versions stay separate. Unknown, incomplete or conflicting source identities remain separate, location-labeled groups. A shared payload with two recorded consumers counts as one physical copy and two recorded placements. Managed copies say **Read-only** and retain owning-tool guidance.
+
+Row summaries label update availability as **Updates:**; **Not checked** refers to updates. When no installed copies were observed, **Search skills (1)** returns to Discover and **Coverage** explains the scan. Configured locations and scanned locations are separate counts; incomplete coverage can leave other copies unknown. When search or filters hide observed copies, the view instead offers **Clear**. Missing filter choices remain selected until explicitly cleared.
 
 The view retains selection by installation ID and exact path, expansion, search, four explicit filters, P/G filters, sort, focus and the top visible row key across refresh, checks, resize and operation return. Missing, ambiguous, filtered-out or collapsed selections disable copy actions until an exact visible copy is selected. The list shows at most 8,192 rows including source headings and an omission row; footer counts distinguish observed, filtered, shown and omitted rows. Coverage describes only captured configured/scanned roots and discovery limitations; it does not enumerate unknown projects.
 
@@ -531,6 +574,10 @@ a just-completed check when that list was already over a minute old. Unknown
 identity or failed whole-payload capture keeps diagnostics in the dialog and asks
 for Refresh without attaching findings to Installed or Issues.
 
+New checks, **Check again**, and retained reports open at the top with a plain
+Problems/Reviews summary and incomplete-check context. The full bounded evidence
+remains below the summary for scrolling and review.
+
 Installed shows Problems and Reviews with their document, resource and available
 line, plus incomplete/omitted coverage. Only an exact missing-file reference from
 root `SKILL.md` is a package **Problem**. Other-document references, dependency-file
@@ -897,3 +944,120 @@ Saved source-changing updates also provide a [frozen source review](saved-update
 with captured diffs and a separate explicit acknowledgement. This user declaration
 supplies no authenticity, compatibility or safety assurance; local `check` remains
 unreviewed without a matching explicit review workflow.
+
+### Retained operation History
+
+Use the visible **History (F4)** control from Discover, Installed or Issues.
+F4 also works while typing in a field. After the shell appears, a bounded
+background read shows recovery hints beside History when retained operations may
+need attention. Nothing resumes automatically.
+
+History lists up to 16 retained replacement operations from the existing saved
+store, including unapplied reviews, retained Undo data and interrupted work.
+Skill, action, date, source and target are **saved metadata**, and slot locations
+and byte estimates are **hints**, not verified current installation state.
+**Inspect to verify** performs fresh local inventory and the existing full saved
+operation/native payload checks. Refresh clears previous inspection results and
+keeps your selected operation ID if it is still listed. Back/Esc cancels pending
+work and returns to the previous view.
+
+Unknown entries, unreadable plans and historical merge evidence stay protected.
+An owner journal conservatively produces a recovery hint even when completion
+filenames exist; only Inspect can verify its evidence. Extra entries beyond the
+listing cap are reported as omissions, with unknown states. Lock/access failures
+are reported as unavailable rather than an empty history.
+
+After **Inspect**, History offers only the retirement action admitted for that
+exact saved operation:
+
+- **Abandon unapplied review** deletes its saved candidate and review after
+  verifying that this operation never moved a payload and its private evidence is
+  intact. The live location may have changed or be missing.
+- **Discard Undo data** permanently deletes retained payloads for an applied or
+  restored operation. Its separate approval explicitly says you will lose Undo
+  for this update. A current live copy must exist; its content may have advanced.
+  The live copy, registry records and consumers stay unchanged.
+
+Superseded operations disclose: “The live copy changed since this operation; Undo
+was already unavailable.” History’s retirement inspection is separate from ordinary
+specialist inspection, which still correctly refuses obsolete live/context states.
+
+Both confirmations default to **Cancel** and show the exact ID and inspection
+fingerprint. Selection changes, Refresh, another Inspect and every attempt clear
+old approval. Operations currently held in Updates for review or Undo remain
+protected; finish/skip the review or refresh its result before inspecting History.
+
+At the 16-operation quota, new reviews stop before staging or source resolution,
+except same-source local reimport: it still needs a bounded private capture and gh
+preview to verify that nothing changed. A verified unchanged result needs no
+retained operation; a changed result refuses allocation with quota/History
+guidance. Source switching keeps its early quota check. Capacity is released only
+after the operation directory is actually removed;
+there is no automatic eviction. A started retirement is listed as protected and
+may need recovery. It never resumes automatically. Inspect it again for a fresh
+explicit retirement approval. Changed or partially removed native trees, unknown
+entries, incomplete owner transitions and unsupported markers remain protected
+with a reason. Preserve that evidence and its exact path for specialist inspection;
+there is no supported manual filesystem cleanup procedure. Interrupted cleanup
+within the final small files may also require specialist inspection. Existing
+specialist recovery and Undo commands retain their separate reviews and approvals
+for operations whose retirement has not started.
+
+For an offline bounded listing:
+
+```sh
+skillview replacement-history
+skillview replacement-history --json
+```
+
+This command reads saved metadata and entry-name/type hints only. It supplies no
+execution approval fingerprint. For full verification use History's Inspect or
+the existing `update-inspect`, `restore-inspect`, `unpin-inspect`,
+`reimport-inspect` or `source-switch-inspect` command with the exact saved ID and
+any required global scan locations. The CLI `history` command continues to
+verify backup archives and keeps its existing output format.
+
+History keeps an operation protected when its payload moved but its own registry
+publication is still pending. Use ordinary Inspect and Recover to finish it before
+retiring Undo data. Later updates or registry changes do not by themselves prevent
+retirement once this operation's completion is verified.
+
+When abandoning a local-reimport review whose live copy is missing, the
+confirmation also warns if deleting its saved installed capture may discard the
+only remaining copy. Cancel is the default.
+
+Install failures and cancellation can leave files behind. SkillView retains
+whether an install child actually started, both output streams, and each known
+subset result. After a possible write and verified child exit, Installed refreshes
+once before the result is delivered, including when you close the review. If the
+child does not stop within the termination grace, SkillView returns with an
+unverified-writer warning instead of waiting indefinitely or scanning while it
+may still write. Wait for that child to stop, then explicitly refresh Installed
+before retrying. Details shows completed,
+failed or canceled selections and those never attempted. A repository-wide
+`--all` result does not identify which individual skills were written on failure.
+Review Installed before retrying; nothing is retried automatically. Incomplete
+or failed refreshes leave the result unknown and require an explicit refresh.
+A preflight refusal says “No install started” and does not scan inventory merely
+because you opened the review. Successful compact installs keep the exact
+“View installed skill” action and your Discover query.
+
+`install --json` also reports `attempt`, `mayHaveChangedFiles`, `childDrained`,
+`stdout`, `stderr`, `refresh` and the post-attempt `observed` entries.
+
+Compatibility change for JSON clients: when no before snapshot exists, install
+reports `"added": null` and `"addedKnown": false`, including on success. This
+replaces the old `added` array representation: an empty array would incorrectly
+mean that no additions were found. Clients must check `addedKnown` and handle a
+null `added` value as unknown. Use `observed` for actual post-attempt inventory
+entries; it does not identify which entries were newly added. A known additions
+list has `addedKnown: true`; only then does `added: []` mean no additions were
+observed. SkillView does not capture inventory merely to compute this difference.
+Cancellation returns exit code 130 while preserving the attempt and refresh
+report.
+
+A successful install with a complete fresh observation prints
+`installed: OWNER/REPO/SKILL[@VERSION]`, gh's output, and
+`rescan: N skill(s) observed`. Failure, cancellation, incomplete refresh and
+unverified child exit retain warning guidance; incomplete/failed refreshes do
+not print a successful rescan line.

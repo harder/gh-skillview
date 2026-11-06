@@ -9,7 +9,7 @@ using Xunit;
 
 namespace SkillView.Tests.Maintenance;
 
-public sealed class ReplacementPlanStoreTests : IDisposable
+public sealed partial class ReplacementPlanStoreTests : IDisposable
 {
     private readonly DirectoryInfo temporary = Directory.CreateTempSubdirectory("skillview-replacement-");
     private CancellationToken Token => TestContext.Current.CancellationToken;

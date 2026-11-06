@@ -83,10 +83,45 @@ public sealed class InstalledOverviewTests
         var overview = InstalledOverview.Build(fixture, TestContext.Current.CancellationToken);
         var groups = overview.View(_ => true, "name", overview.Groups.Select(g => g.Key).ToHashSet(), session.Get, TestContext.Current.CancellationToken).Rows;
         Assert.Contains(groups, r => r.Copy is null && r.Summary.Contains("1 available, 1 no update", StringComparison.Ordinal));
+        Assert.All(groups.Where(r => r.Copy?.ReadOnly == false || r.Group?.Copies.All(c => !c.ReadOnly) == true),
+            r => Assert.Contains("Updates:", r.Summary));
+        Assert.All(groups.Where(r => r.Copy?.ReadOnly == true || r.Group?.Copies.All(c => c.ReadOnly) == true),
+            r => Assert.DoesNotContain("Updates:", r.Summary));
         session.Invalidate();
         groups = overview.View(_ => true, "name", overview.Groups.Select(g => g.Key).ToHashSet(), session.Get, TestContext.Current.CancellationToken).Rows;
         Assert.Contains(groups, r => r.Summary.Contains("2 stale", StringComparison.Ordinal));
         Assert.Contains(groups, r => r.Summary.Contains("1 read-only", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LocalActionStatesStaySeparateFromAvailabilityForOrdinaryReadOnlyAmbiguousAndMixedGroups()
+    {
+        var ordinary = Copy("/ordinary/demo", "demo", "team/tools", "v1");
+        var managed = ordinary with { ResolvedPath = "/managed/demo", Package = new("team/tools", "github", null, null, null) { ReadOnly = true } };
+        var duplicate = Copy("/ambiguous/other", "other", "other/tools", "v1");
+        var snapshot = InventorySnapshot.Empty with { Skills = [ordinary, managed, duplicate, duplicate] };
+        var overview = InstalledOverview.Build(snapshot, TestContext.Current.CancellationToken);
+        var calls = new List<string>();
+        var rows = overview.View(_ => true, "name", overview.Groups.Select(g => g.Key).ToHashSet(), skill =>
+        {
+            calls.Add(skill.ResolvedPath);
+            Assert.Equal(ordinary.ResolvedPath, skill.ResolvedPath);
+            return new(UpdateAvailabilityStatus.Available, "fixture observation");
+        }, TestContext.Current.CancellationToken).Rows;
+        var ordinaryRow = Assert.Single(rows, r => r.Copy?.Path == ordinary.ResolvedPath);
+        Assert.EndsWith("; Updates: Available", ordinaryRow.Summary);
+        var managedRow = Assert.Single(rows, r => r.Copy?.Path == managed.ResolvedPath);
+        Assert.EndsWith("; Read-only", managedRow.Summary); Assert.DoesNotContain("Updates:", managedRow.Summary);
+        var ambiguousRow = Assert.Single(rows, r => r.Copy?.Ambiguous == true);
+        Assert.EndsWith("; Ambiguous; actions disabled", ambiguousRow.Summary); Assert.DoesNotContain("Updates:", ambiguousRow.Summary);
+        var mixed = Assert.Single(rows, r => r.Copy is null && r.Group?.Copies.Count == 2);
+        Assert.EndsWith("; 1 read-only; Updates: 1 available", mixed.Summary);
+        var ambiguousGroup = Assert.Single(rows, r => r.Copy is null && r.Group?.Copies.Any(c => c.Ambiguous) == true);
+        Assert.EndsWith("; 1 ambiguous", ambiguousGroup.Summary); Assert.DoesNotContain("Updates:", ambiguousGroup.Summary);
+        Assert.NotEmpty(calls);
+        var uncheckedRows = View(overview).Rows;
+        Assert.EndsWith("; Updates: Not checked", Assert.Single(uncheckedRows, r => r.Copy?.Path == ordinary.ResolvedPath).Summary);
+        Assert.EndsWith("; 1 read-only; Updates: 1 not checked", Assert.Single(uncheckedRows, r => r.Copy is null && r.Group?.Copies.Count == 2).Summary);
     }
 
     [Fact]

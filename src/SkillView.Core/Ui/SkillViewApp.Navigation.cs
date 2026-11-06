@@ -46,6 +46,13 @@ public sealed partial class SkillViewApp
             return;
         }
 
+        if (ReferenceEquals(app.TopRunnableView, mainWindow) && IsHistoryShortcut(key))
+        {
+            OpenHistory();
+            key.Handled = true;
+            return;
+        }
+
         if (ReferenceEquals(app.TopRunnableView, mainWindow)
             && !TextInputHasFocus()
             && key.AsRune.Value is 'q' or 'Q')
@@ -443,7 +450,7 @@ public sealed partial class SkillViewApp
             case SkillViewTab.Discover:
                 if (!string.IsNullOrEmpty(_queryField?.Text.Trim()))
                 {
-                    SetStatus("refreshing results…");
+                    SetDiscoverStatus("refreshing results…");
                     SubmitSearch();
                 }
                 break;

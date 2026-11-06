@@ -41,6 +41,7 @@ public static partial class CliDispatcher
                 "update" => await UpdateAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "compare" => await CompareAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "backup" => await BackupAsync(options, services, deadline.Token).ConfigureAwait(false),
+                "replacement-history" => await ReplacementHistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "history" => await HistoryAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "update-preserve" => await PreserveUpdateAsync(options, services, deadline.Token).ConfigureAwait(false),
                 "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
@@ -72,7 +73,7 @@ public static partial class CliDispatcher
     internal static TimeSpan TimeoutFor(string? subcommand) => subcommand switch
     {
         "doctor" or "preview" => TimeSpan.FromSeconds(30),
-        "list" or "check" or "queue" or "inspect" or "rescan" or "search" or "compare" or "history" or "ignore" => TimeSpan.FromMinutes(2),
+        "list" or "check" or "queue" or "inspect" or "rescan" or "search" or "compare" or "history" or "replacement-history" or "ignore" => TimeSpan.FromMinutes(2),
         "install" or "update" or "remove" or "cleanup" or "backup" or "quarantine" or "undo" or "quarantine-history" or "restore-ack-source" or "update-ack-source" or "reimport-ack-source" or "restore-plan" or "restore-inspect" or "restore-apply" or "restore-recover" or "restore-undo"
             or "update-plan" or "update-inspect" or "update-apply" or "update-recover" or "update-undo" or "update-repair-owner"
             or "reimport-plan" or "reimport-inspect" or "reimport-apply" or "reimport-recover" or "reimport-undo"

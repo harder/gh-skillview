@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using SkillView.Gh.Models;
 using SkillView.Maintenance;
 using Terminal.Gui.ViewBase;
@@ -16,6 +17,16 @@ internal sealed partial class UpdatesTabView
     private UpdateResult? _undoResult;
     private ReplacementResult? _undoReview;
     private bool _undoHidden;
+
+    // Called on the UI thread; callers pass the frozen values to background
+    // History work. Pending publication is excluded as well as visible targets.
+    internal System.Collections.Immutable.ImmutableArray<string> CaptureActivePlanIds()
+    {
+        if (_operationCancellations.HasActive || _loadCancellations.HasActive)
+            throw new IOException("Updates work is still active. Wait for completion, then Inspect History again.");
+        return new[] { _review?.Id, _undoReview?.Id, _undoResult?.SavedPlan?.Id }
+            .OfType<string>().Distinct(StringComparer.Ordinal).ToImmutableArray();
+    }
 
     private void InitializeUndoControls()
     {

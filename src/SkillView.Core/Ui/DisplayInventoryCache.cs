@@ -19,6 +19,12 @@ internal sealed class DisplayInventoryCache(
     private long _snapshotGeneration;
     private DateTimeOffset _completedAt;
     private Flight? _flight;
+    private DiscoverInstalledObservation? _observation;
+    internal event Action? ObservationChanged;
+    internal DiscoverInstalledObservation? Observation
+    {
+        get { lock (_gate) return _snapshotGeneration == generation() ? _observation : null; }
+    }
 
     internal bool CacheIsCurrent(InventorySnapshot snapshot, long capturedGeneration)
     {
@@ -89,6 +95,7 @@ internal sealed class DisplayInventoryCache(
             obsolete = DetachObsoleteFlightUnderLock(generation());
         }
         obsolete?.Cancel();
+        ObservationChanged?.Invoke();
     }
 
     private Flight? DetachObsoleteFlightUnderLock(long current)
@@ -105,6 +112,7 @@ internal sealed class DisplayInventoryCache(
         if (_snapshot is not null && _snapshotGeneration == capturedGeneration
             && _snapshot.CapturedAt > snapshot.CapturedAt) return _snapshot;
         _snapshot = snapshot;
+        _observation = new(snapshot);
         _snapshotGeneration = capturedGeneration;
         _completedAt = _now();
         return snapshot;
@@ -125,6 +133,7 @@ internal sealed class DisplayInventoryCache(
                 result = StoreUnderLock(result, flight.Generation);
                 ClearFlightUnderLock(flight);
             }
+            ObservationChanged?.Invoke();
             flight.Completion.TrySetResult(result);
         }
         catch (Exception ex)

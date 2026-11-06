@@ -38,6 +38,18 @@ public sealed partial class SkillViewApp
         return row >= 0 && row < _results.Count ? _results[row] : null;
     }
 
+    private sealed record SubmittedSearch(string Query, string? Owner, int Limit, string? Agent, bool Hidden);
+    private SubmittedSearch? _submittedSearch;
+    private int _searchPage = 1;
+
+    private void ChangeSearchPage(int direction)
+    {
+        if (_submittedSearch is not { } submitted || _discoverTab?.IsLoading == true) return;
+        var page = (int)Math.Clamp((long)_searchPage + direction, 1, int.MaxValue);
+        RunOwnedTask(() => RunSearchAsync(submitted.Query, submitted.Owner, submitted.Limit,
+            submitted.Agent, submitted.Hidden, page: page), "search.page");
+    }
+
     private void SubmitSearch()
     {
         var query = _queryField?.Text.Trim() ?? string.Empty;
@@ -63,11 +75,12 @@ public sealed partial class SkillViewApp
         int? limit = null,
         string? agent = null,
         bool allowHiddenDirs = false,
-        Func<CancellationToken, Task<SearchResponse>>? search = null)
+        Func<CancellationToken, Task<SearchResponse>>? search = null,
+        int page = 1)
     {
         if (_ghPath is null)
         {
-            SetStatus("cannot search — gh not found", TuiHelpers.NotificationLevel.Error);
+            SetDiscoverStatus("cannot search — gh not found", TuiHelpers.NotificationLevel.Error);
             return;
         }
         if (!TryCaptureActiveLifetimeToken(_discoverLifetime, out var discoverToken))
@@ -79,20 +92,31 @@ public sealed partial class SkillViewApp
         using var request = _searchRequests.Begin(discoverToken, TimeSpan.FromMinutes(2));
         var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
         var generation = System.Threading.Interlocked.Increment(ref _searchGeneration);
-        var busyOperation = BeginBusyOperation($"searching {query}…");
+        var busyOperation = BeginBusyOperation($"searching {query}…", discoverOwned: true);
         var cancellationToken = request.Token;
+        string submittedContext() => $"Submitted: {InstallFailureDetails.Literal(query)} · page {page}\nOwner: {InstallFailureDetails.Literal(owner ?? "any")} · agent: {InstallFailureDetails.Literal(agent ?? "any")} · cap: {limit ?? GhSkillSearchService.DefaultLimit}";
         try
         {
             await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
+                // A submitted search replaces the previous answer immediately.
+                // Failure or navigation must never reveal the old install targets.
+                _submittedSearch = new(query, owner, limit ?? GhSkillSearchService.DefaultLimit, agent, allowHiddenDirs);
+                _searchPage = page;
+                if (_discoverTab is not null)
+                    _discoverTab.SubmittedSummary.Text = "Using: " + InstallFailureDetails.Literal(query, 256).Replace('\n', ' ').Replace('\t', ' ');
+                _discoverTab?.SetPage(page, "loading", false, loading: true);
+                ReplaceSearchResults([]);
+                SetSearchFeedback($"Searching {InstallFailureDetails.Literal(query)} · page {page}…");
                 _discoverTab?.SetLoading(true);
             }, discoverToken).ConfigureAwait(false);
             var options = new GhSkillSearchService.Options(
                 Owner: owner,
-                Limit: limit ?? GhSkillSearchService.DefaultLimit);
+                Limit: limit ?? GhSkillSearchService.DefaultLimit, Page: page);
             var response = await (search is null
-                ? _services.SearchService.SearchAsync(_ghPath, query, options, cancellationToken)
+                ? (_searchForTests is null ? _services.SearchService.SearchAsync(_ghPath, query, options, cancellationToken)
+                    : _searchForTests(query, options, cancellationToken))
                 : search(cancellationToken)).ConfigureAwait(false);
             if (!response.Succeeded)
                 throw new IOException(response.ErrorMessage ?? $"gh search exited {response.ExitCode}");
@@ -114,6 +138,7 @@ public sealed partial class SkillViewApp
                     return;
                 }
                 _discoverTab?.SetLoading(false);
+                _discoverTab?.SetPage(page, results.Count == 0 ? "empty" : "", results.Count > 0);
                 ReplaceSearchResults(filteredResults);
                 _resultsTable?.SetFocus();
                 _services.Logger.Info("search", $"results loaded: count={_results.Count} rawCount={results.Count} tableFocus={_resultsTable?.HasFocus} queryFocus={_queryField?.HasFocus}");
@@ -125,7 +150,7 @@ public sealed partial class SkillViewApp
                 {
                     _previewFrame.Title = "Preview";
                 }
-                SetStatus(DescribeSearchResults(results.Count, _results.Count, agent));
+                SetDiscoverStatus(DescribeSearchResults(results.Count, _results.Count, agent));
             }, discoverToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -137,7 +162,9 @@ public sealed partial class SkillViewApp
                 {
                     if (request.IsCurrent && IsDiscoverWorkspaceActive(discoverGeneration))
                     {
-                        SetStatus("search timed out", TuiHelpers.NotificationLevel.Error);
+                        _discoverTab?.SetPage(page, "canceled", true);
+                        SetSearchFeedback($"Search canceled or timed out.\n\n{submittedContext()}\n\nNo results to show. Previous returns to an earlier page; submit to retry.");
+                        SetDiscoverStatus("search timed out", TuiHelpers.NotificationLevel.Error);
                     }
                 }, discoverToken).ConfigureAwait(false);
             }
@@ -149,7 +176,9 @@ public sealed partial class SkillViewApp
             await InvokeAsync(() =>
             {
                 if (!request.IsCurrent || !IsDiscoverWorkspaceActive(discoverGeneration)) return;
-                SetStatus(snippet.Length > 0
+                _discoverTab?.SetPage(page, "failed", true);
+                SetSearchFeedback($"Search failed.\n\n{submittedContext()}\n\nNo results to show. Previous returns to an earlier page; submit to retry.\n\n{snippet}");
+                SetDiscoverStatus(snippet.Length > 0
                     ? $"search failed: {snippet}"
                     : "search failed — see logs (l)",
                     TuiHelpers.NotificationLevel.Error);
@@ -173,6 +202,12 @@ public sealed partial class SkillViewApp
                 EndBusyOperation(busyOperation);
             }
         }
+    }
+
+    private void SetSearchFeedback(string text)
+    {
+        SetPreviewText(text);
+        if (_previewFrame is not null) _previewFrame.Title = "Preview";
     }
 
     private void ReplaceSearchResults(IReadOnlyList<SearchResultSkill> results)
@@ -220,7 +255,7 @@ public sealed partial class SkillViewApp
         _searchSort = CycleSearchSort(_searchSort);
         _results = ApplySearchSort(_resultsNaturalOrder, _searchSort);
         RefreshResultsTable();
-        SetStatus(DescribeSearchSort(_searchSort));
+        SetDiscoverStatus(DescribeSearchSort(_searchSort));
     }
 
     private void RefreshResultsTable()
@@ -244,7 +279,7 @@ public sealed partial class SkillViewApp
         var repoMin = Math.Clamp(longestRepo, 14, 32);
         var widths = TuiHelpers.DistributeWidths(available, new (int, double)[]
         {
-            (5,       0.0), // ★
+            (9,       0.0), // observed install + ★
             (nameMin, 1.0), // Name
             (repoMin, 1.0), // Repo
         });
@@ -252,7 +287,7 @@ public sealed partial class SkillViewApp
 
         // Suffix the active sort column with a direction glyph so the user
         // can see at a glance what `S` last did. Inactive columns stay clean.
-        var starsHeader = _searchSort == SearchSort.StarsDesc ? "★ ↓" : "★";
+        var starsHeader = _searchSort == SearchSort.StarsDesc ? "Seen ★ ↓" : "Seen ★";
         var nameHeader = _searchSort switch
         {
             SearchSort.NameAsc => "Name ↑",
@@ -264,7 +299,7 @@ public sealed partial class SkillViewApp
             _results,
             new Dictionary<string, Func<SearchResultSkill, object>>
             {
-                [starsHeader] = s => s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                [starsHeader] = s => (_workflows.DiscoverObservation?.IsObserved(s) == true ? "✓ " : "? ") + (s.Stars?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
                 [nameHeader] = s => TuiHelpers.Truncate(s.SkillName, nameW),
                 [repoHeader] = s => TuiHelpers.Truncate(s.Repo, repoW),
             });
@@ -298,7 +333,7 @@ public sealed partial class SkillViewApp
         if (_discoverTab is null) return;
         var selected = GetSelectedResult();
         var text = selected is not null
-            ? RenderSearchMetadata(selected, _lastReport?.Auth)
+            ? RenderSearchMetadata(selected, _lastReport?.Auth) + "\n\n" + (_workflows.DiscoverObservation?.Describe(selected) ?? "Installed: unknown; no current inventory observation.")
             : null;
         _discoverTab.DetailPane.SetMetadataContent(text);
     }
@@ -396,7 +431,7 @@ public sealed partial class SkillViewApp
         }
         else
         {
-            SetStatus("discover filters updated");
+            SetDiscoverStatus("discover filters updated");
         }
     }
 
@@ -407,29 +442,29 @@ public sealed partial class SkillViewApp
         if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {
-            SetStatus("no result to open");
+            SetDiscoverStatus("no result to open");
             return;
         }
         var row = _resultsTable.GetSelectedRow();
         if (row < 0 || row >= _results.Count)
         {
-            SetStatus("no result selected");
+            SetDiscoverStatus("no result selected");
             return;
         }
         var pick = _results[row];
         if (string.IsNullOrEmpty(pick.Repo))
         {
-            SetStatus("no repo on selected row");
+            SetDiscoverStatus("no repo on selected row");
             return;
         }
         var url = BuildRepoUrl(_lastReport?.Auth, pick.Repo);
         if (TuiHelpers.OpenInDefaultHandler(url))
         {
-            SetStatus($"opened {url}", TuiHelpers.NotificationLevel.Success);
+            SetDiscoverStatus($"opened {url}", TuiHelpers.NotificationLevel.Success);
         }
         else
         {
-            SetStatus("open failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
+            SetDiscoverStatus("open failed — see logs (l)", TuiHelpers.NotificationLevel.Error);
             _services.Logger.Warn("open", $"failed to open {url}");
         }
     }
@@ -442,19 +477,19 @@ public sealed partial class SkillViewApp
         if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {
-            SetStatus("no results to install");
+            SetDiscoverStatus("no results to install");
             return;
         }
         var row = _resultsTable.GetSelectedRow();
         if (row < 0 || row >= _results.Count)
         {
-            SetStatus("no result selected");
+            SetDiscoverStatus("no result selected");
             return;
         }
         var pick = _results[row];
         if (string.IsNullOrEmpty(pick.Repo))
         {
-            SetStatus("no repo on selected row");
+            SetDiscoverStatus("no repo on selected row");
             return;
         }
         var discoverGeneration = Interlocked.Read(ref _discoverGeneration);
@@ -471,31 +506,35 @@ public sealed partial class SkillViewApp
 
     /// Discover the skills in the selected result's repo and open the picker
     /// so the user installs a chosen subset (gh ≥ 2.95 non-interactive
-    /// listing, cli/cli#13548). Falls back to install-all if discovery fails.
+    /// listing, cli/cli#13548). Failed listing offers Retry or Cancel.
     private void StageInstallAll()
     {
         if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {
-            SetStatus("no results to install");
+            SetDiscoverStatus("no results to install");
             return;
         }
         var row = _resultsTable.GetSelectedRow();
         if (row < 0 || row >= _results.Count)
         {
-            SetStatus("no result selected");
+            SetDiscoverStatus("no result selected");
             return;
         }
         var pick = _results[row];
         if (string.IsNullOrEmpty(pick.Repo))
         {
-            SetStatus("no repo on selected row");
+            SetDiscoverStatus("no repo on selected row");
             return;
         }
+        if (!TryCaptureActiveLifetimeToken(_discoverLifetime, out var lifetimeToken)) return;
+        var generation = Interlocked.Read(ref _discoverGeneration);
         _workflows.OpenRepoDiscoveryDialog(
             new InstallRequest(
                 Repo: pick.Repo,
                 SkillName: null,
-                AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)));
+                AllowHiddenDirs: ShouldAllowHiddenDirs(pick, HiddenDirsEnabled)),
+            () => IsDiscoverWorkspaceActive(generation) && !GetRunLifetimeToken().IsCancellationRequested,
+            lifetimeToken, revealInstalled: RevealInstalledInstall);
     }
 }

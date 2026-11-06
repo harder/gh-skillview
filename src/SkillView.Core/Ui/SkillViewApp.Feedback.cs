@@ -59,6 +59,19 @@ public sealed partial class SkillViewApp
         ScheduleStatusAutoClear();
     });
 
+    private void SetDiscoverStatus(string text, TuiHelpers.NotificationLevel level = TuiHelpers.NotificationLevel.Info)
+    {
+        var generation = Interlocked.Read(ref _discoverGeneration);
+        var searchGeneration = Interlocked.Read(ref _searchGeneration);
+        Invoke(() =>
+        {
+            if (!IsDiscoverWorkspaceActive(generation)
+                || Interlocked.Read(ref _searchGeneration) != searchGeneration) return;
+            UpdateStatusStrip(text, level, discoverOwned: true);
+            ScheduleStatusAutoClear();
+        });
+    }
+
     /// Persistent contextual status (gh version, "gh not found", etc.).
     /// Replaces the auto-clear default and is what transient `SetStatus`
     /// messages fall back to after `StatusAutoClear`.
@@ -75,9 +88,10 @@ public sealed partial class SkillViewApp
         CancelStatusAutoClear();
     });
 
-    private void UpdateStatusStrip(string text, TuiHelpers.NotificationLevel level)
+    private void UpdateStatusStrip(string text, TuiHelpers.NotificationLevel level, bool discoverOwned = false)
     {
         _currentStatus = text;
+        _currentStatusDiscoverOwned = discoverOwned;
         if (_statusStrip is null) return;
 
         var hints = GetCurrentHints();
@@ -140,30 +154,39 @@ public sealed partial class SkillViewApp
 
     private void ScheduleStatusAutoClear()
     {
-        if (_app is null) return;
         CancelStatusAutoClear();
-        _statusToken = _app.AddTimeout(StatusAutoClear, () =>
+        if (_app is null) return;
+        _statusToken = _app.AddTimeout(StatusAutoClear, CreateStatusAutoClearCallback());
+    }
+
+    private Func<bool> CreateStatusAutoClearCallback()
+    {
+        var version = _statusVersion;
+        return () =>
         {
+            if (version != _statusVersion) return false;
             _statusToken = null;
-            UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
+            if (!ApplyBusyUi())
+                UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
             return false;
-        });
+        };
     }
 
     private void CancelStatusAutoClear()
     {
+        _statusVersion++;
         if (_app is null || _statusToken is null) return;
         _app.RemoveTimeout(_statusToken);
         _statusToken = null;
     }
 
-    private long BeginBusyOperation(string text)
+    private long BeginBusyOperation(string text, bool discoverOwned = false)
     {
         long operation;
         lock (_busyGate)
         {
             operation = ++_nextBusyOperationId;
-            _busyOperations.Add(operation, text);
+            _busyOperations.Add(operation, (text, discoverOwned));
         }
         Invoke(RefreshBusyUi);
         return operation;
@@ -173,7 +196,7 @@ public sealed partial class SkillViewApp
         LatestRequestGate.Lease request,
         string text)
     {
-        var operation = BeginBusyOperation(text);
+        var operation = BeginBusyOperation(text, discoverOwned: true);
         var previous = Interlocked.Exchange(
             ref _activePreviewBusyOperationId,
             operation);
@@ -223,7 +246,7 @@ public sealed partial class SkillViewApp
             }
 
             var operation = ++_nextBusyOperationId;
-            _busyOperations.Add(operation, text);
+            _busyOperations.Add(operation, (text, DiscoverOwned: false));
             _legacyBusyOperationId = operation;
         }
         Invoke(RefreshBusyUi);
@@ -253,11 +276,37 @@ public sealed partial class SkillViewApp
         Invoke(RefreshBusyUi);
     }
 
+    private void ClearDiscoverFeedback()
+    {
+        lock (_busyGate)
+        {
+            foreach (var operation in _busyOperations.Where(pair => pair.Value.DiscoverOwned).Select(pair => pair.Key).ToArray())
+                _busyOperations.Remove(operation);
+        }
+        if (_currentStatusDiscoverOwned)
+        {
+            CancelStatusAutoClear();
+            if (!ApplyBusyUi())
+                UpdateStatusStrip(_defaultStatus, TuiHelpers.NotificationLevel.Info);
+        }
+        else
+        {
+            // Keep workflow notifications and progress when Discover deactivates.
+            _statusStrip?.SetBusy(HasBusyOperations());
+        }
+    }
+
+    private bool HasBusyOperations()
+    {
+        lock (_busyGate) return _busyOperations.Count > 0;
+    }
+
     private void RefreshBusyUi() => _ = ApplyBusyUi();
 
     private bool ApplyBusyUi()
     {
         string? text = null;
+        var discoverOwned = false;
         long newest = 0;
         lock (_busyGate)
         {
@@ -265,7 +314,8 @@ public sealed partial class SkillViewApp
             {
                 if (operation.Key <= newest) continue;
                 newest = operation.Key;
-                text = operation.Value;
+                text = operation.Value.Text;
+                discoverOwned = operation.Value.DiscoverOwned;
             }
         }
 
@@ -273,7 +323,7 @@ public sealed partial class SkillViewApp
         _statusStrip?.SetBusy(busy);
         if (busy)
         {
-            UpdateStatusStrip(text!, TuiHelpers.NotificationLevel.Info);
+            UpdateStatusStrip(text!, TuiHelpers.NotificationLevel.Info, discoverOwned);
         }
         return busy;
     }

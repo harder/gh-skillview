@@ -121,11 +121,15 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
         {
             token.ThrowIfCancellationRequested();
             matching += copies.Length;
-            var states = copies.GroupBy(c => c.Ambiguous ? "ambiguous" : c.ReadOnly ? "read-only"
-                : availability?.Invoke(c.Target!).TableLabel.ToLowerInvariant() ?? "not checked")
-                .Select(s => $"{s.Count()} {s.Key}");
+            var localStates = copies.Where(c => c.Ambiguous || c.ReadOnly).GroupBy(c => c.Ambiguous ? "ambiguous" : "read-only")
+                .Select(s => $"{s.Count()} {s.Key}").ToArray();
+            var updateStates = copies.Where(c => !c.Ambiguous && !c.ReadOnly)
+                .GroupBy(c => availability?.Invoke(c.Target!).TableLabel.ToLowerInvariant() ?? "not checked")
+                .Select(s => $"{s.Count()} {s.Key}").ToArray();
             var summary = $"{copies.Length}{(copies.Length == group.Copies.Count ? "" : " of " + group.Copies.Count)} observed {(group.Copies.Count == 1 ? "copy" : "copies")}"
-                + (group.RefsDiffer ? "; refs differ" : "") + (group.RefsIncomplete && group.Copies.Count > 1 ? "; refs incomplete" : "") + "; " + string.Join(", ", states);
+                + (group.RefsDiffer ? "; refs differ" : "") + (group.RefsIncomplete && group.Copies.Count > 1 ? "; refs incomplete" : "")
+                + (localStates.Length == 0 ? "" : "; " + string.Join(", ", localStates))
+                + (updateStates.Length == 0 ? "" : "; Updates: " + string.Join(", ", updateStates));
             Add(new(group.Key, group, null, (expanded.Contains(group.Key) ? "v " : "> ") + group.Name + " · " + group.Source, summary));
             if (!expanded.Contains(group.Key)) continue;
             foreach (var copy in copies)
@@ -136,7 +140,7 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
                 var revision = s.Revision.RepositoryRef is { Length: > 0 } r ? "@" + r
                     : s.Revision.AuthoredVersion is { Length: > 0 } a ? "authored " + a
                     : s.Revision.DistributorVersion is { Length: > 0 } d ? "pack " + d : "ref unknown";
-                var state = copy.Ambiguous ? "Ambiguous; actions disabled" : copy.ReadOnly ? "Read-only" : availability?.Invoke(s).TableLabel ?? "Not checked";
+                var state = copy.Ambiguous ? "Ambiguous; actions disabled" : copy.ReadOnly ? "Read-only" : "Updates: " + (availability?.Invoke(s).TableLabel ?? "Not checked");
                 Add(new(copy.Key, group, copy, "  " + Text(revision, 36) + " · " + copy.Location + (pin.HasPin ? " · pin " + pin.Label : ""),
                     Text(string.Join(" + ", copy.Records.SelectMany(s => s.Agents).Select(a => a.AgentId).Distinct(StringComparer.Ordinal)), 64) + "; " + state));
             }

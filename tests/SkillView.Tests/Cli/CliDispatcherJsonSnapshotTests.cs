@@ -195,7 +195,7 @@ public class CliDispatcherJsonSnapshotTests
     // --- install ---------------------------------------------------------
 
     [Fact]
-    public void Install_JsonReportsAddedDiff()
+    public void Install_JsonReportsUnknownAdditionsAndActualObservedEntries()
     {
         var r = new InstallResult
         {
@@ -203,6 +203,8 @@ public class CliDispatcherJsonSnapshotTests
             SkillName = "render-md",
             Version = "v1",
             Succeeded = true,
+            Attempt = InstallAttemptOutcome.Succeeded,
+            ChildDrained = true,
             ExitCode = 0,
             StdOut = "",
             StdErr = "",
@@ -223,12 +225,14 @@ public class CliDispatcherJsonSnapshotTests
             AllowHiddenDirs: false,
             Json: true,
             All: false);
-        var added = new[] { Skill("render-md") };
-        var doc = Parse(CliDispatcher.RenderInstallJson(r, p, added));
+        var observed = InventorySnapshot.Empty with { Skills = [Skill("render-md")] };
+        var doc = Parse(CliDispatcher.RenderInstallJson(r, p, added: null, observed));
         Assert.True(doc.GetProperty("succeeded").GetBoolean());
         Assert.Equal("render-md", doc.GetProperty("skillName").GetString());
         Assert.True(doc.GetProperty("pin").GetBoolean());
-        Assert.Equal(1, doc.GetProperty("added").GetArrayLength());
+        Assert.False(doc.GetProperty("addedKnown").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, doc.GetProperty("added").ValueKind);
+        Assert.Equal("render-md", doc.GetProperty("observed")[0].GetProperty("name").GetString());
     }
 
     // --- update ----------------------------------------------------------

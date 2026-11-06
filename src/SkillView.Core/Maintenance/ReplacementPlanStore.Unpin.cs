@@ -92,9 +92,7 @@ internal sealed partial class ReplacementPlanStore
         // generation; creating state must never refresh an already saved plan.
         using var state = NativeStateDirectory.OpenOrCreate(Root, Exclusions(inventory), token);
         using var writer = state.OpenFile("writer.lock", true, token); CheckWriter(writer);
-        var entries = state.EnumerateEntries(token).Take(MaxPlans + 2).ToArray();
-        if (entries.Length > MaxPlans || entries.Any(entry => entry.Name != "writer.lock" && !QuarantineStore.ValidId(entry.Name)))
-            throw new IOException("Replacement plan quota or state entry policy refused; inspect retained plans.");
+        CheckPlanCapacity(state, token);
         transition = PrepareOwner(target, null, inventory, token, unpinOnly: true, initializeState: false);
         using var heldOwner = OpenOwner(transition, token, requireBefore: true, exactEntryBytes: true);
         inventory = Admit(target, inventory, token, owner: heldOwner);

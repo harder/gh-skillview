@@ -77,7 +77,23 @@ public sealed partial class SkillViewApp
         _previewRawPane = _discoverTab.DetailPane.PreviewRawPane;
         _logPane = _discoverTab.DetailPane.LogPane;
 
+        _discoverTab.PageRequested += ChangeSearchPage;
+        void RefreshInstallMarkers() => Invoke(() => { RefreshResultsTable(); UpdateMetadataPane(); });
+        _services.ListAdapter.Invalidated += RefreshInstallMarkers;
+        _workflows.DisplayObservationChanged += RefreshInstallMarkers;
+        window.Disposing += (_, _) =>
+        {
+            _services.ListAdapter.Invalidated -= RefreshInstallMarkers;
+            _workflows.DisplayObservationChanged -= RefreshInstallMarkers;
+        };
+
         // Wire event handlers that require SkillViewApp state.
+        _resultsTable.KeyDown += (sender, key) =>
+        {
+            // Terminal.Gui consumes printable keys on an empty table before
+            // they reach the window. Keep retry, help and tab shortcuts usable.
+            if (_results.Count == 0) OnWindowKeyDown(sender, key);
+        };
         _queryField.KeyDown += OnSearchFieldKey;
         _ownerField.KeyDown += OnSearchFieldKey;
         _agentField.KeyDown += OnSearchFieldKey;
@@ -280,8 +296,10 @@ public sealed partial class SkillViewApp
         void InvalidateUpdateObservations() => _workflows.InvalidateAvailability(RefreshUpdateAvailability);
         _services.ListAdapter.Invalidated += InvalidateUpdateObservations;
         window.Disposing += (_, _) => _services.ListAdapter.Invalidated -= InvalidateUpdateObservations;
+        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = "History (F4)", Width = 30 };
+        _historyButton.Accepting += (_, args) => { args.Handled = true; OpenHistory(); };
         window.Add(_tabBar, _contextBar, _discoverTab, _installedTab, _updatesTab, _doctorTab,
-                   _changesTab,
+                   _changesTab, _historyButton,
                    _statusStrip, _sizeGuard);
         window.FrameChanged += (_, _) =>
             _sizeGuard.UpdateForSize(window.Frame.Width, window.Frame.Height);
@@ -434,6 +452,6 @@ public sealed partial class SkillViewApp
     private void RefreshShellChrome()
     {
         UpdateContextBar();
-        UpdateStatusStrip(string.IsNullOrEmpty(_currentStatus) ? _defaultStatus : _currentStatus, TuiHelpers.NotificationLevel.Info);
+        UpdateStatusStrip(string.IsNullOrEmpty(_currentStatus) ? _defaultStatus : _currentStatus, TuiHelpers.NotificationLevel.Info, _currentStatusDiscoverOwned);
     }
 }

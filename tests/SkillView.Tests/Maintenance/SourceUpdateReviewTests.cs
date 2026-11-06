@@ -63,6 +63,35 @@ public sealed class SourceUpdateReviewTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task RetirementPreservesLiveCopyAndSupportsResumeAfterReviewedPayloadRemoval(bool applied)
+    {
+        var plan = await Plan();
+        if (applied)
+        {
+            Store().AcknowledgeSourceReview(plan.Id, plan.PlanFingerprint, plan.SourceReview!.Fingerprint, Inventory(), Token);
+            Assert.True(Store().Apply(plan.Id, plan.PlanFingerprint, Inventory(), Token).Succeeded);
+        }
+        var before = PayloadSnapshot.Capture(Payload, Token);
+        Task<InventorySnapshot> Capture(CancellationToken _) => Task.FromResult(Inventory());
+        var review = (await Store().InspectHistoryAsync(plan.Id, Capture, [], Token)).Retirement!;
+        Assert.NotNull(review);
+        var interrupted = Store(checkpoint: point =>
+        {
+            if (point == "retirement-removed-" + (applied ? "original" : "candidate")) throw new IOException("Between payload and source archives");
+        });
+        await Assert.ThrowsAsync<IOException>(() => interrupted.RetireAsync(review, review.Kind, Capture, [], Token));
+        Assert.True(File.Exists(Path.Combine(State, plan.Id, "retiring.json")));
+        Assert.True(Directory.Exists(Path.Combine(State, plan.Id, plan.SourceReview!.InstalledArchive)));
+        var resumed = (await Store().InspectHistoryAsync(plan.Id, Capture, [], Token)).Retirement!;
+        Assert.NotNull(resumed); Assert.True(resumed.Resuming);
+        await Store().RetireAsync(resumed, resumed.Kind, Capture, [], Token);
+        Assert.False(Directory.Exists(Path.Combine(State, plan.Id)));
+        Assert.Equal(before.ObjectStateFingerprint, PayloadSnapshot.Capture(Payload, Token).ObjectStateFingerprint);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task NativeLinkReviewRetainsFullArchiveModesAndHistoricalPlanEvidence(bool candidateHasLink)
     {
         if (OperatingSystem.IsWindows()) { Assert.Skip("Unix link-mode hash domain; Windows link metadata has a separate contract."); return; }

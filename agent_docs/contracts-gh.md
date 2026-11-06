@@ -174,3 +174,47 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   around capture. These lookups never enter the final-admission-to-launch gap;
   User-scope lookups launch no children. This evidence grants browsing only;
   later mutations require fresh admission.
+
+- Install outcomes retain typed attempt accounting independently of success and
+  exit code. Only preflight refusal, canceled admission and a proven start
+  failure establish no mutating child. Old result constructors default to
+  unknown; transport/lifecycle faults never imply unchanged files. Retain both
+  streams on failure/cancellation. Install execution retains the bounded
+  parent-exit grace and independent bounded output retention. Cancel both initial
+  pipe readers on cancellation or retained transport failure before observing
+  them. A started child can return ChildDrained=false when exit is unconfirmed;
+  never extend cancellation/shutdown with an unlimited wait or a reaper.
+  Invalidate observations without inventory capture and require manual refresh
+  after that child stops. Ordinary RunAsync exception semantics stay compatible. This is observation only;
+  all placement, ownership, native and final-launch admission checks remain.
+- Subset install accounting retains each child result and the exact unsubmitted
+  suffix. Stop after the first failed/canceled child; never retry previous
+  successes or widen to --all. One --all result is a repository-wide child
+  outcome, not per-skill success evidence. The low-level update coordinator
+  retains its private staging install attempts separately from mutation of the
+  user's installation. Staging cleanup still uses its owned native lease, but
+  an unverified staging writer retains the private directory and reports its
+  location rather than cleaning up while that writer may still run.
+- CLI install avoids an eager before-inventory capture. After a possible write,
+  invalidate and, only after verified child exit, take one uncached capture under
+  an independent bounded deadline even after cancellation/failure. JSON exposes attempt, streams, refresh status
+  and observed entries. Without a before snapshot, encode added:null and
+  addedKnown:false, including on success; an empty array would falsely claim no
+  additions. JSON clients must migrate to that explicit unknown representation.
+  Never call every observed installation newly added. Text clean success keeps
+  the selected repo/skill/version confirmation and complete observation count;
+  warning/retry guidance belongs to failed, canceled or unverified outcomes.
+
+- Install placement review is read-only guidance under the install service's frozen
+  child context. Use `GhPlacementCatalog` and the existing non-interactive repository
+  listing for flat materialization names; those names never establish source
+  subpaths. Preserve conservative legacy/override alternatives and unknown ALL or
+  upstream target sets. Review's optional typed folder/context binding only rejects
+  stale admission; all existing shared-selector, managed and owner checks still run.
+- Discover paging uses `GhSkillSearchService.Options.Page`. Previous/Next reuse the
+  submitted query/owner/agent/hidden/cap tuple, never current unsubmitted text. An
+  empty raw page disables Next, not Previous; a client cap or agent-filtered count
+  cannot establish a total or a last page. The JSON `path` field is the only search
+  source-subpath evidence; a missing, empty or untrustworthy path stays unknown (explicit `SKILL.md` or `.` can identify a root skill). The tabular
+  install listing contains selectors/descriptions, not source paths, and cannot
+  fill this adapter evidence gap from an authored name.

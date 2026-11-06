@@ -85,6 +85,7 @@ public static partial class CliDispatcher
             | `quarantine` | Preview relocation of one standalone custom-directory copy. Apply requires a reviewed fingerprint and explicit confirmation. | `--path` or `--install-id`, `--yes --standalone --expect`, `--json` |
             | `undo` | Preview or restore an unchanged quarantined directory to its vacant original location. | `--id`, `--yes`, `--json` |
             | `quarantine-history` | Inspect recorded relocation states; incomplete operations require inspection. | `--json` |
+            | `replacement-history` | List up to 16 retained replacement operations using metadata/name hints only. Inspect to verify; no retirement or recovery action. | `--json` |
             | `history` | Verify retained backup journals and every payload blob; reports interrupted, orphaned and corrupt evidence without extracting it. | `--id`, `--json` |
             | `remove [SKILL]` | Safely remove one exact installation. Defaults to dry-run until you pass confirmation. | `--path` or `--install-id`, `--agent`, `--yes`, `--json` |
             | `cleanup` | Find duplicates, residue, malformed installs, and other cleanup candidates. | `--candidates`, `--apply`, `--yes`, `--json`, `--output` |

@@ -9,6 +9,8 @@ internal abstract class NativeStateDirectory : IDisposable
     internal abstract FileStream OpenFile(string name, bool writerLock, CancellationToken token);
     internal abstract FileStream OpenExistingFile(string name, bool writerLock, CancellationToken token);
     internal abstract IEnumerable<(string Name, long Bytes, string? Error)> EnumerateEntries(CancellationToken token);
+    internal virtual IEnumerable<(string Name, long Bytes, string? Error, bool Directory)> EnumerateHistoryEntries(CancellationToken token) =>
+        EnumerateEntries(token).Select(entry => (entry.Name, entry.Bytes, entry.Error, false));
     internal IEnumerable<(string Name, long Bytes)> EnumerateFiles(CancellationToken token)
     {
         foreach (var entry in EnumerateEntries(token))

@@ -396,6 +396,12 @@ jobs:
         run: |
           python tests/native/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
           python tests/native/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
+      - name: Prove explicit retained retirement and process-death protection
+        if: matrix.shard == 'inspection-unpin'
+        shell: bash
+        run: |
+          python tests/native/prove-retained-retirement.py --app 'dist/app/skillview${{ matrix.ext }}' --proof 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --output dist/retirement-app-proof.json
+          python tests/native/prove-retained-retirement.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --output dist/retirement-extension-proof.json
       - name: Verify repository API access and retain response evidence
         if: matrix.shard == 'owners'
         shell: bash

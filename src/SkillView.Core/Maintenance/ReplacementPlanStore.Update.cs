@@ -33,6 +33,7 @@ internal sealed partial class ReplacementPlanStore
     {
         token.ThrowIfCancellationRequested();
         if (tag is not null) GhRevisionResolver.ValidateTag(tag);
+        RequireHistoryCapacity(inventory, token);
         ManagedSkillDiscovery.RefuseTarget(target, token, runner);
         if (target.Pinned && !unpin) throw new IOException(tag is null
             ? "Exact pin retained; updating this installation requires explicit unpin review."
@@ -79,6 +80,7 @@ internal sealed partial class ReplacementPlanStore
         Func<NativeStateDirectory, CancellationToken, Task> stageBase, bool unpin, bool allowUnchanged, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        RequireHistoryCapacity(inventory, token);
         if (target.Pinned && !unpin) throw new IOException("Exact pin retained; updating this installation requires explicit unpin review.");
         var desired = target.FrontMatter with
         {

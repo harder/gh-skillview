@@ -284,7 +284,8 @@ public sealed class ForceInstallDispositionTests : IDisposable
                 Assert.Contains("reviewed local-change disposition", json.RootElement.GetProperty("errorMessage").GetString());
             }
             else Assert.DoesNotContain(json.RootElement.GetProperty("commandLine").EnumerateArray(), argument => argument.GetString() == "--force");
-            Assert.Empty(json.RootElement.GetProperty("added").EnumerateArray());
+            Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("added").ValueKind);
+            Assert.False(json.RootElement.GetProperty("addedKnown").GetBoolean());
             Assert.Equal(!occupied, File.Exists(Marker)); Assert.Equal(before, Bytes());
         }
         finally { Console.SetOut(originalOut); Console.SetError(originalError); SkillView.Tests.Cli.CliConsoleCapture.Gate.Release(); }
