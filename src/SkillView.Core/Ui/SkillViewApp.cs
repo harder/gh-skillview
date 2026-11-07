@@ -69,13 +69,14 @@ public sealed partial class SkillViewApp
     private SkillView.Ui.Tabs.UpdatesTabView? _updatesTab;
     private SkillView.Ui.Tabs.DoctorTabView? _doctorTab;
     private SkillView.Ui.Tabs.DiscoverTabView? _discoverTab;
+    private readonly GuidedRepairSequence _guidedRepairs = new();
     private SkillView.Ui.Tabs.ChangesTabView? _changesTab;
     // Remembered before Doctor took over so Esc returns to where the user was.
     private SkillViewTab _tabBeforeDoctor = SkillViewTab.Discover;
     private bool _inDoctor;
     private SkillViewTab _tabBeforeUpdateReview = SkillViewTab.Discover;
 
-    private const string ItemActionsText = "[Enter] Preview    [i] Install    [o] Open    [?] More";
+    private static string ItemActionsText => ActionLabels.DiscoverLegend(hasResults: true);
 
     private List<SearchResultSkill> _results = new();
     // Original gh-skill-search ordering for the current query — preserved so

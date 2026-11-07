@@ -116,8 +116,8 @@ internal sealed class DiscoverTabView : FrameView
         TuiHelpers.ConfigureTableChrome(ResultsTable);
 
         SubmittedSummary = new Label { X = 0, Y = 1, Width = Dim.Fill(), Height = 1 };
-        PreviousPage = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Previous", Enabled = false };
-        NextPage = new SingleRowButton { X = Pos.Right(PreviousPage) + 1, Y = Pos.AnchorEnd(1), Text = "Next", Enabled = false };
+        PreviousPage = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = ActionLabels.Previous.ButtonText, Enabled = false };
+        NextPage = new SingleRowButton { X = Pos.Right(PreviousPage) + 1, Y = Pos.AnchorEnd(1), Text = ActionLabels.Next.ButtonText, Enabled = false };
         PageStatus = new Label { X = Pos.Right(NextPage) + 1, Y = Pos.AnchorEnd(1), Width = Dim.Fill(), Text = "Page 1" };
         PreviousPage.Accepting += (_, e) => { e.Handled = true; PageRequested?.Invoke(-1); };
         NextPage.Accepting += (_, e) => { e.Handled = true; PageRequested?.Invoke(1); };

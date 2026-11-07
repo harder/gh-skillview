@@ -58,7 +58,7 @@ public sealed class InstalledFilterRenderingTests
             Assert.True(search.Frame.Bottom <= view.Frame.Height); Assert.True(search.Frame.Right <= view.Frame.Width);
             foreach (var label in new[] { "Details", "Review update (u)", "More actions" })
             { var button = buttons.Single(b => b.Text == label); Assert.False(button.Visible); Assert.False(button.Enabled); }
-            Assert.False(buttons.Single(b => b.Text == "Check all updates (C)").Visible);
+            Assert.False(buttons.Single(b => b.Text == "Check updates (C)").Visible);
             foreach (var key in new[] { 'K', 'u', 'C', 'R', 'T' }) app.Keyboard.RaiseKeyDownEvent(new Key(key));
             Assert.False(view.TryStartSelectedRemoveForTests()); Assert.Null(view.GetSelectedSkill()); Assert.Equal(0, actions);
             coverage.SetFocus(); Assert.True(view.HandleLocalNavigation(Key.Tab)); Assert.True(search.HasFocus);

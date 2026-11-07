@@ -61,9 +61,11 @@ flowchart TD
 
 Startup and all three inventory-backed workspaces use the same full-context display
 capture. Scope filtering happens on reconciled rows and retains the other
-consumers in each row. The display cache belongs to one workflow coordinator,
-whose runner, HOME/CWD, roots and profile options are fixed for that app instance.
-It is not a global cache shared across contexts or a persisted authority record.
+consumers in each row. The display cache belongs to one workflow coordinator with a captured runner and
+HOME/CWD. Each capture freezes one selected workspace/root/profile options value.
+Saving Locations advances catalog generation, retires earlier context evidence
+and refreshes Installed. It is not a global cache shared across contexts or a
+persisted authority record.
 
 ## Measurements
 

@@ -39,7 +39,7 @@ public sealed class CliDispatcherCleanupTests : IDisposable
         Assert.Equal("EmptyDirectory", entry.GetProperty("kind").GetString());
         Assert.False(entry.GetProperty("reviewOnly").GetBoolean());
 
-        foreach (var filter in new[] { new[] { "--candidates=Malformed" }, new[] { "--candidates", "Malformed" } })
+        foreach (var filter in new[] { new[] { "--candidates=Malformed" }, new[] { "--candidates", "mAlFoRmEd" } })
         {
             var (filteredCode, filteredOutput, _) = await RunCliAsync(root, ["cleanup", .. filter, "--json"]);
             Assert.Equal(ExitCodes.Success, filteredCode);
@@ -48,6 +48,20 @@ public sealed class CliDispatcherCleanupTests : IDisposable
             Assert.True(PathIdentity.Equals(nonempty, malformed.GetProperty("path").GetString()!));
             Assert.Equal("Malformed", malformed.GetProperty("kind").GetString());
         }
+        foreach (var name in new[] { "SourceOrphaned", "Duplicate", "OrphanCanonicalCopy", "FutureUnknownKind" })
+        {
+            foreach (var filter in new[] { new[] { "--candidates=" + name }, new[] { "--candidates", name } })
+            {
+                var (legacyCode, legacyOutput, _) = await RunCliAsync(root, ["cleanup", .. filter, "--json"]);
+                Assert.Equal(ExitCodes.Success, legacyCode);
+                using var legacy = JsonDocument.Parse(legacyOutput);
+                Assert.Empty(legacy.RootElement.GetProperty("entries").EnumerateArray());
+            }
+        }
+        var (mixedCode, mixedOutput, _) = await RunCliAsync(root, "cleanup", "--candidates=Duplicate,eMpTyDiReCtOrY", "--json");
+        Assert.Equal(ExitCodes.Success, mixedCode);
+        using var mixed = JsonDocument.Parse(mixedOutput);
+        Assert.Equal("EmptyDirectory", Assert.Single(mixed.RootElement.GetProperty("entries").EnumerateArray()).GetProperty("kind").GetString());
         Assert.True(Directory.Exists(empty)); Assert.Empty(Directory.EnumerateFileSystemEntries(empty));
         Assert.Equal("Keep these authored bytes.", File.ReadAllText(keep));
         if (observedBefore)

@@ -1,5 +1,7 @@
 # Review and apply a saved update
 
+This is the development workflow; use the installed binary's help for its supported commands. See the [action matrix](supported-actions.md) for selection boundaries and [History](usage.md#retained-operation-history) for retirement (Abandon versus Discard Undo data).
+
 Ordinary `update` prepares a saved review when needed and leaves installed payloads unchanged:
 
 ```sh
@@ -35,9 +37,13 @@ named like a commit is still resolved only as a tag. New pin policy, automatic t
 browsing and persistent version approvals are outside this flow.
 
 Installed's **Review update (u)** and an Issues **Updates** finding open
-one exact physical copy and prepare its saved candidate immediately. Copies'
-**Update / version...** opens options for its already selected copy, so choosing
-a tag does not first stage latest. Enter in Installed browses ordinary detail; it does not prepare an update. The operation surface stays restricted to its one selected copy. Main-view **Check updates (C)** is
+one exact physical copy and prepare its saved candidate immediately. **Choose version...**
+prepares a tag review for that same selected copy when version choice is available;
+after an attempted write, refresh inventory before starting another review. The
+inline copy comparison is read-only: choose Reference and Compare there, then use
+**u** on the exact Issues child for saved update review. Enter in Installed browses
+ordinary detail; it does not prepare an update. The operation surface stays
+restricted to its one selected copy. Main-view **Check updates (C)** is
 read-only and consumes no saved-plan quota.
 
 Each candidate has its own source acknowledgement, retention checkbox and

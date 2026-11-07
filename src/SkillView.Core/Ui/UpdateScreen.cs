@@ -114,6 +114,7 @@ public static class UpdateScreen
         Field("Retained original", plan.RetainedPath);
         Field("Candidate", plan.CandidatePath);
         Field("Disposition", plan.LocalImport is not null ? plan.LocalImport.Disposition : plan.PinPolicy is not null ? "unpin-only; retain original" : plan.LocalDisposition?.Kind ?? "replace; retain original");
+        Field("Local edit disposition", UpdateReviewPresentation.ReplacementDisposition(plan));
         Field("Review fingerprint", plan.ReviewFingerprint);
         if (plan.LocalSourceSwitch is { } change)
         {

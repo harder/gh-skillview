@@ -54,6 +54,10 @@ internal sealed class DoctorTabView : FrameView
         Add(_body);
     }
 
+    internal void SetProbeFailure(string message) => _body.Text = TerminalEscapeSanitizer.Sanitize("Authentication could not be checked. Local browsing remains available.\n\n" + message + "\n\nRetry Doctor or run gh auth status. Esc returns to browsing.") ?? "Authentication check failed.";
+
+    internal void SetProbing() => _body.Text = "Checking gh authentication… Esc returns to local browsing. This check may contact the configured host through gh.";
+
     /// Replace the rendered body with a fresh report. Call this on activate
     /// so capability/auth changes during the session are reflected.
     internal void SetReport(EnvironmentReport report, InventorySnapshot? inventory = null)

@@ -11,7 +11,7 @@ internal static class CleanupReviewFormatter
         CleanupClassifier.CandidateKind.BrokenSymlink => "Broken link",
         CleanupClassifier.CandidateKind.EmptyDirectory => "Empty directory",
         CleanupClassifier.CandidateKind.Malformed => "Missing or invalid skill file",
-        CleanupClassifier.CandidateKind.Duplicate or CleanupClassifier.CandidateKind.NameCollision => "Multiple copies",
+        CleanupClassifier.CandidateKind.NameCollision => "Multiple copies",
         CleanupClassifier.CandidateKind.Untracked => "Source not recorded",
         CleanupClassifier.CandidateKind.MetadataConflict => "Conflicting installation records",
         CleanupClassifier.CandidateKind.BrokenSharedMapping => "Shared link needs attention",
@@ -109,7 +109,7 @@ internal static class CleanupReviewFormatter
             CleanupClassifier.CandidateKind.BrokenSymlink => "This link's target could not be found.",
             CleanupClassifier.CandidateKind.EmptyDirectory => candidate.ReviewOnly ? candidate.Reason : "This directory contains no files.",
             CleanupClassifier.CandidateKind.Malformed => "The skill file is missing or its metadata needs attention.",
-            CleanupClassifier.CandidateKind.Duplicate or CleanupClassifier.CandidateKind.NameCollision => "Other copies use this name; compare their sources and versions.",
+            CleanupClassifier.CandidateKind.NameCollision => "Other copies use this name; compare their sources and versions.",
             CleanupClassifier.CandidateKind.Untracked => "Not listed by gh; another installer may own it.",
             _ => candidate.Reason
         });

@@ -46,6 +46,13 @@ public sealed partial class SkillViewApp
             return;
         }
 
+        if (ReferenceEquals(app.TopRunnableView, mainWindow) && key.KeyCode == KeyCode.F5)
+        {
+            OpenLocations();
+            key.Handled = true;
+            return;
+        }
+
         if (ReferenceEquals(app.TopRunnableView, mainWindow) && IsHistoryShortcut(key))
         {
             OpenHistory();
@@ -155,7 +162,7 @@ public sealed partial class SkillViewApp
         if (rune.Value == 'I') { StageInstall(forceAdvanced: true); return true; }
         if (rune.Value == 'i') { StageInstall(forceAdvanced: false); return true; }
         // A → discover the skills in the selected result's repo and pick which
-        // to install (gh ≥ 2.95 non-interactive listing, cli/cli#13548).
+        // to install using the supported non-interactive repository listing.
         if (rune.Value == 'A' && _activeTab == SkillViewTab.Discover) { StageInstallAll(); return true; }
         if (rune.Value == 'o' || rune.Value == 'O') { OpenSelected(); return true; }
         // Open the update workspace directly. Changes rows describe observed
@@ -168,7 +175,13 @@ public sealed partial class SkillViewApp
             else { ActivateTab(SkillViewTab.Changes); SetStatus("Use Check updates (C), then select an Updates finding and press Enter."); }
             return true;
         }
-        if (rune.Value == 'c' || rune.Value == 'C') { _workflows.ShowCleanupScreen(); return true; }
+        if (rune.Value == 'c')
+        {
+            var selected = _activeTab == SkillViewTab.Installed ? _installedTab?.GetSelectedSkill() : null;
+            ActivateTab(SkillViewTab.Changes);
+            _changesTab?.ShowCleanup(selected is null ? null : OperationSubject.From(selected));
+            return true;
+        }
         if (key.KeyCode == KeyCode.F1 || rune.Value == '?') { ShowHelp(); return true; }
 
         // Search-tab sort cycle. Lower-case `s` is unused at this level so
@@ -240,7 +253,7 @@ public sealed partial class SkillViewApp
     /// Switch active tab. All three (Discover / Installed / Changes) are
     /// embedded views — flipping the Visible flags swaps them in-place
     /// without re-running the app loop.
-    private void ActivateTab(SkillViewTab tab, InstalledInstallHandoff? installHandoff = null)
+    private void ActivateTab(SkillViewTab tab, InstalledInstallHandoff? installHandoff = null, bool returningReview = false)
     {
         var leftDoctor = false;
         if (_inDoctor)
@@ -257,6 +270,7 @@ public sealed partial class SkillViewApp
                 : SkillViewTab.Discover;
         }
         if (tab == _activeTab) return;
+        if (!returningReview) _guidedRepairs.Stop();
 
         if (_activeTab == SkillViewTab.Discover)
         {
@@ -339,17 +353,9 @@ public sealed partial class SkillViewApp
         if (_changesTab is not null) _changesTab.Visible = false;
         RefreshShellChrome();
 
-        // Make sure the report is fresh — probe lazily if we never have.
-        if (Volatile.Read(ref _lastReport) is { } cachedReport)
-        {
-            _doctorTab.SetReport(cachedReport, _installedTab?.CurrentSnapshot);
-            _doctorTab.Visible = true;
-            _doctorTab.SetFocus();
-            return;
-        }
-
         // Probe in the background; reveal an empty pane in the meantime so
         // the user sees the screen flip even before the report lands.
+        _doctorTab.SetProbing();
         _doctorTab.Visible = true;
         SetBusy("probing environment for Doctor…");
         var doctorGeneration = Interlocked.Read(ref _doctorGeneration);
@@ -398,10 +404,11 @@ public sealed partial class SkillViewApp
 
     private void LeaveUpdates()
     {
+        _guidedRepairs.CloseReview();
         _updatesTab?.CancelPendingWork();
         if (_updatesTab is not null) _updatesTab.Visible = false;
         _activeTab = _tabBeforeUpdateReview == SkillViewTab.Discover ? SkillViewTab.Installed : SkillViewTab.Discover;
-        ActivateTab(_tabBeforeUpdateReview);
+        ActivateTab(_tabBeforeUpdateReview, returningReview: true);
     }
 
     private void CheckUpdates()
@@ -415,6 +422,7 @@ public sealed partial class SkillViewApp
     {
         _installedTab?.RefreshAvailability();
         _changesTab?.RefreshAvailability();
+        RefreshShellChrome();
     }
 
     private void CycleTab(int delta)
@@ -460,7 +468,7 @@ public sealed partial class SkillViewApp
     private void ShowHelp()
     {
         if (_app is null) return;
-        HelpOverlay.Show(_app);
+        HelpOverlay.Show(_app, CurrentActionScreen, _showingLogs, _updatesTab?.SourceDiffAvailable == true);
     }
 
     private void FocusSearchFromInstalled()

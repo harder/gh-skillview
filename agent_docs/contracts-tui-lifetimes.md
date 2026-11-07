@@ -3,6 +3,11 @@
 Read these contracts before changing this subsystem. See [the guide index](README.md)
 for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
 
+- `ActionLabels` supplies pure display metadata for contextual Help, shell hints
+  and corresponding controls. Add labels for existing handlers only; routing,
+  text-input guards, ownership and mutation approval remain in those handlers.
+  Keep review-screen aliases distinct from primary-tab actions.
+
 - Prefer the built `skillview` host binary over `dotnet run` for PTY-driven TUI
   automation. `dotnet run` can add first-run noise and long startup delays,
   especially with sandboxed `HOME`.
@@ -297,7 +302,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   old rows visibly refreshing with copy actions paused. Bound display to 8,192
   rows including headings and omission indication. C (Shift+c) remains global
   check/cancel for observed copies or a running check; an empty Installed view
-  hides Check all updates and consumes C without starting work. c remains Cleanup.
+  hides Check updates (C) and consumes C without starting work. c remains Cleanup.
   The existing Issues copy chooser is separate.
 
 - With no observed Installed copies, show a full-width empty explanation, separate
@@ -395,6 +400,15 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   Refresh retains the selected operation ID when it is still present. History
   work remains owned by the app task tracker after a canceled modal closes.
 
+- B9 typed `CapturedFinding` observations distinguish exact captured copy sets
+  from exact contextual gh records, with explicit navigation allowlists. Issues
+  and Installed's issue facet share this capture/generation through the existing
+  evidence handoff. Remote Updates remain the explicit availability session's
+  observations. Recorded revision/method differences never synthesize upgrades.
+  Issues uses full-width list/detail below 110 columns, preserving selection on
+  Back/refresh. Keep both requests use the selected-view lease; canceled or stale
+  queued completions cannot publish notices, reopen reviews or steal focus.
+
 - History retirement exposes only actions admitted by its current inspection.
   Clear approval on selection/Refresh/Inspect/confirmation/attempt, guard ID and
   request ownership through dispatch, and default each action's confirmation to
@@ -471,3 +485,57 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   lifetime change requiring focused parity tests. The current refresh retains
   the existing dispatch/staging helpers. Editor's typed and polymorphic Text
   setters must keep its document/raw text coherent and read-only input inert.
+
+- F5 Locations is a main-shell shortcut from text inputs. Its synchronous dialog
+  owns load, directory validation and preference writes through
+  ModalOperationTracker; keep all I/O off the event thread, publish completion
+  only while the modal/app token is active, and cancel linked work before
+  disposing its token registrations. A saved location change advances catalog
+  generation before refreshing the current captured discovery context.
+
+  Locations recovery uses the same modal ownership/linked cancellation and queued
+  completion checks as directory validation and Save. Never perform review,
+  backup, native topology or filesystem work from draw/filter handlers. Enter in
+  Directory/Profile adds or is consumed; Enter in list/read-only Selected cannot
+  bubble to default Cancel. Focused buttons retain Enter. Recovery is Cancel by
+  default, displays full bounded literal errors and stored-versus-session choices,
+  and applies only the reviewed native generation. A failed apply requires a fresh
+  review; leaving either modal cancels work and rejects late publication.
+
+- Copies browsing lives in the main Installed/Issues views. Family headers only
+  expand; exact children own actions. InlineCopyRequest freezes snapshot reference,
+  catalog generation, context, exact subject/choice objects, request epoch and
+  return state independently of typed finding projections. InlineCopiesView owns
+  explicit comparison leases through awaited UI dispatch; selection, Back,
+  refresh, context/catalog invalidation and departure retire requests/facts.
+  A reference is explicitly chosen and comparison-only. Held capture root IDs
+  distinguish aliases independently of generations; internal witnesses never
+  enter saved hashes or public comparison JSON. Complete local capture, raw
+  equality, root modes, source/revision domains and bounded inventory/consumer
+  coverage stay separate. Full ACL/xattr/ADS equivalence remains unknown.
+- Cleanup shortcut filters Issues. SelectedCleanupHandoff retains exact fresh
+  issue/kind/path/subject matching and exclusive dispatch. CleanupScreen is now
+  a focused selected-item operation review; its owned native preflight identity
+  must match immediate execution validation. Its executor retains specialist
+  batch validation/accounting compatibility, with no general browsing shell.
+  Reconciliation runs independently of canceled delivery. GuidedRepairSequence
+  stores frozen per-item intents/outcomes only, never prepared sibling candidates;
+  explicit Review next waits for prior executor/reconciliation settlement.
+  Updates callbacks bind the dispatched exact ID/path, accepted load generation,
+  operation instance and saved plan ID. An unrelated review cannot start/settle
+  that item; replacing an unstarted review records a skip, while matching work
+  retains its own result through reconciliation even after the view is replaced.
+- Standalone Move aside is a thin QuarantineStore Preview/Apply/Undo adapter.
+  Comparison is never admission. Keep both explicit move approvals and Preview
+  fingerprint, exact fresh inventory/native intent, all existing refusals and
+  separate Undo preview/approval with no invented --expect contract. Results
+  distinguish native movement from bounded post-action inventory verification.
+  A failed reconciliation capture retains the native result and reports bounded
+  literal failure detail plus Refresh Installed guidance; it cannot imply that
+  an already reported move/restore did not happen.
+  Reconcile after possible execution independently of canceled modal delivery;
+  restart guidance uses quarantine-history/undo, never replacement-only F4 History.
+- More-actions and reference popups anchor to their actual control for keyboard
+  and mouse acceptance, use a bounded screen rectangle and opaque framed content.
+
+- The B9/Inline UI adapter retains typed finding keys and parent-qualified exact children. ExactEntry admits only verified expanded membership, non-finding singleton rows, or the strict existing typed singleton leaf shape with exact ordinal IDs/path and consistent single ReviewCleanup/ReviewUpdate navigation. Registry, family, intent and coverage observations supply no execution subject. Finding comparison revalidates Id/Difference and all captured members under the owned selection lease; Allowed membership restricts browsing only. Guided requests own a separate selection gate; s is Skip and k/K remain preferences. Source/retention approvals and specialist fresh admission remain independent.

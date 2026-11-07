@@ -17,6 +17,15 @@ public sealed partial class ReviewedUpdatesTabTests
         using var view = View([target], (_, _, _) => Task.FromResult(Result(review)), (saved, _, _) =>
         { received = saved; return Task.FromResult(Result(saved with { Status = "installed" }, true)); });
         await view.LoadForSubjectAsync(OperationSubject.From(target)); await view.ReviewUpdateAsync();
+        Assert.True(view.DiffButtonForTests.Visible);
+        view.ToggleDiffForTests();
+        Assert.True(view.DiffPreviewForTests.Visible);
+        Assert.Contains("Opening Diff grants no approval", view.DiffPreviewForTests.Text);
+        Assert.Equal(CheckState.UnChecked, view.SourceReviewBoxForTests.Value);
+        Assert.Equal(CheckState.UnChecked, view.RetainBoxForTests.Value);
+        await view.ApplyReviewForTestsAsync(); Assert.Null(received);
+        view.ToggleDiffForTests();
+        Assert.False(view.DiffPreviewForTests.Visible);
         view.ToggleDetailsForTests();
         Assert.Contains(review.SourceReview.Fingerprint, view.PreviewTextForTests);
         Assert.Contains("not-reviewed", view.PreviewTextForTests);
@@ -29,6 +38,9 @@ public sealed partial class ReviewedUpdatesTabTests
         await view.ApplyReviewForTestsAsync(); Assert.Null(received);
         view.RetainBoxForTests.Value = CheckState.Checked;
         Assert.True(view.ApplyButtonForTests.Enabled);
+        view.ToggleDiffForTests(); view.ToggleDiffForTests();
+        Assert.Equal(CheckState.Checked, view.RetainBoxForTests.Value);
+        Assert.Equal(CheckState.Checked, view.SourceReviewBoxForTests.Value);
         await view.ApplyReviewForTestsAsync();
         Assert.NotNull(received); Assert.True(received.AcknowledgeSourceReview);
         Assert.Equal(review.PlanFingerprint, received.PlanFingerprint);

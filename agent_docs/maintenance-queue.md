@@ -23,18 +23,21 @@ refreshing the queue does not. No skill code or client session runs for comparis
 The main tab is visibly **Issues** (keyboard alias `3`; internal Changes names
 remain). `ChangesQueueBuilder` is a pure presentation over the captured queue:
 it filters `installation-review` and `Untracked` routine observations, groups
-`NameCollision`/`Duplicate` by raw name using the classifier's ordinal-ignore-case
+`NameCollision` by raw name using the classifier's ordinal-ignore-case
 comparison, and retains every frozen member. One stable path/ID-sorted member
 anchors the existing copy chooser; it grants no survivor preference or mutation
 authority. Affected-copy count uses distinct captured installation ID/path pairs.
 Problems (`Malformed`, `MetadataConflict`, `BrokenSymlink`, `BrokenSharedMapping`,
 `EmptyDirectory`) remain individual findings, including review-only findings.
-Other observations are Review suggestions. Availability is always **Updates not
-checked**. Header and status counts share that wording and omit a numeric update
-count until availability results exist; routine unknown availability is never a
-finding. Routine inspection remains in Installed, and the Issues footer exposes
-`u Updates` even for an empty list. Family field omission messages appear only
-when the omission count is positive.
+`HiddenNestedResidue` remains a Review suggestion; `Duplicate` is no longer an
+emitted classifier kind or a copy-family selector. The queue capture itself does
+not check upstream availability: its initial projection says **Updates not
+checked**. Issues overlays the existing explicit availability observations shared
+with Installed and adds **Updates** findings for available updates; routine unknown
+availability is never a finding. **Check updates (C)** starts or cancels checks;
+**Enter** or **u/U** reviews the selected finding. Routine inspection remains in
+Installed. Family field omission messages appear only when the omission count
+is positive.
 
 The presentation caps visible findings at 8,192 after filtering/grouping. Counts
 include omitted findings; hidden routine rows and collapsed family members are
@@ -134,3 +137,20 @@ subject to the existing backends' supported and explicitly refused cases.
 No session or loaded-version fact is inferred from inventory or a read-only client
 list handler. The original audit clauses remain unchanged; other maintenance
 findings retain their separate incomplete status.
+
+B9 supersedes the same-name-only TUI grouping above. `CapturedFindingBuilder`
+produces typed subjects (captured copy sets or exact contextual registry records)
+inside the queue, without changing schema1 CLI entries. Known repository/subpath
+families compare ref-to-ref and tree-to-tree, retaining unknown/conflicting domains;
+authored/distributor versions never substitute for either. Source differences
+remain Review; installation methods alone are Information. Same-source multiple
+physical copies remain Information with comparable matching evidence or Review
+with unknown revision evidence, never claimed redundant without full comparison.
+Families retain every
+physical member/exposure/claim, with no preferred survivor and fresh exact-family
+revalidation before the existing copy chooser. `Keep both` changes only the
+separate intentional-difference preference; intent stays visible and reversible.
+The Installed issue facet receives the same frozen typed findings/generation.
+Registry-only subjects remain Issues-only and have inspection/guidance navigation
+only, including honest custom-copy and partial-capture caveats. Full comparison
+and cleanup/remediation expansion are separate tasks, not inferred duplicates.

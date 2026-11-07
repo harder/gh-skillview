@@ -307,7 +307,7 @@ public sealed class DiscoveryTests : IDisposable
         };
         Assert.True(snapshot.IsPartial);
         Assert.DoesNotContain(CleanupClassifier.Classify(snapshot, roots), candidate =>
-            candidate.Kind is CleanupClassifier.CandidateKind.Untracked or CleanupClassifier.CandidateKind.SourceOrphaned);
+            candidate.Kind == CleanupClassifier.CandidateKind.Untracked);
         incomplete.Clear();
         Assert.Equal(2, new LocalSkillScanner(new Logger()).ScanWithCancellation(roots, new(AllowHiddenDirs: true),
             TestContext.Current.CancellationToken, incomplete).Length);

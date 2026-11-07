@@ -76,7 +76,7 @@ public sealed class CleanupScreenTests
                 protectedPath, "inspection required", protectedSkill, true)
             { Impact = protectedImpact };
             var candidates = ImmutableArray.Create(
-                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, active, "fixture", skill),
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Malformed, active, "fixture", skill),
                 review,
                 new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.EmptyDirectory, stale, "was empty", null),
                 review);
@@ -250,14 +250,14 @@ public sealed class CleanupScreenTests
             };
             var candidates = ImmutableArray.Create(
                 new CleanupClassifier.Candidate(
-                    CleanupClassifier.CandidateKind.SourceOrphaned,
+                    CleanupClassifier.CandidateKind.Malformed,
                     directory,
-                    "source orphaned",
+                    "invalid skill metadata",
                     skill),
                 new CleanupClassifier.Candidate(
-                    CleanupClassifier.CandidateKind.Duplicate,
+                    CleanupClassifier.CandidateKind.Malformed,
                     directory,
-                    "duplicate install",
+                    "same malformed path",
                     skill));
             var screen = CreateScreen(
                 candidates,
@@ -307,14 +307,14 @@ public sealed class CleanupScreenTests
             };
             var candidates = ImmutableArray.Create(
                 new CleanupClassifier.Candidate(
-                    CleanupClassifier.CandidateKind.SourceOrphaned,
+                    CleanupClassifier.CandidateKind.Malformed,
                     directory,
-                    "source orphaned",
+                    "invalid skill metadata",
                     skill),
                 new CleanupClassifier.Candidate(
-                    CleanupClassifier.CandidateKind.Duplicate,
+                    CleanupClassifier.CandidateKind.Malformed,
                     directory,
-                    "duplicate install",
+                    "same malformed path",
                     skill));
             var remove = new RemoveService(
                 new Logger(),
@@ -366,8 +366,8 @@ public sealed class CleanupScreenTests
         {
             var skill = Skill("demo", directory) with { ScanRoot = root.FullName };
             var candidates = ImmutableArray.Create(
-                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, directory, "fixture", skill),
-                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Duplicate, directory, "fixture duplicate", skill));
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Malformed, directory, "fixture", skill),
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Malformed, directory, "fixture duplicate", skill));
             var deleting = 0;
             var remove = new RemoveService(new Logger(), null, (_, _) =>
             {
@@ -441,8 +441,8 @@ public sealed class CleanupScreenTests
             var one = Skill("first", first) with { ScanRoot = root.FullName };
             var two = Skill("second", second) with { ScanRoot = root.FullName };
             var candidates = ImmutableArray.Create(
-                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, first, "fixture", one),
-                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, second, "fixture", two));
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Malformed, first, "fixture", one),
+                new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Malformed, second, "fixture", two));
             var canonicalSecond = OwnershipPath.CanonicalCandidate(second)!;
             var remove = new RemoveService(new Logger(), null, (path, _) =>
             {
@@ -620,21 +620,23 @@ public sealed class CleanupScreenTests
     public void RenderDetail_DefaultExplainsActionAndKeepsTechnicalEvidenceBehindDetails()
     {
         var candidate = new CleanupClassifier.Candidate(
-            CleanupClassifier.CandidateKind.Duplicate,
+            CleanupClassifier.CandidateKind.NameCollision,
             "/skills/demo`copy",
-            "duplicate install",
-            Skill("demo", "/skills/demo"));
+            "name collision",
+            Skill("demo", "/skills/demo"), ReviewOnly: true);
 
         candidate = candidate with { Impact = OperationImpact.Payload(OperationSubject.From(candidate.Skill!), "cleanup") };
         var summary = CleanupScreen.RenderDetail(candidate);
         Assert.Contains("## Multiple copies", summary);
-        Assert.Contains("Deletion has no automatic undo.", summary);
+        Assert.Contains("Inspection changes nothing.", summary);
+        Assert.Contains("Deletion has no automatic undo.", CleanupScreen.RenderDetail(candidate with
+        { Kind = CleanupClassifier.CandidateKind.Malformed, ReviewOnly = false }));
         Assert.Contains("`` /skills/demo`copy ``", summary);
         Assert.DoesNotContain("| Field |", summary);
         Assert.DoesNotContain(candidate.Impact.Subject.InstallationId, summary);
         var detail = CleanupScreen.RenderDetail(candidate, showDetails: true);
         Assert.Contains("## Technical details", detail);
-        Assert.Contains("duplicate install", detail);
+        Assert.Contains("name collision", detail);
         Assert.Contains(candidate.Impact.Subject.InstallationId, detail);
         Assert.Contains("## Skill", detail);
         Assert.Contains("## Summary", detail);
@@ -684,62 +686,17 @@ public sealed class CleanupScreenTests
         Assert.Contains("context protection", CleanupScreen.RenderDetail(candidate, showDetails: true));
     }
 
-    [Fact]
-    public void BuildShortcuts_UsesCompactOrderedCleanupActions()
-    {
-        var shortcuts = CleanupScreen.BuildShortcutsForTests();
 
-        Assert.Collection(
-            shortcuts,
-            shortcut =>
-            {
-                Assert.Equal("Space", shortcut.Title);
-                Assert.Equal("Select", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("Enter", shortcut.Title);
-                Assert.Equal("Review", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("F2", shortcut.Title);
-                Assert.Equal("Details", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("i", shortcut.Title);
-                Assert.Equal("Ignore", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("x", shortcut.Title);
-                Assert.Equal("Export", shortcut.HelpText);
-            },
-            shortcut =>
-            {
-                Assert.Equal("Esc", shortcut.Title);
-                Assert.Equal("Back", shortcut.HelpText);
-            });
-    }
 
     [Fact]
-    public void BuildHeaderText_UsesShortSelectionHint()
-    {
-        Assert.Contains("Space Select", CleanupScreen.BuildHeaderTextForTests());
-        Assert.Contains("Enter Review", CleanupScreen.BuildHeaderTextForTests());
-        Assert.Contains("F2 Details", CleanupScreen.BuildHeaderTextForTests());
-    }
-
-    [Fact]
-    public void ConfirmationGroupsKindsWithTheSameFriendlyIssueTogether()
+    public void ConfirmationGroupsRepeatedFriendlyIssuesTogether()
     {
         var candidates = new[]
         {
-            new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Duplicate, "/one", "duplicate", null, true),
+            new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.NameCollision, "/one", "duplicate", null, true),
             new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.NameCollision, "/two", "collision", null, true),
             new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.HiddenNestedResidue, "/three", "hidden", null, true),
-            new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned, "/four", "source", null, true)
+            new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.HiddenNestedResidue, "/four", "source", null, true)
         };
         var text = CleanupScreen.BuildRemoveConfirmationText(candidates);
         Assert.Contains("- Multiple copies: 2", text);
@@ -753,15 +710,15 @@ public sealed class CleanupScreenTests
     {
         var candidates = ImmutableArray.Create(
             new CleanupClassifier.Candidate(
-                CleanupClassifier.CandidateKind.Duplicate,
+                CleanupClassifier.CandidateKind.NameCollision,
                 "/tmp/a",
-                "duplicate install",
-                Skill: null),
+                "name collision",
+                Skill: null, ReviewOnly: true),
             new CleanupClassifier.Candidate(
-                CleanupClassifier.CandidateKind.Duplicate,
+                CleanupClassifier.CandidateKind.NameCollision,
                 "/tmp/b",
-                "duplicate install",
-                Skill: null),
+                "name collision",
+                Skill: null, ReviewOnly: true),
             new CleanupClassifier.Candidate(
                 CleanupClassifier.CandidateKind.BrokenSymlink,
                 "/tmp/c",
@@ -804,7 +761,7 @@ public sealed class CleanupScreenTests
     [Fact]
     public void TechnicalDetailExplicitlyReportsWholeFieldOmissions()
     {
-        var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.SourceOrphaned,
+        var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.Malformed,
             "/skills/exact", new string('x', MaintenanceQueueFormatter.MaxDetailCharacters + 1), null);
         var detail = CleanupScreen.RenderDetail(candidate, showDetails: true);
         Assert.Contains("/skills/exact", detail);

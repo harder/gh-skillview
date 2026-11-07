@@ -8,7 +8,7 @@
 [![Release](https://github.com/harder/gh-skillview/actions/workflows/release.yml/badge.svg)](https://github.com/harder/gh-skillview/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
 
-![Discover and preview skills in SkillView](assets/animations/g1-discover.gif)
+This checkout documents the development version. Some workflows below may be ahead of your installed release; check `skillview --version` and `skillview --help`.
 
 ## Install
 
@@ -47,22 +47,16 @@ Put the binary on your `PATH`. On macOS and Linux, make it executable first (`ch
 
 ## Use SkillView
 
-Start the TUI with `gh skillview` (extension) or `skillview` (standalone). Search for a skill, select a result to preview its `SKILL.md`, and press `i` to review an install. The **Installed** tab shows local skills and their details; **Issues** shows local problems and review suggestions; updates are checked explicitly. Press `?` or `F1` for all shortcuts.
+Start with `gh skillview` (extension) or `skillview` (standalone):
 
-| Key | Action |
-|---|---|
-| `1` / `2` / `3` | Discover / Installed / Issues |
-| `/` | Focus search |
-| `i` / `I` | Install / advanced install |
-| `x` | Review removal of a selected installed skill |
-| `c` / `d` | Cleanup / Doctor |
-| `Ctrl+Q` | Quit |
+1. **Discover (1):** search, preview a skill and press `i` to review its placement before installing.
+2. **Installed (2):** inspect an exact physical copy and every recorded consumer. Press `C` to check updates explicitly; `u` prepares that copy's saved update review.
+3. **Issues (3):** inspect local problems and review suggestions. Expand a family, select an exact child and compare it. A suggestion never applies a change by itself.
+4. Review the exact target, source changes and affected consumers. Source acknowledgement and permission to retain the original are separate approvals. Undo and recovery have their own fresh reviews.
 
-| Installed skills | Cleanup candidates |
-|---|---|
-| ![Installed skills and details](assets/screenshots/05-installed.png) | ![Cleanup candidates and details](assets/screenshots/08-cleanup.png) |
+Local browsing does not require a remote authentication check. **F5 / Locations** chooses known scan roots, workspaces and profiles; incomplete coverage stays unknown. **F4 / History** inspects saved replacements and eligible retirement actions. Press **? / F1** for the current screen's keys, **F2** for technical evidence, and **Ctrl+Q** to quit.
 
-More [screenshots](assets/screenshots) and [animations](assets/animations) are available in `assets/`.
+Read the [usage guide](docs/usage.md) for keyboard controls and configuration, the [supported actions matrix](docs/supported-actions.md) for what each selection can do, [saved updates](docs/saved-updates.md) for review/apply/Undo, and [quarantine and undo](docs/quarantine-and-undo.md) for standalone relocation. Unmatched gh registry records provide inspection guidance; they are not automatic cleanup targets.
 
 The CLI offers the same core workflows:
 
@@ -89,5 +83,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture, test
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-For reversible relocation of a standalone custom-directory copy, see [Quarantine and undo](docs/quarantine-and-undo.md).

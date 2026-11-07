@@ -9,6 +9,10 @@ using SkillView.Ui;
 // have no pause/fault switches. Recovery runs through the actual CLI on restart.
 try
 {
+    if (args.Length == 4 && args[0] == "--locations-recovery-proof")
+        return LocationsRecoveryProof.Run(args[1], args[2], args[3]);
+    if (args.Length >= 2 && args[0] == "--intentional-differences-proof")
+        return await IntentionalDifferenceProof.RunAsync(args[1..]);
     if (args.Length >= 3 && args[0] == "--retained-retirement")
         return await RetainedRetirementProof.RunAsync(args[1..]);
     if (args.Length == 2 && args[0] == "--exposure-lifetime-proof")

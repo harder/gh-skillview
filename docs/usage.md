@@ -1,5 +1,7 @@
 # Using SkillView
 
+This guide describes the development checkout. Installed releases may have an earlier command or UI surface; check `skillview --version` and `skillview --help`. The [supported actions matrix](supported-actions.md) summarizes selection and approval boundaries.
+
 For installation and a quick start, see the [README](../README.md).
 
 ## TUI
@@ -12,26 +14,139 @@ The TUI is organized around three primary tabs in a persistent top header — **
 |---|---|---|
 | **Discover** ◇ | Search public skills, refine by owner/agent/limit, preview `SKILL.md`, inspect metadata, flip the right pane between preview and logs, and stage installs. Opens when no skills are installed. | `1`, click the pill, or `←/→` to cycle |
 | **Installed** ▣ | Browse physical copies by source; filter by Agent, Project/location, Source/owner or Issue, inspect coverage and details, or review an exact copy. | `2`, click the pill, or `←/→` |
-| **Issues** △ | Problems, checked Updates and Review suggestions, with incomplete discovery/checks separate. Checks are explicit. Enter reviews the exact issue or opens the existing copy chooser. | `3`, click the pill, or `←/→` |
+| **Issues** △ | Problems, checked Updates and Review suggestions, with incomplete discovery/checks separate. Checks are explicit. Enter expands a family, opens an expanded child's inline comparison, inspects a registry row, or opens an exact item's review (narrow ordinary rows show details first). | `3`, click the pill, or `←/→` |
+| **Locations** | Select extra workspaces, skill folders and agent profiles; save choices and refresh local inventory. | `F5` or **Locations** |
 | **Doctor** | Full-screen environment report: `gh` path/version, auth state, `gh skill` availability, installed agent homes, and log location. Esc returns to the previous tab. | `d` |
 | **Install — compact** | One-screen confirm: scope radio, agent checkboxes pre-selected from your home directory, **Install** / **Advanced…** / **Cancel**. | `i` from a Discover result |
 | **Install — advanced wizard** | Full multi-step dialog with version, scope, agent, path, overwrite, and options for hidden-dir scanning, installing from a republished skill's upstream source, or local installs. | `I` from a Discover result, or **Advanced…** from the compact modal |
 | **Remove — compact** | `[y]es / [n]o` confirm for simple single-skill removes. | `x` from an Installed row whose plan is straightforward |
 | **Remove wizard** | Multi-step review/confirm for plans with incoming symlinks, validation warnings, or package/repo group removes. | Automatically escalated from `x` when needed |
-| **Cleanup view** | Finds name collisions, metadata issues, broken symlinks, and residue; compare/review uncertain items and remove eligible cleanup candidates. | `c` |
-| **Help overlay** | Grouped Markdown reference for every keybinding. | `?` or `F1` |
+| **Cleanup findings** | Filters Issues to captured cleanup findings; review one exact item or use a guided per-item sequence. | `c` |
+| **Help overlay** | Grouped Markdown reference for the current screen's actions and shared navigation keys. | `?` or `F1` |
+
+At narrow widths, **History ! F4** is the compact retained-history attention hint;
+F4 opens its full explanation.
 
 Each tab preserves its own state (filter text, selection, sort, marks) when you switch away and back.
 
+Startup checks the local gh binary, minimum version and `gh skill` command, then
+captures local inventory without checking remote authentication. Doctor checks
+authentication when opened; an explicit Discover search loads optional host/account
+context independently. These on-demand auth checks have a 30-second deadline and
+are canceled when you leave their view. Remote commands still use gh authentication and report their
+own failures. No startup update or remote skill scan runs.
+
 Startup checks the local inventory. If skills are found before you start
 interacting, it opens Installed and focuses the list. Otherwise it keeps the
-current view. From a list, press `/` to focus the Discover search box.
+current view. Outside Installed, press `/` to focus the Discover search box.
+
+### Select locations
+
+Press **F5** from any main view, including a text field. Tab reaches the list,
+location kind, directory, optional profile identity, Add, Remove selected,
+Details / recovery, Selected (a scrollable full path), Save & refresh and Cancel.
+Enter in Directory or Profile adds the directory; Enter in the list or Selected
+display keeps the draft open. Enter still activates a focused button. Choose **Workspace** for the same known skill-folder
+seeds and bounded project ancestors as `--workspace`; choose **Scan root** for
+the exact skills folder used by `--scan-root`. **Profile** uses the same
+`agent[:name]` identity and skills directory as `--profile agent[:name]=directory`.
+Relative paths resolve against the captured launch directory. Add requires an
+existing accessible directory. Existing default HOME/CWD/config locations remain
+part of discovery; removing an extra selection does not disable those defaults.
+
+**Add** and **Remove selected** edit the selection. **Save & refresh** persists
+that selection and opens refreshed Installed in the same captured context.
+**Cancel** or Escape discards unsaved edits. Existing filters, sort and selection
+are retained where their addresses still exist. Previous package/Issues evidence
+and update checks become stale or unavailable when locations change. A selection
+is discovery configuration, never permission to change an installation.
+
+Reopening Locations rereads its preference records. Another process's changes
+do not silently alter the active scan scope. The dialog edits the latest saved
+selection and shows when it differs from the current session. Opening or Cancel
+does not activate external changes; Save refuses an intervening external write
+until you reopen and review it.
+
+Saved choices apply to TUI launches only. Explicit global CLI options override
+saved choices **per category**: any `--workspace` arguments replace saved
+workspaces, any `--scan-root` arguments replace saved scan roots, and any
+`--profile` arguments replace saved profiles for that launch. Other saved
+categories still apply. The dialog always edits saved values, including categories currently overridden
+by CLI flags. Details identifies each override and shows saved versus active
+values. After every Save, the ORIGINAL launch flags still override their
+categories in this session; flags are never saved as preferences. Saved values
+for an overridden category apply when launched without that flag. CLI subcommands keep their explicit/default discovery scope
+and do not load these TUI preferences.
+
+Locations shows the last inventory's configured and actually scanned counts.
+Use Installed **Coverage** for unavailable/omitted locations and retained outside
+coverage evidence. An unavailable saved directory remains configured and makes
+coverage incomplete. Unselected projects are outside coverage; unknown or unscanned
+does not mean empty, healthy, enabled, or loaded in a running agent.
+
+Selections are stored in `SkillView/locations` beside the maintenance state
+folder, using the captured `SKILLVIEW_STATE_HOME` override, otherwise the existing
+platform state-home rules (Linux: `XDG_STATE_HOME` or `~/.local/state`; macOS:
+`~/Library/Application Support`; Windows: `LOCALAPPDATA`). The dialog shows the
+resolved literal path. Only chosen paths and profile labels are persisted.
+There can be at most 32 workspaces, 32 profiles and 256 scan roots in a snapshot.
+The permanent `locations` folder contains an empty `writer.lock`, at most one
+`records-<random id>` log and at most one `backup-<records id>` directory. Every
+read of saved records, Save and recovery holds that lock; the folder and lock
+are never removed. Reads do not create storage. If first initialization was
+interrupted before the lock existed, an existing-only read accepts only a
+verified empty native root and reports no saved selections. Save your selection
+to finish initialization; any entry in a root without its lock remains protected.
+The active log allows 64 records, 128 KiB each and 8 MiB total. Locations shows used/limit counts and warns at 75% capacity. Saving
+an unchanged saved selection consumes no record.
+
+Open **Details / recovery** for the full scrollable error, paths and recovery
+review, even when malformed storage blocks Save. **Cancel** is the default.
+**Reset saved Locations (keeps backup)** discards only saved Locations and any
+unsaved dialog draft. It first copies the bounded raw records, including empty
+or partial known regular records, writes a manifest last, flushes and verifies
+those bytes. It then removes only that reviewed records child using held native
+identities and per-entry identity/size/hash checks. Payloads, owner records and
+all other state are untouched; launch flags remain active. **Compact, keeping
+saved selection** performs that reset and saves the latest VALID SAVED snapshot
+in a fresh generation. It never saves CLI overrides or an unsaved dialog draft.
+Without a valid latest saved snapshot, Compact refuses and Reset remains
+available for admitted raw records.
+
+Recovery refuses unknown names, links, shared/unknown hard-link topology,
+subfolders, different mounts, unsafe ownership/modes or over-limit files without
+deleting them. The error includes the literal protected path. If interrupted
+before backup completion, the records remain intact and explicit Reset can
+resume only matching retained byte prefixes. During removal, Locations reports
+incomplete recovery and the backup path; explicit Reset resumes only matching
+manifest/native survivor evidence. It refuses completion based on names alone.
+If interruption removed the last record before writing an empty receipt, Locations
+says **records directory is empty; backup verified; run Reset to finish**. Open
+**Details / recovery** and explicitly choose **Reset saved Locations (keeps backup)**.
+It verifies the complete raw backup, matching native child identity, empty native
+walk and root/mount boundary again, then uses empty-only removal. Any entry or
+different native child is protected; names alone never authorize removal.
+Interrupted compaction can explicitly resume the saved backup selection.
+
+Backups are never deleted automatically. One complete backup blocks another
+reset/compaction of a different generation, with instructions shown before the
+action. Close all SkillView sessions, copy the entire literal backup directory
+(raw files and manifest) to an archive **outside Locations**, verify its bytes
+against `manifest.json`, then move the verified backup directory out using your
+file manager. This loses in-app access to those earlier choices; keep the external
+archive. Never remove `locations` or `writer.lock`. A backup adds at most 8 MiB
+of raw bytes plus two bounded 128 KiB metadata files. This is an explicit archive
+step, not automatic eviction.
+
+Malformed, unreadable or unsafe storage shows **Locations ! F5** and refuses
+ordinary writes while preserving existing data. Read-only browsing continues
+with explicit/default roots. No process environment is changed.
 
 ### Find and install a skill
 
 The main "discover and inspect" loop:
 
-1. Focus the Discover search box (press `/` from a list), then type a search query. Leave the field and press `f` to narrow the next search with **Owner**, **Agent**, **Limit**, and hidden-dir options.
+1. Focus the Discover search box (press `1`, then `/`, from another list), then type a search query. Leave the field and press `f` to narrow the next search with **Owner**, **Agent**, **Limit**, and hidden-dir options.
 2. Browse results in the left table; selection drives the detail pane on the right.
 3. Press `S` to cycle a sort (stars ↓ → name ↑ → name ↓ → repo ↑ → off). The active sort column's header shows the direction.
 4. Press `e` to flip the detail pane between rendered markdown and raw, `o` to open the repo in a browser, or `l` to inspect logs.
@@ -118,11 +233,13 @@ Navigation:
 | Key | Action |
 |---|---|
 | `1` / `2` / `3` | Jump directly to Discover / Installed / Issues |
-| `←` / `→` | Cycle tabs |
+| `←` / `→` | Outside Installed, cycle tabs when the focused list/pane does not use these keys |
 | `↑` / `↓`, `PgUp` / `PgDn`, `Home` / `End` | Move through rows |
 | `Tab` / `Shift+Tab` | Move focus between list and detail |
-| `/` | Jump to Discover and focus the search box |
+| `/` | Focus Installed search in Installed; otherwise open Discover and focus its query |
 | `?` or `F1` | Open the help overlay |
+| `F5` | Open Locations, including while typing |
+| `F4` | Open saved replacement History, including while typing |
 | `Esc` | Leave a field or back out of the current sub-view / modal |
 | `q` | Quit from a top-level list or preview |
 | `Ctrl+Q` | Quit from anywhere, including while typing |
@@ -150,7 +267,7 @@ Installed tab:
 | `Esc` | Return from full-width detail, then leave Installed from the list |
 | `C` (Shift+c) | Check updates for the whole catalog, or cancel the check |
 | `u` | Hand the selected exact copy to saved update review |
-| `c` | Open Cleanup |
+| `c` | Show Cleanup findings in Issues |
 | `Tab` / `Shift+Tab` | Reach the four visible filter selectors, Clear, Coverage and copy controls; Enter opens a selector, arrows/Enter choose, Esc cancels |
 | `G` | Cycle scope (all / user / project / custom), keeping all consumers |
 | `/` or `f` | Search Installed by name, path, agent or recorded source |
@@ -181,7 +298,7 @@ Issue reuses local findings **only after Issues has loaded them for the same inv
 
 Selected choices stay visible in abbreviated form; open the selector or detail for the full bounded label. `#` markers distinguish colliding shortened labels. A choice that disappears on refresh remains selected with **!missing**, zero matches and an explanation; choose Any or Clear explicitly to broaden it. **Clear** resets search, the four selectors and P/G; sort and exact-copy selection remain retained. Header P/G abbreviations mean any/pin/no and any/user/proj/dir; s:N/S/L means name/source/location.
 
-**Coverage** expands captured facts in the same detail pane (full-width at 80 columns). Esc/Back returns to the list with filters and exact selection retained. It shows configured/scanned roots, inaccessible paths as **could not be scanned**, and captured limitations. Other projects are scanned only when configured. An explicitly recorded owner context may be labeled **referenced, not scanned**; no arbitrary projects are enumerated and no scan or remote check runs. Coverage stays global when filtering. **Check all updates (C)** likewise checks the whole fresh catalog, including copies outside the filters; partial coverage retains batch-8 Unknown results and starts no upstream checks. It never prepares an update plan.
+**Coverage** expands captured facts in the same detail pane (full-width at 80 columns). Esc/Back returns to the list with filters and exact selection retained. It shows configured/scanned roots, inaccessible paths as **could not be scanned**, and captured limitations. Other projects are scanned only when configured. An explicitly recorded owner context may be labeled **referenced, not scanned**; no arbitrary projects are enumerated and no scan or remote check runs. Coverage stays global when filtering. **Check updates (C)** likewise checks the whole fresh catalog, including copies outside the filters; partial coverage retains batch-8 Unknown results and starts no upstream checks. It never prepares an update plan.
 
 Installed details show the full bounded metadata description as literal text, wrapped to the current pane width. Longer descriptions scroll normally; F2 opens technical evidence. Compact source, recorded ref, scope and pin facts precede the physical-copy and recorded-placement counts. “Git tag” is used only for a recorded `refs/tags/` ref.
 
@@ -195,22 +312,28 @@ Issues tab:
 
 | Key | Action |
 |---|---|
-| `Enter` | Review the selected maintenance item without changing files |
+| `Enter` | Expand a family; open an exact child comparison; inspect registry guidance; open an ordinary exact review (details first below 110 columns) |
 | `F2` | Switch between its issue summary and technical details |
 | `r` | Refresh disk inventory; upstream availability and running-session state remain unknown |
 | `C` | Check updates for the inventory, or cancel a running check |
-| `u` | Review the selected finding (alias for Enter) |
+| `u` | Review the selected eligible exact item directly (an expanded child: its saved update review) |
+| `k` / `K` | Keep both or Restore suggestions for an eligible family / review saved Choices |
+| `g` | Start a guided sequence of eligible exact items, when no review or preference work is active |
+| `n` / `s` / `x` | Review next / Skip / Stop, only during an active guided sequence |
 
 Routine valid installs show **No local problems found. Updates not checked.**
 The list excludes generic installation-review opportunities and absence from gh
 alone; inspect routine or manual installs in **Installed (2)**. Problems include
 malformed metadata, broken links, conflicting records and empty residue, even
-when only review is supported. Same-name/duplicate observations form one **Review**
+when only review is supported. Same-name observations form one **Review**
 family with an affected-copy count and distinct locations in its detail pane.
 Matching names alone do not establish damage or redundant content; project
-overrides can be intentional. Enter opens the existing copy chooser, where an
-exact copy must be chosen before update/version or cleanup review. Other faults
-at those locations remain separate Problems.
+overrides can be intentional. Enter or Right expands the exact captured family.
+Enter on an expanded child opens its inline comparison; u opens its exact saved
+update review. An exact copy must be chosen before update/version or cleanup
+review. Ordinary exact rows open their review (details first below 110 columns);
+registry rows provide inspection only. Other faults at those locations remain
+separate Problems.
 
 **Check updates (C)** is visible in both Installed and Issues. Nothing checks
 upstream automatically at startup. Checks run for all captured physical copies,
@@ -248,39 +371,85 @@ case differences remain distinct. When long or sanitized paths would still look
 identical, a `#` marker
 distinguishes them within the captured list; details retain the full location.
 
-For **Same name, multiple copies** or **Duplicate** observations, Enter opens
-**Copies and versions**. Each row is one physical installation; its recorded
-consumers share those files. Select a row to see its full location, source,
-recorded ref, authored version and pin. Related rows include matching names and
-matching recorded sources/subpaths; matching names alone do not prove a common
-source. Unknown provenance and incomplete discovery stay visible.
+For **Same name, multiple copies**, Enter expands the family in Issues. Family
+headers have no copy action. Select an exact child and press Enter for inline
+copy detail. Installed also expands source groups into exact children. Below
+110 columns the detail uses the full width; **Back / Esc** returns to the same
+selection and scroll. Wider terminals retain the list beside the detail.
 
-The original selection is the reference. Select another row and press
-**Compare** to inspect local file differences, or **Use as reference** to change
-the pair. This does not check upstream availability or infer which version is
-best. **Update / version...** selects that exact location in the existing Updates
-workspace, where **Choose version...** offers a Git tag. **Cleanup review...**
-opens the matching captured issue at that location; name conflicts remain
-review-only. Actions without an applicable finding, and updates to managed
-read-only copies, are disabled with an explanation in the details.
-Opening either review changes no skill files. The list shows at most 128 copies;
-comparison summaries show at most 12 changed paths and report omissions.
+Installed's **More actions → Compare copies (broad: same name or recorded source; not the finding's family)** opens the shared inline
+selected-copy detail. Choose a **Reference...** explicitly, then **Compare**.
+The reference is only a comparison partner, never a preferred survivor. Related
+choices include matching names or recorded sources; that browsing relation grants
+no removal authority. Compare reads bounded local payloads in the background;
+Back, selection changes, refresh and navigation retire its transient result.
+There is no startup payload hashing or upstream check in this action.
+
+A completed local capture does not establish complete inventory or consumer
+coverage. Raw fingerprints can differ even when normalized source differences
+are empty. Root modes and held physical identities are checked separately; aliases
+are one payload. Matching files with unknown source/revision stay unknown.
+Known-source matching captures can support Review guidance only with compatible
+observed modes, revisions and complete bounded coverage. Full ACL/xattr/ADS
+metadata equivalence, authentic origin, non-use and running sessions remain
+unverified. No survivor is chosen automatically. Tracked copies cannot use
+standalone Move aside; use their exact update/version or owning-tool review.
+
+**More actions → Review standalone Move aside...** independently requests the
+existing quarantine admission for the deliberately selected untracked standalone
+Custom copy. It requires fresh inventory, exact native checks, separate standalone
+and effect approvals, and the Preview fingerprint. Provider, managed, owned,
+tracked, pinned, shared, partial and unknown states remain refused. The native
+same-volume move retains the original objects; it does not edit a registry or
+retarget consumers. The result separates native movement from inventory
+verification and offers **Inspect retained** and a separate **Review Undo**.
+Undo revalidates the exact operation, vacant destination, consumers, retained
+identities and original context. It has no `--expect` fingerprint contract and
+never overwrites a destination. A newly dangling exposure can refuse Undo.
+
+After restart, use `quarantine-history` and `undo --id <operation>` for a fresh
+preview under the same HOME/state/CWD and global scan-root options; execute with
+`--yes` only after review. F4 History lists saved replacements, not quarantine.
+
+**c** navigates to Cleanup findings in Issues, retaining the selected exact target
+when a finding matches. Enter or **Review (u)** freshly classifies and matches the
+exact issue/kind/path/installation ID; missing or ambiguous matches refuse. The
+focused removal review retains native preflight, confirmation, cancellation and
+partial-result accounting. Deletion has no automatic Undo. **Suppress suggestion**
+is a private preference, separate from health, disablement and ownership.
+
+**Guided (g)** freezes up to 128 eligible visible cleanup/update findings.
+Use **Review next (n)**, **Skip (s)** and **Stop (x)**. Each item resolves afresh to
+its original exact address/native/source intent; changed, missing or ambiguous
+items are reported as skipped/refused. No replacement sibling is prepared until
+the prior apply/reconciliation returns and the user chooses Review next. Existing
+source and retention approvals remain independent. Outcomes, skipped and remaining
+counts survive cancellation; incomplete inventory verification is separate from
+native failure. Stop leaves unstarted items untouched. There is no Apply all.
 
 In Updates, the selected-copy and saved-review summaries use the full reading
 width. **Review update** prepares one immutable candidate; it does not apply it.
 The summary explains the target, revision, affected consumers, local changes and
-retained original. Press **F2** or **Details (F2)** for the existing fingerprints,
-frozen source diffs, complete diagnostics and recovery evidence; F2 returns to
-the summary. Switching views changes neither the candidate nor its approvals.
+retained original. **View source changes (D)** opens the saved Diff inline;
+**D**, **Esc**, or **Back to review** returns to review. It shows captured file
+changes, local-change disposition and omitted/unknown evidence. Current live
+files may have changed since preparation. **F2** or **Details (F2)** retains the
+fingerprints, full source evidence, diagnostics and recovery evidence; F2 returns
+to the summary. Opening Diff or switching views grants no approval.
 Checks in the main views preserve selection and filters. The operation review
 uses the saved-update controls; availability observations grant no apply authority.
 
 Review controls appear when applicable. Source review and retention remain
-separate declarations: inspect the frozen source changes and omissions in Details,
+separate declarations: inspect the frozen source changes and omissions in Diff,
 then check the source declaration and retention approval before applying. Unpin
-reviews change only the verified pin. Compare local and source files in Details,
+reviews change only the verified pin. Compare local and source files in Diff,
 then choose **Preserve installed**, skip, or approve **Replace reviewed** with the
-original retained. New merge creation and the built-in editor have been removed;
+original retained. Replacement installs the whole saved candidate; original local
+edits/extras survive in the retained original for Undo and are not copied into
+the candidate. Matching candidate content may still be present. A targeted
+resource review names the missing resource and same-ref choice first, only when
+the current session's bound comparison establishes its restoration.
+New merge creation and the built-in editor have been removed;
 existing saved merge plans still support inspection, admitted apply, recovery and
 undo through the specialist update commands. **Skip review** closes the prepared
 change without applying it and retains its saved evidence. Updates review stays
@@ -366,7 +535,7 @@ Other:
 | Key | Action |
 |---|---|
 | `d` | Open Doctor (full-screen) |
-| `c` | Open Cleanup |
+| `c` | Show Cleanup findings in Issues |
 
 **Warp note:** if `Enter` is unreliable after the first interaction, use `Ctrl+J` or `→` for preview.
 
@@ -802,6 +971,12 @@ review items. This also changes the CLI JSON `kind` and candidate filtering:
 Both `--candidates=EmptyDirectory` and `--candidates EmptyDirectory` are accepted;
 comma-separated kind names are matched without regard to case.
 
+Cleanup kind filters (`cleanup --candidates NAME`) remain case-insensitive and
+tolerant: unknown or retired names (`SourceOrphaned`, `Duplicate`,
+`OrphanCanonicalCopy`) match no current candidates, without a validation error.
+Same-name copies are emitted as review-only `NameCollision` findings; matching
+names or recorded sources do not prove exact duplicates or authorize deletion.
+
 Without `--apply`, cleanup only reports candidates and leaves installed entries
 unchanged. `--apply` requires `--yes`; it can now remove eligible empty-directory
 observations that previously appeared only as malformed review items. Native
@@ -823,7 +998,7 @@ skillview --scan-root /path/to/skills cleanup --candidates EmptyDirectory --appl
 An apply batch can remove eligible entries while refusing protected entries;
 inspect the per-entry `applied` results and exit status.
 
-Cleanup's **Ignore** action stores a preference outside the skill directory. It
+Cleanup's **Suppress suggestion** action stores a preference outside the skill directory. It
 suppresses suggestions for that physical installation across its consumer
 contexts; agent loading and update policy stay unchanged. The CLI accepts an
 exact `--path` (including an agent symlink) or `--install-id`, plus `--json`.
@@ -1017,6 +1192,78 @@ the existing `update-inspect`, `restore-inspect`, `unpin-inspect`,
 any required global scan locations. The CLI `history` command continues to
 verify backup archives and keeps its existing output format.
 
+Issues groups different recorded revisions only when the repository and skill
+subpath agree and the recorded revision domains can be compared. A recorded ref,
+Git tree and authored version are separate evidence; differences do not prove
+that an upgrade exists. Check updates explicitly for remote availability.
+Installation method differences describe captured owners, links and contexts;
+they are informational. Same-name copies with different or unknown sources stay
+separate. Same-source physical copies also remain visible: matching recorded
+evidence is informational, while incomplete revision evidence stays unknown.
+Neither proves identical payloads or redundant copies. Enter or Right expands a
+family; Enter on an expanded child opens its inline comparison, and u opens that
+copy's exact saved update review. Ordinary exact rows open their review (details
+first below 110 columns), while registry rows provide inspection only. Review
+and apply each exact copy separately; a family never selects a survivor.
+
+On Issues, **k / Keep both** marks an exact observed source, revision or method
+family intentional. The row remains visible as **Intent**, with **k / Restore**
+to restore suggestions. This issue preference is separate from cleanup Ignore;
+it does not hide Problems, conflicts, coverage limitations, package findings or
+available updates. Changes to the relevant members, source, recorded revision,
+owner/method or exposures invalidate the matching acknowledgement. No startup
+payload comparison is needed. Preferences use private held-native state under
+`SkillView/intentional-differences` beside the existing maintenance/preferences
+stores, resolved from the captured child HOME/state/CWD. They never edit skill
+files or registries. Malformed/incomplete state remains preserved and is reported
+under coverage. Refresh before retrying a stale writer. The append-only log
+retains at most **512 records / 2 MiB**, reserving one clear record per active
+family. The latest record supersedes prior evidence for that family; changed
+evidence never inherits intent. A notice appears at 75% of capacity. Repeated
+writes still consume retained history; refreshing cannot free that capacity.
+
+**Shift+K / Choices (K)** opens **Reset saved intentional differences** with
+Cancel selected by default. Review the exact preference location and counts.
+Confirming forgets acknowledgements and their history only. It first preserves
+raw bytes, including malformed ordinary records, in a private `backup-*` child,
+then removes the exact held `records-*` child and creates a new empty generation.
+The permanent root and empty `writer.lock` remain. An interrupted reset requires
+a new explicit review and resumes only matched backup/original bytes. Unknown
+entries, links, subfolders, wrong context or oversize files refuse with their
+literal location; preserve those bytes externally rather than editing around a
+refusal. No payload, registry, cleanup choice, Location or saved operation changes.
+
+Only **one backup** is retained, at most 512 raw files of 2 KiB and a 512 KiB
+manifest. Before another reset, close SkillView and externally archive the entire
+reported backup outside the preference store. Backups are never automatically
+deleted. The capacity notice and reset review disclose this finite retention
+limit. Very large or unverifiable family bindings remain inspectable but cannot
+be acknowledged.
+
+A gh registry observation without an associated captured copy says **Not matched
+to any observed copy in known locations**. This is Review guidance, not proof of
+a stale or broken record: one shared schema-3 record can describe several custom
+`--dir` copies outside the configured locations. Inspect its exact selector,
+source, context and coverage with F2. Add a known location using existing global
+`--scan-root ROOT` or workspace/profile options, then refresh; do not scan unknown
+projects to infer absence. Discover offers ordinary guarded install review. gh
+has no supported exact-record removal/uninstall route; SkillView supplies no
+registry-only cleanup, raw registry editor or installation mutation for this row.
+Unsupported/diagnostic record evidence stays protected/unknown. Capture/display
+bounds can omit records and never prove the absence of omitted records.
+
+Below 110 columns, Issues uses the full width. For ordinary exact rows, including
+Updates and package rows, Enter shows details first; a second Enter opens the
+supported review. Families still expand, expanded children open their inline
+comparison with one Enter, and registry rows show details only. Escape returns
+to the same list selection before leaving the tab. Wider terminals show the list
+and detail side by side. F2 toggles technical evidence; r refreshes local inventory only.
+
+CLI `queue --json` remains schema 1 with its existing exact-installation rows,
+fields and unknown update semantics. The grouped typed observations and
+registry-only guidance are currently TUI projections; no invented installation
+subject or additive registry row is serialized into this legacy wire format.
+
 History keeps an operation protected when its payload moved but its own registry
 publication is still pending. Use ordinary Inspect and Recover to finish it before
 retiring Undo data. Later updates or registry changes do not by themselves prevent
@@ -1091,3 +1338,5 @@ update availability as unsupported and refuses ordinary update/version choice.
 Use the existing exact-copy remove and reinstall flows where admitted. Repair
 never runs a later gh update or invents a ref. Other unscanned copies and running
 sessions remain unknown.
+
+Guided **n / s / x** act only during an active sequence. **k / K** remain Keep both / Choices; while a guided review is open or working, finish or Stop it before preference or cleanup actions. Starting **g** requires an eligible exact item and no active review or preference work. Typed family children retain that finding's exact captured membership; stale membership requires refresh before comparison. Registry-only observations stay inspect-only.

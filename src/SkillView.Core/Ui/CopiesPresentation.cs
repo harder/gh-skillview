@@ -1,35 +1,32 @@
 using System.Text;
-using System.Collections.Immutable;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Maintenance;
 
 namespace SkillView.Ui;
 
-internal sealed record CopiesGroup(InstalledSkill[] Copies, int Omitted, int Ambiguous, bool Partial)
-{
-    internal ImmutableDictionary<string, CleanupClassifier.Candidate> CleanupCandidates { get; init; }
-        = ImmutableDictionary<string, CleanupClassifier.Candidate>.Empty;
-}
+internal sealed record CopiesGroup(InstalledSkill[] Copies, int Omitted, int Ambiguous, bool Partial);
 
 internal static class CopiesPresentation
 {
     internal const int MaxCopies = 128;
 
-    internal static CopiesGroup Build(InventorySnapshot snapshot, InstalledSkill selected, CancellationToken token)
+    internal static CopiesGroup Build(InventorySnapshot snapshot, InstalledSkill selected, CancellationToken token,
+        IReadOnlySet<(string Id, string Path)>? allowed = null)
     {
         token.ThrowIfCancellationRequested();
-        var source = selected.SourceIdentity.Key;
-        var selectedId = selected.InstallationId;
+        var source = (selected.ObservedSubject?.Source ?? selected.SourceIdentity).Key;
+        var selectedId = UpdateAvailability.Address(selected);
         var related = new List<(InstalledSkill Skill, string Id)>();
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var skill in snapshot.Skills)
         {
             token.ThrowIfCancellationRequested();
-            var id = skill.InstallationId;
+            var id = UpdateAvailability.Address(skill);
             counts[id] = counts.GetValueOrDefault(id) + 1;
-            if (skill.Name.Equals(selected.Name, StringComparison.OrdinalIgnoreCase)
-                || source is not null && skill.SourceIdentity.Key == source) related.Add((skill, id));
+            if ((allowed is null || allowed.Contains((id, skill.ResolvedPath)))
+                && (skill.Name.Equals(selected.Name, StringComparison.OrdinalIgnoreCase)
+                || source is not null && (skill.ObservedSubject?.Source ?? skill.SourceIdentity).Key == source)) related.Add((skill, id));
         }
         var groups = related.GroupBy(row => row.Id).ToArray();
         var ambiguous = groups.Count(group => counts[group.Key] != 1);
@@ -52,10 +49,7 @@ internal static class CopiesPresentation
         skill.AllOwnershipClaims.Any(owner => owner.InstallationMode == "managed-read-only")
             ? "Managed copy: use its owning tool to update it." : null;
 
-    internal static string? CleanupUnavailableReason(CopiesGroup group, InstalledSkill skill) =>
-        group.CleanupCandidates.ContainsKey(skill.InstallationId) ? null : "No unambiguous matching cleanup issue at this location.";
-
-    internal static string Render(CopiesGroup group, InstalledSkill reference, InstalledSkill selected,
+    internal static string Render(CopiesGroup group, InstalledSkill? reference, InstalledSkill selected,
         SkillComparisonResult? comparison = null)
     {
         var text = new StringBuilder();
@@ -86,7 +80,7 @@ internal static class CopiesPresentation
             if (comparison.Diagnostics.Length > 8) Line("More notices", (comparison.Diagnostics.Length - 8).ToString());
             text.AppendLine();
         }
-        else if (selected.InstallationId != reference.InstallationId)
+        else if (reference is not null && UpdateAvailability.Address(selected) != UpdateAvailability.Address(reference))
         {
             Line("Source relationship", Source(SkillComparisonService.SourceRelationship(reference, selected)));
             Line("Revision", Revision(SkillComparisonService.RevisionRelationship(reference, selected)));
@@ -102,9 +96,9 @@ internal static class CopiesPresentation
         Line("Pin", PinDisplayPolicy.From(selected).Description);
         Line("Recorded source", selected.SourceIdentity.Origin);
         Line("Skill subpath", selected.SourceIdentity.Subpath is "" ? "repository root" : selected.SourceIdentity.Subpath);
-        Line("Reference location", reference.ResolvedPath);
+        Line("Reference location", reference?.ResolvedPath ?? "not chosen; comparison only");
         if (UpdateUnavailableReason(selected) is { } updateReason) Line("Update unavailable", updateReason);
-        if (CleanupUnavailableReason(group, selected) is { } cleanupReason) Line("Cleanup unavailable", cleanupReason);
+        text.AppendLine("Cleanup findings and exact reviews are in Issues (c).");
         if (group.Partial) text.AppendLine("Partial discovery: other installations or consumers may exist.");
         if (group.Omitted > 0) Line("Additional copies not shown", group.Omitted.ToString());
         if (group.Ambiguous > 0) Line("Ambiguous installation addresses excluded", group.Ambiguous.ToString());

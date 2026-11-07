@@ -100,57 +100,13 @@ public sealed partial class SkillViewApp
         _statusStrip.Update(text, hints);
     }
 
-    private List<StatusHint> GetCurrentHints()
-    {
-        if (_showingLogs)
-        {
-            return [
-                new StatusHint("l", "Preview"),
-                new StatusHint("?", "Help"),
-                new StatusHint("Ctrl+Q", "Quit"),
-            ];
-        }
+    private ActionScreen CurrentActionScreen => _inDoctor ? ActionScreen.Doctor
+        : _updatesTab?.Visible == true ? ActionScreen.UpdateReview
+        : _activeTab == SkillViewTab.Installed ? ActionScreen.Installed
+        : _activeTab == SkillViewTab.Changes ? ActionScreen.Issues : ActionScreen.Discover;
 
-        if (_inDoctor)
-        {
-            return [
-                new StatusHint("Esc", "Back"),
-                new StatusHint("?", "Help"),
-                new StatusHint("Ctrl+Q", "Quit"),
-            ];
-        }
-
-        return _activeTab switch
-        {
-            SkillViewTab.Discover => [
-                new StatusHint("f", "Filters"),
-                new StatusHint("1/2/3", "Tabs"),
-                new StatusHint("?", "Help"),
-                new StatusHint("Ctrl+Q", "Quit"),
-            ],
-            SkillViewTab.Installed => [
-                new StatusHint("Enter", "Details/Expand"),
-                new StatusHint("/", "Search"),
-                new StatusHint("c", "Cleanup"),
-                new StatusHint("r", "Refresh"),
-                new StatusHint("?", "Help"),
-                new StatusHint("Ctrl+Q", "Quit"),
-            ],
-            SkillViewTab.Changes => [
-                new StatusHint("Enter", "Review"),
-                new StatusHint("F2", "Details"),
-                new StatusHint("c", "Cleanup"),
-                new StatusHint("d", "Doctor"),
-                new StatusHint("?", "Help"),
-                new StatusHint("C", "Check updates"),
-                new StatusHint("Ctrl+Q", "Quit"),
-            ],
-            _ => [
-                new StatusHint("?", "Help"),
-                new StatusHint("Ctrl+Q", "Quit"),
-            ],
-        };
-    }
+    private List<StatusHint> GetCurrentHints() => ActionLabels.Footer(
+        CurrentActionScreen, _showingLogs, _workflows.Availability.Running);
 
     private void ScheduleStatusAutoClear()
     {

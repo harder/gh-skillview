@@ -30,7 +30,7 @@ internal sealed partial class UpdatesTabView
         var previous = _resourceNote is not null ? _undoResult : null;
         var verifying = _resourceNote?.Verifying == true;
         _resourceNote = null;
-        if (previous is not null) ShowResultPreview(previous, false);
+        if (previous is not null) ShowResultPreview(previous, false, preserveScroll: true);
         if (verifying) _status.Text = " replacement installed · Undo is available";
     }
 
@@ -72,7 +72,7 @@ internal sealed partial class UpdatesTabView
             || remembered.PlanFingerprint != applied.PlanFingerprint) return;
         var epoch = Interlocked.Increment(ref _resourceVerificationEpoch);
         _resourceNote = new(applied.Id, applied.PlanFingerprint, "Verifying package… Undo is available.", Verifying: true);
-        ShowResultPreview(_undoResult, false);
+        ShowResultPreview(_undoResult, false, preserveScroll: true);
         _status.Text = " replacement installed · verifying package… · Undo is available";
         // The native result and RememberUndo have already been published and
         // the review operation released. This separately tracked follow-up
@@ -117,7 +117,7 @@ internal sealed partial class UpdatesTabView
                 // inspection followed by Cancel undo on this same saved plan.
                 if (token.IsCancellationRequested || !ResourceVerificationIsCurrent(epoch, applied)) return;
                 _resourceNote = new(applied.Id, applied.PlanFingerprint, text);
-                ShowResultPreview(_undoResult!, false);
+                ShowResultPreview(_undoResult!, false, preserveScroll: true);
                 _status.Text = " replacement installed · package check finished · Undo is available";
             }).ConfigureAwait(false);
         }
@@ -129,10 +129,12 @@ internal sealed partial class UpdatesTabView
     {
         if (result.SavedPlan is not { } plan) return "";
         if (_resourceNote is { } note && note.Id == plan.Id && note.Fingerprint == plan.PlanFingerprint)
-            return "\n\n" + note.Text;
+            return note.Text + "\n\n";
         if (_resourceIntent?.Plan is { } reviewed && plan.Id == reviewed.Id && plan.PlanFingerprint == reviewed.PlanFingerprint)
-            return "\n\nReview replacement for " + MarkdownTableFormatter.FormatCodeSpan(_resourceIntent.Target)
-                + ". The saved full comparison shows this resource absent in Installed and a regular file in Candidate. " + PackageResourceReplacement.Disclosure;
+            return "## Restore missing resource\n\nRestores missing " + MarkdownTableFormatter.FormatCodeSpan(_resourceIntent.Target)
+                + ". " + MarkdownTableFormatter.FormatCodeSpan(UpdateReviewPresentation.RefChange(plan))
+                + ". The saved full comparison shows this resource absent in Installed and a regular file in Candidate. "
+                + PackageResourceReplacement.Disclosure + "\n\n";
         return "";
     }
 }

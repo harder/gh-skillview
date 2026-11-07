@@ -59,6 +59,7 @@ public sealed partial class SkillViewApp
         var limit = _limitUpDown?.Value ?? GhSkillSearchService.DefaultLimit;
         var allowHiddenDirs = HiddenDirsEnabled;
         UpdateContextBar();
+        StartDiscoverAuthentication();
         RunOwnedTask(
             () => RunSearchAsync(
                 query,
@@ -333,7 +334,7 @@ public sealed partial class SkillViewApp
         if (_discoverTab is null) return;
         var selected = GetSelectedResult();
         var text = selected is not null
-            ? RenderSearchMetadata(selected, _lastReport?.Auth) + "\n\n" + (_workflows.DiscoverObservation?.Describe(selected) ?? "Installed: unknown; no current inventory observation.")
+            ? RenderSearchMetadata(selected, _remoteAuth ?? _lastReport?.Auth) + "\n\n" + (_workflows.DiscoverObservation?.Describe(selected) ?? "Installed: unknown; no current inventory observation.")
             : null;
         _discoverTab.DetailPane.SetMetadataContent(text);
     }
@@ -393,9 +394,7 @@ public sealed partial class SkillViewApp
             return;
         }
 
-        _detailPane.SetActionsText(_results.Count == 0
-            ? "[f] Filters    [?] Help"
-            : ItemActionsText);
+        _detailPane.SetActionsText(ActionLabels.DiscoverLegend(_results.Count > 0));
     }
 
     private void OpenDiscoverFilters()
@@ -457,7 +456,7 @@ public sealed partial class SkillViewApp
             SetDiscoverStatus("no repo on selected row");
             return;
         }
-        var url = BuildRepoUrl(_lastReport?.Auth, pick.Repo);
+        var url = BuildRepoUrl(_remoteAuth ?? _lastReport?.Auth, pick.Repo);
         if (TuiHelpers.OpenInDefaultHandler(url))
         {
             SetDiscoverStatus($"opened {url}", TuiHelpers.NotificationLevel.Success);
@@ -505,8 +504,7 @@ public sealed partial class SkillViewApp
     }
 
     /// Discover the skills in the selected result's repo and open the picker
-    /// so the user installs a chosen subset (gh ≥ 2.95 non-interactive
-    /// listing, cli/cli#13548). Failed listing offers Retry or Cancel.
+    /// so the user installs a chosen subset. Failed listing offers Retry or Cancel.
     private void StageInstallAll()
     {
         if (_discoverTab?.IsLoading == true) return;

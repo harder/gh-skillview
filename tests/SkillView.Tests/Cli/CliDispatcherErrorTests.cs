@@ -664,14 +664,14 @@ public class CliDispatcherErrorTests : IDisposable
     public void RenderCleanupJson_WithDuplicateSkip_ReportsSkipSeparately()
     {
         var unique = new CleanupClassifier.Candidate(
-            CleanupClassifier.CandidateKind.SourceOrphaned,
+            CleanupClassifier.CandidateKind.Malformed,
             "/duplicate",
-            "not in gh inventory",
+            "invalid skill metadata",
             null);
         var duplicate = unique with
         {
-            Kind = CleanupClassifier.CandidateKind.Duplicate,
-            Reason = "same skill name",
+            Kind = CleanupClassifier.CandidateKind.Malformed,
+            Reason = "same malformed path",
         };
         var applied = new[]
         {
@@ -701,7 +701,7 @@ public class CliDispatcherErrorTests : IDisposable
         Assert.Single(root.GetProperty("applied").EnumerateArray());
         var skipped = Assert.Single(root.GetProperty("skipped").EnumerateArray());
         Assert.Equal("/duplicate", skipped.GetProperty("path").GetString());
-        Assert.Equal("Duplicate", skipped.GetProperty("kind").GetString());
+        Assert.Equal("Malformed", skipped.GetProperty("kind").GetString());
         Assert.Equal("duplicate candidate path", skipped.GetProperty("reason").GetString());
     }
 

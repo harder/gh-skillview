@@ -122,7 +122,6 @@ public sealed class MaintenanceInventoryRegressionTests
         var candidates = CleanupClassifier.Classify(Snapshot(a, b), []);
         Assert.Equal(2, candidates.Length);
         Assert.All(candidates, c => { Assert.True(c.ReviewOnly); Assert.Equal(CleanupClassifier.CandidateKind.NameCollision, c.Kind); });
-        Assert.DoesNotContain(candidates, c => c.Kind == CleanupClassifier.CandidateKind.Duplicate);
     }
 
     [Fact]

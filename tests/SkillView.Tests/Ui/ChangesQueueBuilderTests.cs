@@ -68,7 +68,7 @@ public sealed class ChangesQueueBuilderTests
     public void SameNameIntentionalOverridesFormOneReviewFamilyWithEveryFrozenEntry()
     {
         var first = Entry("/projects/alpha/.agents/skills/demo");
-        var second = Entry("/projects/beta/.agents/skills/demo") with { Issue = "Duplicate" };
+        var second = Entry("/projects/beta/.agents/skills/demo");
         var queue = Queue([second, first]);
         var projection = ChangesQueueBuilder.Build(queue, Token);
         var row = Assert.Single(projection.Rows);

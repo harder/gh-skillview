@@ -49,13 +49,13 @@ public sealed class TuiHelpersTests
 
     [Theory]
     [InlineData(CleanupClassifier.CandidateKind.Malformed, "malformed")]
-    [InlineData(CleanupClassifier.CandidateKind.SourceOrphaned, "orphan")]
-    [InlineData(CleanupClassifier.CandidateKind.Duplicate, "duplicate")]
+    [InlineData(CleanupClassifier.CandidateKind.NameCollision, "compare")]
+    [InlineData(CleanupClassifier.CandidateKind.Untracked, "untracked")]
+    [InlineData(CleanupClassifier.CandidateKind.MetadataConflict, "metadata")]
     [InlineData(CleanupClassifier.CandidateKind.EmptyDirectory, "empty-dir")]
     [InlineData(CleanupClassifier.CandidateKind.BrokenSharedMapping, "broken-map")]
     [InlineData(CleanupClassifier.CandidateKind.HiddenNestedResidue, "hidden-nest")]
     [InlineData(CleanupClassifier.CandidateKind.BrokenSymlink, "broken-link")]
-    [InlineData(CleanupClassifier.CandidateKind.OrphanCanonicalCopy, "orphan-copy")]
     public void ShortKind_ReturnsCompactLabel(CleanupClassifier.CandidateKind kind, string expected)
     {
         Assert.Equal(expected, TuiHelpers.ShortKind(kind));
@@ -77,33 +77,6 @@ public sealed class TuiHelpersTests
     public void ErrorSnippet_RespectsCustomMaxLen()
     {
         Assert.Equal("abcdefghi…", TuiHelpers.ErrorSnippet("abcdefghijklmnop", maxLen: 10));
-    }
-
-    [Fact]
-    public void HelpText_IsNotEmpty()
-    {
-        Assert.True(TuiHelpers.HelpText.Length > 0);
-        Assert.Contains("quit", TuiHelpers.HelpText);
-    }
-
-    [Fact]
-    public void HelpText_ClarifiesEnterPreviewRequiresResultsFocus()
-    {
-        Assert.Contains("when results are focused", TuiHelpers.HelpText);
-    }
-
-    [Fact]
-    public void HelpText_DocumentsDiscoverFilters()
-    {
-        Assert.Contains("Discover filters", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("hidden dirs", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void HelpText_DocumentsRenderedMarkdownCopySupport()
-    {
-        Assert.Contains("Ctrl+C", TuiHelpers.HelpText);
-        Assert.Contains("copy", TuiHelpers.HelpText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

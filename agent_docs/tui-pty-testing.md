@@ -15,50 +15,67 @@ Exercise the full-screen Terminal.Gui app, not just service methods:
 
 ## Recommended sandbox
 
-Use a temp workspace and a temp `HOME`, but keep real GitHub auth available:
+Default to a credential-free offline fixture. Isolate HOME/state/CWD, Git and
+client configuration in the **child environment**; never copy real gh credentials
+or auth configuration into a fixture. Use a built executable for the correct RID,
+not `dotnet run`. For example, prepare this private directory before attaching
+an actual terminal emulator / PTY driver:
 
 ```bash
-ROOT="$(mktemp -d /tmp/skillview-pty.XXXXXX)"
-HOME_DIR="$ROOT/home"
-WORK_DIR="$ROOT/work"
-SCAN_ROOT="$WORK_DIR/.agents/skills"
-mkdir -p "$HOME_DIR" "$WORK_DIR"
+TASK_ROOT="$(mktemp -d /var/tmp/skillview-pty.XXXXXX)"
+chmod 700 "$TASK_ROOT"
+(umask 077; mkdir -p "$TASK_ROOT"/{home,state,work/skills,shim,config,cache,tmp})
+cat > "$TASK_ROOT/shim/gh" <<'SH'
+#!/bin/sh
+case "$*" in
+  --version) printf 'gh version 2.102.0 (offline fixture)\n' ;;
+  'skill --help') printf 'offline fixture: gh skill\n' ;;
+  'skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version'|
+  "skill list --json skillName,agentHosts,path,pinned,scope,sourceURL,version --dir $TASK_SCAN_ROOT") printf '[]\n' ;;
+  *) printf 'offline fixture refused gh invocation\n' >&2; exit 97 ;;
+esac
+SH
+chmod 700 "$TASK_ROOT/shim/gh"
+# Set TASK_APP to the absolute path of an already built host for this machine.
+# Launch this command through the PTY driver, from the private working directory:
+(
+  cd "$TASK_ROOT/work" || exit 1
+  env -i PATH="$TASK_ROOT/shim:/usr/bin:/bin" \
+    HOME="$TASK_ROOT/home" USERPROFILE="$TASK_ROOT/home" \
+    TASK_SCAN_ROOT="$TASK_ROOT/work/skills" \
+    SKILLVIEW_STATE_HOME="$TASK_ROOT/state" XDG_STATE_HOME="$TASK_ROOT/state" \
+    XDG_CONFIG_HOME="$TASK_ROOT/config" XDG_CACHE_HOME="$TASK_ROOT/cache" \
+    GH_CONFIG_DIR="$TASK_ROOT/config/gh" \
+    CODEX_HOME="$TASK_ROOT/config/codex" CLAUDE_CONFIG_DIR="$TASK_ROOT/config/claude" \
+    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_COUNT=0 \
+    GIT_TERMINAL_PROMPT=0 GIT_CEILING_DIRECTORIES="$TASK_ROOT" \
+    TMPDIR="$TASK_ROOT/tmp" TERM=xterm-256color COLUMNS=80 LINES=24 \
+    HTTP_PROXY=http://127.0.0.1:9 HTTPS_PROXY=http://127.0.0.1:9 ALL_PROXY=http://127.0.0.1:9 \
+    DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_NOLOGO=1 \
+    "$TASK_APP" --scan-root "$TASK_ROOT/work/skills"
+)
 ```
 
-Recommended PTY env:
+The refusing shim's exact argument allowlist is fixture-specific. Inspect and bind
+any additional **local list** form deliberately; an unexpected invocation is a
+failure to retain, not permission to accept arbitrary gh commands. This empty
+fixture proves UI behavior only, not real gh compatibility, authentication,
+network operations or native mutation. Live contracts require separately
+authorized isolated fixtures and their own evidence; do not infer them from this
+shim. Never launch an AI client to verify package checks or reload advice.
 
-```bash
-HOME="$HOME_DIR"
-GH_CONFIG_DIR="$HOME/.config/gh"   # or a real gh config dir if needed
-GH_TOKEN="$(gh auth token)"
-TERM=xterm-256color
-COLUMNS=140
-LINES=42
-DOTNET_CLI_TELEMETRY_OPTOUT=1
-DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
-DOTNET_NOLOGO=1
-SKILLVIEW_LOG=debug
-```
-
-Important:
-
-- Prefer `GH_TOKEN` over relying on `gh auth status` inside a temp `HOME`.
-- Use the built app binary:
-
-```bash
-src/SkillView.App/bin/Debug/net10.0/osx-arm64/skillview --scan-root "$SCAN_ROOT"
-```
-
-- Do **not** use `dotnet run` for PTY automation unless you need to rebuild.
-  First-run SDK messages make synchronization much harder.
-- `/usr/bin/script` creates a PTY, but it is not a terminal emulator. An
-  automated harness must answer Terminal.Gui's startup probes (window size,
-  cursor position, device attributes, and keyboard protocol) or initialization
-  can wait indefinitely. The opt-in `PtyStartupTests` fixture shows the minimal
-  response sequence used by this repo.
-- If readiness times out, terminate and wait for the owned process before
-  calling `ReadToEnd` on a redirected stream. Reading to EOF while the TUI is
-  still alive blocks the test before its cleanup can run.
+- Start at 80×24 and 120×36 when the feature is responsive. Set the actual PTY
+  window size; environment dimensions alone do not resize it.
+- `/usr/bin/script` creates a PTY, not a terminal emulator. Answer Terminal.Gui's
+  startup probes (size, cursor, device attributes and keyboard protocol). The
+  opt-in `PtyStartupTests` fixture demonstrates the response sequence.
+- Retain the owned child PID, exact command/environment roles, input timestamps,
+  raw ANSI, decoded frames, source/binary hashes and native fixture baselines.
+  On failure, record pretermination status and any signals actually sent; stop,
+  wait and drain only owned workers within the harness bounds. Reading to EOF
+  while the TUI is still alive can strand cleanup.
+- Preserve journals, retained originals and unique fixture evidence. A temporary
+  path is not permission to remove recovery data.
 
 ## Why `.agents/skills`
 
@@ -116,9 +133,9 @@ interacted. The first Discover frame and its initial `ready` status do not prove
 that startup inventory has finished. Wait for the environment/inventory result
 and inspect the active view before sending keys.
 
-With an empty inventory, Discover starts with query focus. From the Installed list,
-press `/` to open Discover and focus its query. Typing `f` while the Installed
-list has focus opens its filter; that shortcut is consumed rather than inserted.
+With an empty inventory, Discover starts with query focus. From Installed, press
+`1` then `/` to focus Discover. In Installed, `/` and `f` focus its own inventory
+search field; they do not open Discover. That shortcut is consumed rather than inserted.
 Do not interpret the remaining filter text as a lost Discover query without
 checking which view had focus when the key arrived.
 
@@ -183,79 +200,35 @@ For shell verification, match either:
 - `skill.name`
 - `basename(skill.resolvedPath)`
 
-## Recommended walkthrough order
+## Bounded walkthrough and verification
 
-This order reduced interference during testing:
+Start with local inventory, Help, Locations, exact finding expansion, comparison
+and Back in the credential-free context above. Use actual selected-row/focus
+transitions, not an assumed row index after Home or a title appearing during
+paint. Wait for complete ready content with loading absent; a dialog is closed
+only when its actual controls/body are absent and the underlying view is ready.
+At wide widths Back can leave detail visible while returning focus to the table.
+Keep bounded stage deadlines and preserve the first failing frame and input trace.
 
-1. main screen
-2. search
-3. preview
-4. install
-5. doctor
-6. help
-7. update
-8. cleanup
-9. logs
-10. installed
-11. remove
+Search, install, removal and saved apply/Undo require their own explicitly
+authorized fixtures. Do not add them to a read-only walkthrough to fill a media
+slot. For a remote search fixture, retain the actual submitted query/results and
+select the observed exact result; search order is not stable. Authentication
+status and repository access are separate observations, not permission to copy
+credentials or treat any failed command as success.
 
-Running search/install first is safer than opening multiple modals before the
-first remote operation.
+For any authorized mutation, retain the same complete child HOME/state/CWD,
+Git/client configuration and discovery flags for post-attempt inspection. Do not
+run a bare `list` under the user's real environment. Match the exact installation
+ID **and** resolved path; names and path basenames can collide. Bind the selected
+native identity and relevant bytes/modes/links before and after; verify untouched
+peers and registry state as well as the intended effect. An empty result or a
+successful exit alone does not prove the right object changed. A deletion has no
+automatic Undo; quarantine and saved replacement use their separate fresh reviews.
 
-## Suggested verification scripts
-
-### Install verification
-
-Run after the PTY install action:
-
-```bash
-GH_TOKEN="$(gh auth token)" \
-HOME="$HOME_DIR" \
-skillview --scan-root "$SCAN_ROOT" list --json
-```
-
-Assert:
-
-- expected skill exists by `name` **or** resolved-path basename
-- `resolvedPath` is inside the temp sandbox
-
-### Remove verification
-
-Run after the PTY remove action:
-
-```bash
-GH_TOKEN="$(gh auth token)" \
-HOME="$HOME_DIR" \
-skillview --scan-root "$SCAN_ROOT" list --json
-```
-
-Assert:
-
-- exit code `20` with `{"skills":[]}` is a valid "no matches left" result
-- expected skill no longer exists
-- scan root is empty or only contains unrelated leftovers you explicitly expect
-
-## Known product issues discovered during PTY testing
-
-These are current repo-specific pitfalls, not generic PTY problems:
-
-1. **Searching for a random skill name is not enough.**
-   `gh skill search` ordering may not place the chosen repo first. For random
-   install tests, pick a query/result pair from the same CLI search output and
-   drive the PTY to the stored row index.
-
-2. **`gh auth status` may show unauthenticated in a temp `HOME` even when
-   `GH_TOKEN` allows `gh skill search/install` to work.**
-   Treat actual command success as authoritative for sandboxed PTY tests.
-
-## Minimal future-agent workflow
-
-1. Build once with `dotnet build`.
-2. Create a temp sandbox (`HOME_DIR`, `WORK_DIR`, `SCAN_ROOT`).
-3. Pick a query and row index from `gh skill search <query> --json ...`.
-4. Launch the built `skillview` binary in a PTY with `SKILLVIEW_LOG=debug`.
-5. Send `Esc` before single-letter global shortcuts; use `Ctrl+Q` to quit from any focus state.
-6. Wait on log conditions for search/preview milestones.
-7. Verify install/remove with CLI shell scripts after each mutation.
-8. Save cleaned PTY snapshots for UX review.
-9. Log only confirmed bugs, with the snapshot/log evidence that proved them.
+Retain raw ANSI, actual keys, settled frames, fixture declarations and source/
+binary bindings. Rendered or cropped media should link back to that provenance;
+never fabricate terminal text or call an offline fixture a live upstream result.
+Save logs only from the isolated fixture and report confirmed observations,
+unexercised paths and unresolved failures separately. Build, live contracts,
+native proofs and performance work need their own task authorization and bounds.

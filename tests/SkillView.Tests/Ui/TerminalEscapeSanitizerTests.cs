@@ -111,7 +111,7 @@ public sealed class TerminalEscapeSanitizerTests
     public void RenderCleanupDetail_StripsEscapeSequences_FromSummaryAndTechnicalMetadata(bool showDetails)
     {
         var detail = CleanupScreen.RenderDetail(new CleanupClassifier.Candidate(
-            CleanupClassifier.CandidateKind.SourceOrphaned,
+            CleanupClassifier.CandidateKind.HiddenNestedResidue,
             "/skills/demo\x1b]0;bad\x07",
             "reason\x1b]8;;https://example.test\x07text",
             Skill: null), showDetails);

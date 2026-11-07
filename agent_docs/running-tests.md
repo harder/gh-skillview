@@ -87,7 +87,7 @@ flags instead.
 - **PTY startup smoke:** opt-in only. Run `dotnet build`, then `SKILLVIEW_PTY_TESTS=true dotnet test --project tests/SkillView.Tests/SkillView.Tests.csproj --filter-trait "Category=PTY"`. The test uses the built `src/SkillView.App/bin/Debug/net10.0/<rid>/skillview` host under `/usr/bin/script`, supplies the terminal-probe responses that `script` itself cannot provide, and expects either `GH_TOKEN` or a working `gh auth token`. Keep failure cleanup bounded: terminate and wait for the child before reading redirected streams to EOF.
 - The contract-test workflow runs daily and on `workflow_dispatch` against
   **two required lanes**: the `GhBinaryLocator.MinimumVersion` (currently
-  2.97.0) and the latest GitHub CLI release. A manual version override applies
+  2.102.0) and the latest GitHub CLI release. A manual version override applies
   only to the latest lane. A failure opens an assigned compatibility issue.
   Keep the minimum lane equal to the app's hard minimum.
 - **Automation checks:** `node --test .github/scripts/critical-dependencies.test.js .github/scripts/critical-dependency-assessment.test.js`,
