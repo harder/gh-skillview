@@ -98,7 +98,7 @@ public class CleanupClassifierTests : IDisposable
     }
 
     [Fact]
-    public void Classify_SourceOrphaned_WhenGhListUsedAndFsScanOnly()
+    public void Classify_Untracked_WhenGhListUsedAndFsScanOnly()
     {
         var snap = Snapshot(true, Skill("orph", prov: Provenance.FsScan));
         var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
@@ -107,7 +107,7 @@ public class CleanupClassifierTests : IDisposable
     }
 
     [Fact]
-    public void Classify_SourceOrphaned_NotReportedWhenGhListAbsent()
+    public void Classify_Untracked_NotReportedWhenGhListAbsent()
     {
         var snap = Snapshot(false, Skill("orph", prov: Provenance.FsScan));
         var roots = new[] { new ScanRoot(_tempRoot, Scope.User, null) };
@@ -128,7 +128,7 @@ public class CleanupClassifierTests : IDisposable
     }
 
     [Fact]
-    public void DeduplicateByPath_SourceOrphanedAndDuplicateShareOneRemoval()
+    public void DeduplicateByPath_UntrackedAndNameCollisionShareOnePath()
     {
         var primary = Skill(
             "dup",

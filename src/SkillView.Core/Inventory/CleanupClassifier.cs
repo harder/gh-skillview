@@ -13,17 +13,16 @@ public static class CleanupClassifier
 {
     public enum CandidateKind
     {
-        EmptyDirectory,
-        Malformed,
-        SourceOrphaned,
-        Duplicate,
-        BrokenSharedMapping,
-        HiddenNestedResidue,
-        BrokenSymlink,
-        OrphanCanonicalCopy,
-        NameCollision,
-        Untracked,
-        MetadataConflict,
+        // Keep emitted numeric values and ordering stable. Retired producer-only
+        // kinds occupied 2, 3 and 7; they are not saved-operation schema values.
+        EmptyDirectory = 0,
+        Malformed = 1,
+        BrokenSharedMapping = 4,
+        HiddenNestedResidue = 5,
+        BrokenSymlink = 6,
+        NameCollision = 8,
+        Untracked = 9,
+        MetadataConflict = 10,
     }
 
     public sealed record Candidate(

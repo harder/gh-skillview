@@ -153,6 +153,14 @@ public sealed class PackageResourceReplacementTests
         Assert.Contains("Whole-package replacement", view.PreviewTextForTests);
         await view.ReviewUpdateAsync();
         Assert.Contains("saved full comparison", view.PreviewTextForTests);
+        Assert.StartsWith("## Restore missing resource", view.PreviewTextForTests);
+        Assert.Contains("Restores missing `" + Resource + "`", view.PreviewTextForTests);
+        Assert.Contains("Same source ref", view.PreviewTextForTests);
+        Assert.Contains("Authored version", view.PreviewTextForTests);
+        view.ToggleDiffForTests();
+        Assert.Contains(Resource, view.DiffPreviewForTests.Text);
+        Assert.False(view.ApplyButtonForTests.Enabled);
+        view.ToggleDiffForTests();
         Assert.False(view.ApplyButtonForTests.Enabled);
         await view.ApplyReviewForTestsAsync(); Assert.Equal(0, applies);
         view.RetainBoxForTests.Value = CheckState.Checked;
@@ -202,6 +210,7 @@ public sealed class PackageResourceReplacementTests
         view.ActivateExactReview(OperationSubject.From(fact.Request.Target), false, fact, Resource);
         await view.ReviewUpdateAsync();
         Assert.DoesNotContain("saved full comparison", view.PreviewTextForTests);
+        Assert.DoesNotContain("Restores missing", view.PreviewTextForTests);
         Assert.DoesNotContain(PackageResourceReplacement.Restored, view.PreviewTextForTests);
         if (result.SavedPlan is not null)
         {
@@ -232,6 +241,7 @@ public sealed class PackageResourceReplacementTests
         view.RetainBoxForTests.Value = CheckState.Checked;
         await view.ApplyReviewForTestsAsync();
         Assert.Equal(boundary == "skip" ? 1 : 0, targeted); Assert.Equal(1, ordinary); Assert.Equal(0, checks);
+        Assert.DoesNotContain("Restores missing", view.PreviewTextForTests);
         Assert.DoesNotContain(PackageResourceReplacement.Restored, view.PreviewTextForTests);
     }
 
@@ -320,6 +330,59 @@ public sealed class PackageResourceReplacementTests
         Assert.Empty(faults);
         Assert.DoesNotContain(PackageResourceReplacement.Restored, view.PreviewTextForTests);
         Assert.DoesNotContain("Verifying package", view.PreviewTextForTests);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PostcheckPublicationPreservesDeliberateResultScrollAndImmediateUndo(bool readingDiff)
+    {
+        var fact = Fact(); var plan = Plan(fact);
+        var release = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task? verification = null;
+        using var view = View(fact, plan, run: (work, name) =>
+        {
+            var task = work();
+            if (name == "updates.verify-package") verification = task;
+            else task.GetAwaiter().GetResult();
+        }, postcheck: () => release.Task);
+        view.Frame = new(0, 0, 80, 24);
+        view.ActivateExactReview(OperationSubject.From(fact.Request.Target), false, fact, Resource);
+        await view.ReviewUpdateAsync();
+        view.RetainBoxForTests.Value = CheckState.Checked; await view.ApplyReviewForTestsAsync();
+        view.Layout(new(80, 24));
+        var preview = view.SubViews.OfType<Markdown>().Single();
+        Assert.Equal(0, preview.Viewport.Y);
+        Assert.StartsWith("Verifying package", view.PreviewTextForTests);
+        Assert.True(view.UndoButtonForTests.Enabled);
+        preview.Viewport = preview.Viewport with { Y = 8 };
+        var scroll = preview.Viewport.Y;
+        Assert.True(scroll > 0);
+        var diffVisibilityChanges = 0;
+        if (readingDiff)
+        {
+            view.ToggleDiffForTests();
+            view.DiffPreviewForTests.CaretOffset = 50;
+            view.DiffPreviewForTests.Viewport = view.DiffPreviewForTests.Viewport with { Y = 2 };
+            view.DiffPreviewForTests.VisibleChanged += (_, _) => diffVisibilityChanges++;
+        }
+        var diffScroll = view.DiffPreviewForTests.Viewport.Y;
+        release.SetResult(PackageResourceReplacement.Incomplete);
+        Assert.NotNull(verification); await verification.WaitAsync(Token);
+        view.Layout(new(80, 24));
+        Assert.Equal(scroll, preview.Viewport.Y);
+        Assert.StartsWith(PackageResourceReplacement.Incomplete, view.PreviewTextForTests);
+        Assert.True(view.UndoButtonForTests.Enabled);
+        if (readingDiff)
+        {
+            Assert.True(view.DiffPreviewForTests.Visible);
+            Assert.Equal(0, diffVisibilityChanges);
+            Assert.Equal(50, view.DiffPreviewForTests.CaretOffset);
+            Assert.Equal(diffScroll, view.DiffPreviewForTests.Viewport.Y);
+        }
+        await view.InspectUndoForTestsAsync();
+        Assert.False(view.ConfirmUndoButtonForTests.Enabled);
+        Assert.DoesNotContain(PackageResourceReplacement.Incomplete, view.PreviewTextForTests);
     }
 
     [Fact]

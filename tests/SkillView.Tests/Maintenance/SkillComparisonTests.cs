@@ -45,12 +45,32 @@ public sealed class SkillComparisonTests : IDisposable
             TestContext.Current.CancellationToken);
         Assert.True(result.Complete);
         Assert.Equal("byte-identical", result.PayloadRelationship);
+        Assert.NotNull(result.LeftRootIdentity);
+        Assert.NotNull(result.RightRootIdentity);
+        Assert.False(NativeDirectoryMoveLease.SameObject(result.LeftRootIdentity.Value, result.RightRootIdentity.Value));
         Assert.NotNull(result.LeftObjectStateFingerprint);
         Assert.NotEqual(result.LeftObjectStateFingerprint, result.RightObjectStateFingerprint);
         using var json = System.Text.Json.JsonDocument.Parse(SkillView.Cli.CliDispatcher.RenderComparisonJson(result));
+        Assert.False(json.RootElement.TryGetProperty("leftRootIdentity", out _));
+        Assert.False(json.RootElement.TryGetProperty("rightRootIdentity", out _));
         Assert.Equal(result.LeftObjectStateFingerprint, json.RootElement.GetProperty("leftObjectStateFingerprint").GetString());
         Assert.Equal(result.RightObjectStateFingerprint, json.RootElement.GetProperty("rightObjectStateFingerprint").GetString());
         Assert.Contains("not attested", json.RootElement.GetProperty("objectEvidenceContract").GetString());
+    }
+
+    [Fact]
+    public async Task HeldNativeAliasWitnessPreventsIndependentCopyRecommendation()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var left = Install("one");
+        var alias = Path.Combine(_root.FullName, "alias");
+        Directory.CreateSymbolicLink(alias, left.ScanRoot);
+        var result = await new SkillComparisonService().CompareAsync(left, left with { ResolvedPath = Path.Combine(alias, "demo") }, TestContext.Current.CancellationToken);
+        Assert.True(result.Complete);
+        Assert.NotNull(result.LeftRootIdentity); Assert.NotNull(result.RightRootIdentity);
+        Assert.True(NativeDirectoryMoveLease.SameObject(result.LeftRootIdentity.Value, result.RightRootIdentity.Value));
+        Assert.False(result.RequiresExposureMigration);
+        Assert.Contains("preserve all exposures", result.Recommendation);
     }
 
     [Fact]

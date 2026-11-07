@@ -13,9 +13,7 @@ using Terminal.Gui.Views;
 
 namespace SkillView.Ui;
 
-/// Phase 6 cleanup screen. Lists cleanup candidates with a Space-to-toggle
-/// checkbox column (same pattern as `UpdateScreen`), and surfaces the cleanup
-/// actions: remove, mark ignored, rescan, export.
+/// Focused review and existing removal executor. Browsing belongs to Issues.
 public sealed class CleanupScreen
 {
     internal sealed record RemovalSummary(int Removed, int Failed, bool Confirmed)
@@ -44,6 +42,8 @@ public sealed class CleanupScreen
     private readonly Func<IReadOnlyList<CleanupClassifier.Candidate>, int> _confirmBatchRemoval;
     private readonly SkillView.Subprocess.ProcessRunner? _ownershipRunner;
     private readonly Func<CancellationToken, Task<InventorySnapshot>>? _captureInventory;
+    private RemoveValidator.RemoveValidation? _reviewedRemoval;
+    private readonly CancellationToken _lifetimeToken;
 
     public int RemovedCount { get; private set; }
     public int RemovedFileCount { get; private set; }
@@ -52,6 +52,7 @@ public sealed class CleanupScreen
     public bool PreferenceMutationObserved { get; private set; }
     public bool CancellationObserved { get; private set; }
     public RemoveService.BatchRemoveReport? LastReport { get; private set; }
+    internal string OutcomeSummary { get; private set; } = "Skipped: review closed without an action.";
 
     public CleanupScreen(
         IApplication app,
@@ -62,8 +63,9 @@ public sealed class CleanupScreen
         IReadOnlyList<InstalledSkill> allSkills,
         Func<string, int>? confirmBatchRemoval = null,
         SkillView.Subprocess.ProcessRunner? ownershipRunner = null,
-        Func<CancellationToken, Task<InventorySnapshot>>? captureInventory = null)
+        Func<CancellationToken, Task<InventorySnapshot>>? captureInventory = null, CancellationToken lifetimeToken = default)
     {
+        _lifetimeToken = lifetimeToken;
         _app = app;
         _remove = remove;
         _logger = logger;
@@ -79,385 +81,123 @@ public sealed class CleanupScreen
 
     public void Show() => Show(null);
 
-    internal void Show(Action<Window>? ready)
+    internal void Show(Action<Dialog>? ready)
     {
-        RemoveService.RemoveProgress? lastProgress = null;
-        var closeAfterCancellation = 0;
-        var showDetails = false;
-
-        using var window = new Window
-        {
-            Title = $"Cleanup — {_candidates.Length} candidate(s)",
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(),
-        };
-        using var operation = new ModalOperationTracker(_app, _logger, "cleanup.ignore");
-        var readyToClose = false;
-        bool Busy() => operation.CurrentOwnership != ModalOperationTracker.Ownership.None;
-
-        var header = new Label
-        {
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = 1,
-            Text = BuildHeaderText(),
-        };
-
-        var table = new TableView
-        {
-            X = 0,
-            Y = 1,
-            Width = Dim.Percent(55),
-            Height = Dim.Fill(3),
-            FullRowSelect = true,
-        };
-        TuiHelpers.DisableTypeToSearch(table);
-        TuiHelpers.ConfigureTableNavigation(table);
-        TuiHelpers.ConfigureTableChrome(table);
-
-        // Width state shared between the column-projection lambdas and the
-        // resize handler. Mutating these does not require rebuilding the
-        // table source; the closures re-read on every render.
-        var widths = new ColumnWidths { Name = 12, Path = 15 };
-        var rowsList = _candidates.Select((c, i) => (i, c)).ToList();
-        var inner = new EnumerableTableSource<(int Idx, CleanupClassifier.Candidate C)>(
-            rowsList,
-            new Dictionary<string, Func<(int Idx, CleanupClassifier.Candidate C), object>>
-            {
-                ["Kind"] = row => TuiHelpers.ShortKind(row.C.Kind),
-                ["Name"] = row => TuiHelpers.Truncate(
-                    row.C.Skill?.Name ?? System.IO.Path.GetFileName(row.C.Path),
-                    widths.Name),
-                ["Path"] = row => TuiHelpers.Truncate(TuiHelpers.ShortenPath(row.C.Path), widths.Path),
-            });
-        // RC5's CheckBoxTableSourceWrapperByIndex inserts the checkbox column,
-        // hooks Space-to-toggle and click-to-toggle on the table, and tracks
-        // checked rows in a HashSet<int> we can read directly. Replaces the
-        // old manual `bool[] checkStates` + " " column + Space KeyDown handler.
-        var wrapper = new CheckBoxTableSourceWrapperByIndex(table, inner);
-        table.Table = wrapper;
-        var style = table.Style;
-        style.ExpandLastColumn = true;
-        // Wrapper inserts " " at column 0, so Name is column 2, Path column 3.
-        var nameStyle = style.GetOrCreateColumnStyle(2);
-        nameStyle.MinWidth = 8;
-        var pathStyle = style.GetOrCreateColumnStyle(3);
-        pathStyle.MinWidth = 10;
-
-        void Recompute()
-        {
-            var viewportWidth = table.Viewport.Width;
-            var available = viewportWidth > 0 ? Math.Max(40, viewportWidth - 4) : 70;
-            // Fixed: checkbox(1) + Kind(11). Remainder split Name (35%) / Path (65%).
-            var remaining = Math.Max(20, available - 1 - 11);
-            widths.Name = Math.Max(12, (int)Math.Round(remaining * 0.35));
-            widths.Path = Math.Max(15, remaining - widths.Name);
-            nameStyle.MaxWidth = widths.Name;
-            table.Update();
-        }
-        Recompute();
-        var lastCleanupWidth = -1;
-        table.FrameChanged += (_, _) =>
-        {
-            var w = table.Viewport.Width;
-            if (w > 0 && w != lastCleanupWidth)
-            {
-                lastCleanupWidth = w;
-                Recompute();
-            }
-        };
-
-        var detail = new Markdown
-        {
-            X = Pos.Right(table) + 1,
-            Y = 1,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(3),
-            Text = _candidates.Length == 0 ? "(no cleanup candidates)" : RenderDetail(_candidates[0]),
-        };
+        if (_lifetimeToken.IsCancellationRequested) return;
+        if (_candidates.Length != 1) throw new InvalidOperationException("Select one exact cleanup finding in Issues before review.");
+        using var window = new Dialog { Title = "Selected cleanup review", Width = Dim.Percent(96), Height = Dim.Percent(96) };
+        using var operation = new ModalOperationTracker(_app, _logger, "cleanup.selected");
+        var detail = new Markdown { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(4), Text = RenderDetail(_candidates[0]) };
         TuiHelpers.ConfigureMarkdownPane(detail, SkillViewStyling.BaseSchemeName);
-
-        table.ValueChanged += (_, _) =>
+        var status = new Label { X = 0, Y = Pos.AnchorEnd(3), Width = Dim.Fill(), Height = 1, Text = "Review this exact object; deletion has no automatic Undo." };
+        var remove = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(2), Text = "Review removal", Enabled = false };
+        var ignore = new SingleRowButton { X = Pos.Right(remove) + 1, Y = Pos.AnchorEnd(2), Text = "Suppress suggestion", Enabled = false };
+        var close = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Back (Esc)", IsDefault = true };
+        var closeRequested = false;
+        var readyToClose = false;
+        var showDetails = false;
+        bool Busy() => operation.CurrentOwnership != ModalOperationTracker.Ownership.None;
+        void Finish(string text)
         {
-            var i = table.GetSelectedRow();
-            if (i >= 0 && i < _candidates.Length) detail.Text = RenderDetail(_candidates[i], showDetails);
-        };
-
-        var status = new Label
-        {
-            X = 2,
-            Y = Pos.AnchorEnd(2),
-            Width = Dim.Fill(2),
-            Text = _candidates.Length == 0
-                ? " no cleanup candidates"
-                : $" {_candidates.Length} candidate(s)",
-        };
-        var spinner = new SpinnerView
-        {
-            X = 0,
-            Y = Pos.AnchorEnd(2),
-            Visible = false,
-            AutoSpin = false,
-        };
-
-        var shortcuts = BuildShortcuts();
-        var reviewShortcut = shortcuts.Single(shortcut => shortcut.Title == "Enter");
-        var detailsShortcut = shortcuts.Single(shortcut => shortcut.Title == "F2");
-        var statusBar = new StatusBar(shortcuts);
-        // StatusBar sets shortcut alignment (and resets child margins) when
-        // adding items. Compact them afterward, keeping a gap before each key.
-        foreach (var shortcut in shortcuts)
-        {
-            if (shortcut.CommandView?.Margin is { } commandMargin) commandMargin.Thickness = new(0);
-            if (shortcut.HelpView.Margin is { } helpMargin) helpMargin.Thickness = new(0, 0, 1, 0);
+            OutcomeSummary = text;
+            operation.Release(); status.Text = text;
+            remove.Enabled = false; // A fresh exact finding is required for another attempt.
+            ignore.Enabled = false;
+            if (closeRequested) { readyToClose = true; _app.RequestStop(); }
         }
-
-        TuiHelpers.ApplyScheme(SkillViewStyling.BaseSchemeName,
-            window, header, table, detail, spinner, status, statusBar);
-
-        async Task RunRemovalAsync(HashSet<int> selectedRows, CancellationToken cancellationToken)
+        void Close()
         {
-            var selectedCount = selectedRows.Count(index => index >= 0 && index < _candidates.Length);
-            var attemptState = new RemovalAttemptState();
-            var progress = new CallbackProgress<RemoveService.RemoveProgress>(value =>
-            {
-                lastProgress = value;
-                operation.InvokeIfActive(() => status.Text = FormatProgress(value));
-            });
-
-            try
-            {
-                var summary = await RemoveSelectedAsync(
-                        selectedRows,
-                        cancellationToken,
-                        progress,
-                        attemptState,
-                        confirmationGranted: true)
-                    .ConfigureAwait(false);
-                operation.InvokeTerminalIfActive(() =>
-                {
-                    spinner.AutoSpin = false;
-                    spinner.Visible = false;
-                    operation.Release();
-                    status.Text = summary.Confirmed
-                        ? $" removed {summary.Removed}, skipped {summary.Skipped}, failed {summary.Failed}. Esc returns."
-                        : " cleanup removal canceled";
-                    if (Volatile.Read(ref closeAfterCancellation) != 0) { readyToClose = true; _app.RequestStop(); }
-                });
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                var removed = lastProgress?.TargetsDeleted ?? 0;
-                var skipped = attemptState.PreValidationSkipped;
-                var failed = CountFailedSelections(
-                    selectedCount,
-                    removed,
-                    skipped);
-                _logger.Debug("cleanup.remove", "cleanup removal canceled");
-                operation.InvokeTerminalIfActive(() =>
-                {
-                    spinner.AutoSpin = false;
-                    spinner.Visible = false;
-                    status.Text = $" removal canceled after {removed}; skipped {skipped}, failed {failed}";
-                    if (Volatile.Read(ref closeAfterCancellation) != 0)
-                    {
-                        readyToClose = true; operation.Release(); _app.RequestStop();
-                    }
-                    else
-                    {
-                        operation.Release();
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("cleanup.remove", ex.Message);
-                operation.InvokeTerminalIfActive(() =>
-                {
-                    spinner.AutoSpin = false;
-                    spinner.Visible = false;
-                    operation.Release();
-                    status.Text = " cleanup removal failed — see logs";
-                    if (Volatile.Read(ref closeAfterCancellation) != 0) { readyToClose = true; _app.RequestStop(); }
-                });
-            }
+            if (Busy()) { closeRequested = true; operation.Cancel(); status.Text = "Canceling; waiting for result accounting…"; return; }
+            readyToClose = true; _app.RequestStop(window);
         }
-
-        void ReviewSelection()
+        remove.Accepting += (_, e) =>
         {
-            if (Busy()) return;
-            var selectedRows = wrapper.CheckedRows
-                .Where(index => index >= 0 && index < _candidates.Length)
-                .ToHashSet();
-            if (selectedRows.Count == 0)
-            {
-                status.Text = " Select a row with Space, then press Enter to review.";
-                return;
-            }
-            if (_confirmBatchRemoval(selectedRows.Select(index => _candidates[index]).ToImmutableArray()) != 1)
-            { status.Text = " Review canceled; nothing removed."; return; }
-            spinner.Visible = true;
-            spinner.AutoSpin = true;
-            lastProgress = null;
-            status.Text = " removing…  Esc cancels";
-            operation.TryStart(token => Task.Run(() => RunRemovalAsync(selectedRows, token)));
-        }
-
-        void ToggleSelection()
-        {
-            if (Busy()) return;
-            var index = table.GetSelectedRow();
-            if (index < 0 || index >= _candidates.Length) return;
-            if (!wrapper.CheckedRows.Remove(index)) wrapper.CheckedRows.Add(index);
-            table.Update();
-        }
-
-        void ToggleDetails()
-        {
-            showDetails = !showDetails;
-            var i = table.GetSelectedRow();
-            if (i >= 0 && i < _candidates.Length) detail.Text = RenderDetail(_candidates[i], showDetails);
-            UpdateHints();
-        }
-
-        void UpdateHints()
-        {
-            var action = showDetails ? "Summary" : "Details";
-            detailsShortcut.HelpText = action;
-            reviewShortcut.Title = detail.HasFocus ? "r" : "Enter";
-            header.Text = detail.HasFocus
-                ? $"r Review · F2 {action} · Ctrl+A Select · Ctrl+C Copy"
-                : BuildHeaderText().Replace("F2 Details", $"F2 {action}", StringComparison.Ordinal);
-        }
-
-        void IgnoreSelection()
-        {
-            if (Busy()) return;
-            var selected = wrapper.CheckedRows.Where(index => index >= 0 && index < _candidates.Length)
-                .Select(index => _candidates[index]).ToArray();
-            if (selected.Length == 0) { status.Text = " no cleanup candidates selected"; return; }
-            if (_captureInventory is null || _ownershipRunner is null)
-            { status.Text = " fresh inventory unavailable; no preferences changed"; return; }
-            spinner.Visible = true; spinner.AutoSpin = true;
-            status.Text = " suppressing cleanup suggestions for selected physical installs across consumer contexts… Esc cancels";
+            e.Handled = true;
+            if (Busy() || !remove.Enabled || _lifetimeToken.IsCancellationRequested) return;
+            // Confirmation stays on the event-loop thread, before worker admission.
+            if (_confirmBatchRemoval(_candidates) != 1 || _lifetimeToken.IsCancellationRequested) { OutcomeSummary = "Skipped: removal review canceled; nothing removed."; status.Text = OutcomeSummary; return; }
+            remove.Enabled = ignore.Enabled = false;
+            status.Text = "Removing selected object… Esc cancels and waits.";
             operation.TryStart(token => Task.Run(async () =>
             {
                 string text;
                 try
                 {
-                    var result = await CleanupSuppressionWorkflow.SetAsync(selected,
-                        CleanupSuppressionStore.For(_ownershipRunner), _captureInventory,
-                        () => PreferenceMutationObserved = true, () => IgnoredCount++, token).ConfigureAwait(false);
-                    foreach (var error in result.Errors) _logger.Error("cleanup.ignore", error);
-                    CancellationObserved |= result.Canceled;
-                    text = $" ignored {result.Changed}, skipped {result.Skipped}, failed {result.Failed}" + (result.Canceled ? "; canceled" : "")
-                        + (result.Errors.Length > 0 ? " — see logs" : "");
+                    var summary = await RemoveSelectedAsync([0], token, confirmationGranted: true).ConfigureAwait(false);
+                    text = (summary.Failed > 0 ? "Refused/failed: " : "") + $"Removed {summary.Removed}; skipped {summary.Skipped}; failed/refused {summary.Failed}. No automatic Undo.";
                 }
-                catch (Exception ex) { _logger.Error("cleanup.ignore", ex.Message); text = " preference update failed — see logs"; }
-                operation.InvokeTerminalIfActive(() =>
-                {
-                    spinner.AutoSpin = false; spinner.Visible = false; status.Text = text;
-                    operation.Release();
-                    if (Volatile.Read(ref closeAfterCancellation) != 0) { readyToClose = true; _app.RequestStop(); }
-                });
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                { text = $"Canceled/partial: removed {RemovedCount} items, {RemovedFileCount} files, {RemovedDirectoryCount} folders. Inspect partial results."; }
+                catch (Exception ex) { _logger.Error("cleanup.selected", ex.ToString()); text = "Removal failed or partial: " + TuiHelpers.ErrorSnippet(ex.Message); }
+                OutcomeSummary = text; // Retain the worker outcome even if UI delivery is canceled.
+                operation.InvokeTerminalIfActive(() => Finish(text));
             }));
-        }
-
-        void Export()
+        };
+        ignore.Accepting += (_, e) =>
         {
-            if (!Busy()) DoExport(status);
-        }
-
-        void Close()
-        {
-            if (Busy())
+            e.Handled = true;
+            if (Busy() || !ignore.Enabled || _lifetimeToken.IsCancellationRequested) return;
+            if (_captureInventory is null || _ownershipRunner is null) { status.Text = "Fresh inventory unavailable; no preferences changed."; return; }
+            remove.Enabled = ignore.Enabled = false;
+            status.Text = "Suppressing this cleanup suggestion… Esc cancels and waits.";
+            operation.TryStart(token => Task.Run(async () =>
             {
-                Interlocked.Exchange(ref closeAfterCancellation, 1);
-                operation.Cancel();
-                status.Text = " canceling cleanup operation…";
-                return;
-            }
-            readyToClose = true;
-            _app.RequestStop();
-        }
-
-        void Bind(string title, Action action)
-        {
-            var shortcut = shortcuts.Single(shortcut => shortcut.Title == title);
-            // Terminal.Gui invokes Action for Activate, but a programmatic
-            // Accept takes its separate Accepting route. Consume that route so
-            // both explicit commands run the action exactly once.
-            shortcut.Action = action;
-            shortcut.Accepting += (_, args) => { args.Handled = true; action(); };
-        }
-        Bind("Space", ToggleSelection);
-        Bind("Enter", ReviewSelection);
-        Bind("F2", ToggleDetails);
-        Bind("i", IgnoreSelection);
-        Bind("x", Export);
-        Bind("Esc", Close);
-        table.HasFocusChanged += (_, _) => UpdateHints();
-        detail.HasFocusChanged += (_, _) => UpdateHints();
-        // The window owns keyboard routing, including contextual Enter/Space.
-        // Footer labels do not install competing global bindings; their actions
-        // remain available to mouse and explicit command activation.
-
+                string text;
+                try
+                {
+                    var result = await CleanupSuppressionWorkflow.SetAsync(_candidates, CleanupSuppressionStore.For(_ownershipRunner),
+                        _captureInventory, () => PreferenceMutationObserved = true, () => IgnoredCount++, token).ConfigureAwait(false);
+                    CancellationObserved |= result.Canceled;
+                    foreach (var error in result.Errors) _logger.Error("cleanup.suppress", error);
+                    text = (result.Canceled ? "Canceled/partial: " : result.Failed > 0 ? "Failed/partial: " : result.Changed == 0 ? "Skipped: " : "") + $"Suppressed {result.Changed}; skipped {result.Skipped}; failed {result.Failed}. Preference only; health, ownership and enablement unchanged.";
+                }
+                catch (Exception ex) { _logger.Error("cleanup.suppress", ex.ToString()); text = "Suppression unavailable: " + TuiHelpers.ErrorSnippet(ex.Message); }
+                OutcomeSummary = text; // Retain the worker outcome even if UI delivery is canceled.
+                operation.InvokeTerminalIfActive(() => Finish(text));
+            }));
+        };
+        close.Accepting += (_, e) => { e.Handled = true; Close(); };
         window.KeyDown += (_, key) =>
         {
             if (key.Handled) return;
-            var r = key.AsRune.Value;
-            if (key.KeyCode == KeyCode.Enter && table.HasFocus)
-            {
-                key.Handled = true;
-                ReviewSelection();
-            }
+            if (key.KeyCode == KeyCode.Esc) { key.Handled = true; Close(); }
             else if (key.KeyCode == KeyCode.F2)
-            {
-                key.Handled = true;
-                ToggleDetails();
-            }
-            else if (r == 'r' || r == 'R')
-            {
-                key.Handled = true;
-                ReviewSelection();
-            }
-            else if (r == 'i' || r == 'I')
-            {
-                key.Handled = true;
-                IgnoreSelection();
-            }
-            else if (r == 'x' || r == 'X')
-            {
-                key.Handled = true;
-                Export();
-            }
-            else if (key.KeyCode == KeyCode.Esc)
-            {
-                key.Handled = true;
-                Close();
-            }
+            { key.Handled = true; showDetails = !showDetails; detail.Text = RenderDetail(_candidates[0], showDetails); }
         };
         window.IsRunningChanging += (_, args) =>
         {
             if (args.NewValue || readyToClose || !Busy()) return;
-            args.Cancel = true; Interlocked.Exchange(ref closeAfterCancellation, 1);
-            operation.Cancel(); status.Text = " canceling cleanup operation…";
+            args.Cancel = true; Close();
         };
-
-        window.Add(header, table, detail, spinner, status, statusBar);
-        table.SetFocus();
-        ready?.Invoke(window);
-        try
+        window.Add(detail, status, remove, ignore, close);
+        close.SetFocus();
+        operation.TryStart(token => Task.Run(() =>
         {
-            _app.Run(window);
-        }
-        finally
+            RemoveValidator.RemoveValidation? validation = null;
+            string? error = null;
+            try { validation = ValidateCandidate(_candidates[0], token); }
+            catch (Exception ex) { error = ex.Message; }
+            operation.InvokeTerminalIfActive(() =>
+            {
+                _reviewedRemoval = validation;
+                operation.Release();
+                remove.Enabled = !_candidates[0].ReviewOnly && validation is not null;
+                ignore.Enabled = true;
+                if (validation is not { Allowed: true, RequiresSecondConfirm: false } || _candidates[0].ReviewOnly)
+                    OutcomeSummary = "Refused: selected cleanup requires inspection or changed native admission.";
+                status.Text = _candidates[0].ReviewOnly ? "Removal unavailable: inspect or repair this finding first."
+                    : validation is { Allowed: true, RequiresSecondConfirm: false } ? "Exact native target captured; Review removal opens confirmation."
+                    : "Removal unavailable: " + TuiHelpers.ErrorSnippet(error ?? string.Join("; ", validation?.Errors.Select(item => item.Detail) ?? []));
+                if (closeRequested) { readyToClose = true; _app.RequestStop(); }
+            });
+        }));
+        using var lifetimeRegistration = _lifetimeToken.Register(() =>
         {
             operation.Cancel();
-        }
+            _app.Invoke(() => { if (window.IsRunning) Close(); });
+        });
+        ready?.Invoke(window);
+        if (!_lifetimeToken.IsCancellationRequested) _app.Run(window);
     }
 
     internal async Task<RemovalSummary> RemoveSelectedAsync(
@@ -586,16 +326,15 @@ public sealed class CleanupScreen
             // target executes. Do not materialize it: deleting an earlier
             // sibling changes the shared parent's native generation, so later
             // link identities must be captured after that owned mutation.
-            var validation = candidate.ReviewOnly ? RefuseUnsupportedCandidate(candidate) : candidate.Kind switch
-            {
-                CleanupClassifier.CandidateKind.BrokenSymlink =>
-                    RemoveValidator.ValidateBrokenSymlink(candidate.Path, _scanRoots, cancellationToken, _ownershipRunner),
-                CleanupClassifier.CandidateKind.EmptyDirectory =>
-                    RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots, cancellationToken, _ownershipRunner),
-                _ when candidate.Skill is not null =>
-                    RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills, cancellationToken),
-                _ => RefuseUnsupportedCandidate(candidate),
-            };
+            var validation = ValidateCandidate(candidate, cancellationToken);
+            if (_reviewedRemoval is { } reviewed && (validation.ExecutionIdentity != reviewed.ExecutionIdentity
+                || validation.ExecutionLinkIdentity != reviewed.ExecutionLinkIdentity
+                || validation.RequiresEmptyDirectory != reviewed.RequiresEmptyDirectory || validation.RemovesLinkOnly != reviewed.RemovesLinkOnly))
+                validation = validation with
+                {
+                    Errors = validation.Errors.Add(new(RemoveValidator.ErrorKind.FilesystemIdentityUnavailable,
+                    "Selected cleanup target changed after review; refresh and review again."))
+                };
             validation = validation with { Impact = validation.Impact ?? candidate.Impact };
             if (!validation.Allowed || validation.RequiresSecondConfirm)
             {
@@ -606,10 +345,14 @@ public sealed class CleanupScreen
         }
     }
 
-    private static string FormatProgress(RemoveService.RemoveProgress progress) =>
-        progress.IsCanceled
-            ? $" canceling… removed {progress.TargetsDeleted} target(s)"
-            : $" removing… {progress.TargetsProcessed} target(s), {progress.FilesProcessed} file(s), {progress.DirectoriesProcessed} dir(s)  Esc cancels";
+    private RemoveValidator.RemoveValidation ValidateCandidate(CleanupClassifier.Candidate candidate, CancellationToken token) =>
+        candidate.ReviewOnly ? RefuseUnsupportedCandidate(candidate) : candidate.Kind switch
+        {
+            CleanupClassifier.CandidateKind.BrokenSymlink => RemoveValidator.ValidateBrokenSymlink(candidate.Path, _scanRoots, token, _ownershipRunner),
+            CleanupClassifier.CandidateKind.EmptyDirectory => RemoveValidator.ValidateEmptyDirectory(candidate.Path, _scanRoots, token, _ownershipRunner),
+            _ when candidate.Skill is not null => RemoveValidator.Validate(candidate.Skill, _scanRoots, _allSkills, token),
+            _ => RefuseUnsupportedCandidate(candidate)
+        };
 
     internal const int MaxConfirmationItems = 128;
     internal const int MaxConfirmationConsumers = 256;
@@ -649,39 +392,6 @@ public sealed class CleanupScreen
         return new(TerminalEscapeSanitizer.Sanitize(text.ToString()) ?? "", complete);
     }
 
-    private void DoExport(Label status)
-    {
-        try
-        {
-            var path = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                $"skillview-cleanup-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}.txt");
-            System.IO.File.WriteAllText(path, RenderReport());
-            _logger.Info("cleanup.export", $"wrote {path}");
-            status.Text = $" exported report → {path}";
-        }
-        catch (Exception ex)
-        {
-            _logger.Error("cleanup.export", ex.Message);
-            status.Text = " export failed — see logs";
-        }
-    }
-
-    private string RenderReport()
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine($"# SkillView cleanup report — {DateTimeOffset.UtcNow:O}");
-        sb.AppendLine($"candidates: {_candidates.Length}");
-        foreach (var c in _candidates)
-        {
-            sb.AppendLine();
-            sb.AppendLine($"- kind : {c.Kind}");
-            sb.AppendLine($"  path : {c.Path}");
-            sb.AppendLine($"  why  : {c.Reason}");
-        }
-        return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
-    }
-
     internal static string RenderDetail(CleanupClassifier.Candidate c, bool showDetails = false)
     {
         if (!showDetails) return TerminalEscapeSanitizer.Sanitize(CleanupReviewFormatter.Render(c)) ?? string.Empty;
@@ -705,22 +415,6 @@ public sealed class CleanupScreen
         return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? string.Empty;
     }
 
-    internal static Shortcut[] BuildShortcutsForTests() => BuildShortcuts();
-
-    internal static string BuildHeaderTextForTests() => BuildHeaderText();
-
-    private static Shortcut[] BuildShortcuts() =>
-    [
-        new Shortcut { Title = "Space", HelpText = "Select" },
-        new Shortcut { Title = "Enter", HelpText = "Review" },
-        new Shortcut { Title = "F2", HelpText = "Details" },
-        new Shortcut { Title = "i", HelpText = "Ignore" },
-        new Shortcut { Title = "x", HelpText = "Export" },
-        new Shortcut { Title = "Esc", HelpText = "Back" },
-    ];
-
-    private static string BuildHeaderText() => "Space Select · Enter Review · F2 Details · Tab Scroll";
-
     private static RemoveValidator.RemoveValidation RefuseUnsupportedCandidate(CleanupClassifier.Candidate candidate) =>
         new(
             ImmutableArray.Create(new RemoveValidator.Error(
@@ -729,12 +423,6 @@ public sealed class CleanupScreen
             ImmutableArray<RemoveValidator.Warning>.Empty,
             candidate.Path,
             ImmutableArray<string>.Empty);
-
-    private sealed class ColumnWidths
-    {
-        public int Name;
-        public int Path;
-    }
 
     private int ConfirmBatchRemoval(IReadOnlyList<CleanupClassifier.Candidate> selected)
     {
@@ -753,7 +441,8 @@ public sealed class CleanupScreen
             ViewportSettings = ViewportSettingsFlags.HasVerticalScrollBar
         };
         TuiHelpers.ConfigureMarkdownPane(review, SkillViewStyling.BaseSchemeName);
-        var canRemove = summary.Complete && selected.Any(candidate => !candidate.ReviewOnly);
+        var canRemove = summary.Complete && selected.Any(candidate => !candidate.ReviewOnly)
+            && (_reviewedRemoval is null || _reviewedRemoval is { Allowed: true, RequiresSecondConfirm: false });
         var explanation = new Label
         {
             X = 0,

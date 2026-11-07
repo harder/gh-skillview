@@ -204,6 +204,26 @@ public sealed partial class SkillViewApp
             availability: _workflows.Availability,
             onCheckUpdates: CheckUpdates,
             onReviewUpdate: skill => OpenUpdatesWorkspace(OperationSubject.From(skill)),
+            context: () => SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner),
+            onMoveAside: skill =>
+            {
+                var lifetime = GetRunLifetimeToken();
+                var generation = _services.ListAdapter.Generation;
+                var installed = _installedTab;
+                _workflows.ShowMoveAside(skill, lifetime);
+                if (installed is null || _app is not { } app || lifetime.IsCancellationRequested) return;
+                // The popover restores its anchor after this action returns.
+                // Reclaim browse focus on the next iteration, then consume the
+                // independently reconciled display snapshot if anything changed.
+                StageForNextIteration(app, () =>
+                {
+                    if (lifetime.IsCancellationRequested || !installed.Visible || _activeTab != SkillViewTab.Installed
+                        || _updatesTab?.Visible == true || _inDoctor) return;
+                    installed.FocusList();
+                    if (generation != _services.ListAdapter.Generation)
+                        RunOwnedTask(installed.LoadAsync, "installed.after-standalone");
+                });
+            },
             capturedIssues: () => _changesTab?.CapturedIssues,
             packageCheck: () => _workflows.CurrentPackageCheck,
             onResourceReplacement: (fact, target) =>
@@ -231,7 +251,7 @@ public sealed partial class SkillViewApp
             runOnUi: runOnUi,
             runTask: RunOwnedTask,
             snapshotLoader: token => _workflows.CaptureInventorySnapshotAsync(token),
-            updateRunner: (ghPath, options, token) => _workflows.PrepareUpdatesAsync(ghPath, options, token),
+            updateRunner: (ghPath, options, token) => _workflows.PrepareUpdatesAsync(ghPath, options, token, _guidedRepairs.Active?.CopyIntent),
             ghPathProvider: () => _ghPath,
             logger: _services.Logger,
             onLeaveTab: LeaveUpdates,
@@ -252,6 +272,15 @@ public sealed partial class SkillViewApp
             Visible = false,
         };
 
+        _updatesTab.ReviewWorkStarted = _guidedRepairs.WorkStarted;
+        _updatesTab.ReviewWorkSettled = (work, result) =>
+        {
+            _guidedRepairs.WorkSettled(work, result);
+            Invoke(() => { if (_changesTab?.Visible == true) _changesTab.RefreshGuided(); });
+        };
+        _updatesTab.ReviewSkipped = _guidedRepairs.ReviewSkipped;
+        _updatesTab.ReviewLoaded = _guidedRepairs.ReviewLoaded;
+
         _doctorTab = new SkillView.Ui.Tabs.DoctorTabView(
             onLeaveTab: LeaveDoctor)
         {
@@ -271,6 +300,10 @@ public sealed partial class SkillViewApp
             homeDirectory: DisplayPath.CaptureHome(_services.Runner),
             packageCheck: () => _workflows.CurrentPackageCheck,
             onPackageCheck: fact => _workflows.ShowRetainedPackageCheck(fact, GetRunLifetimeToken()),
+            context: () => SkillView.Gh.InstallNavigationEvidence.Context(_services.Runner),
+            reviewCopy: skill => OpenUpdatesWorkspace(OperationSubject.From(skill)),
+            guided: _guidedRepairs,
+            activateGuided: (item, request) => _workflows.ReviewGuidedAsync(_guidedRepairs, item, request, subject => OpenUpdatesWorkspace(subject)),
             catalogGeneration: () => _services.ListAdapter.Generation,
             onLeaveTab: () => ActivateTab(SkillViewTab.Discover),
             onStateChange: UpdateContextBar,
@@ -279,13 +312,13 @@ public sealed partial class SkillViewApp
                 CancellationCallbackReporter.For(_services.Logger, "changes tab"),
             activateEntryAsync: (entry, request) =>
             {
-                if (entry.IsCopyReview)
-                    return _workflows.ShowCopiesAsync(entry, request,
-                        subject => OpenUpdatesWorkspace(subject, prepareImmediately: false), GetRunLifetimeToken());
                 if (entry.Cleanup is not null) return _workflows.ShowSelectedCleanupAsync(entry, request);
                 if (request.IsCurrent) OpenUpdatesWorkspace(entry.Subject);
                 return Task.CompletedTask;
             },
+            setIntentional: (finding, request) => _workflows.SetIntentionalDifferenceAsync(finding, request),
+            resetIntentional: request => _workflows.ShowIntentionalDifferenceResetAsync(request),
+            validateFinding: _workflows.ValidateFindingAsync,
             runTask: RunOwnedTask)
         {
             X = 0,
@@ -297,10 +330,13 @@ public sealed partial class SkillViewApp
         void InvalidateUpdateObservations() => _workflows.InvalidateAvailability(RefreshUpdateAvailability);
         _services.ListAdapter.Invalidated += InvalidateUpdateObservations;
         window.Disposing += (_, _) => _services.ListAdapter.Invalidated -= InvalidateUpdateObservations;
-        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = "History (F4)", Width = 30 };
+        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = ActionLabels.History.ButtonText, Width = Dim.Func(_ => window.Viewport.Width >= 110 ? 30 : 16) };
         _historyButton.Accepting += (_, args) => { args.Handled = true; OpenHistory(); };
+        _locationsButton = new SingleRowButton { X = Pos.Right(_historyButton), Y = 0, Text = "Locations F5", Width = 17 };
+        window.FrameChanged += (_, _) => RefreshHistoryButton();
+        _locationsButton.Accepting += (_, args) => { args.Handled = true; OpenLocations(); };
         window.Add(_tabBar, _contextBar, _discoverTab, _installedTab, _updatesTab, _doctorTab,
-                   _changesTab, _historyButton,
+                   _changesTab, _historyButton, _locationsButton,
                    _statusStrip, _sizeGuard);
         window.FrameChanged += (_, _) =>
             _sizeGuard.UpdateForSize(window.Frame.Width, window.Frame.Height);

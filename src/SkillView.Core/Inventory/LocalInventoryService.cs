@@ -241,7 +241,13 @@ public sealed class LocalInventoryService
                 return skill with { Ignored = suppression.Active, CleanupSuppression = suppression };
             }).ToImmutableArray();
             Stage("cleanup preferences");
-            return snapshot with { Skills = enriched, PreferenceDiagnostics = read.Diagnostic is { } message ? [message] : [] };
+            var differences = IntentionalDifferenceStore.ReadFor(_contextRunner, snapshot, cancellationToken);
+            return snapshot with
+            {
+                Skills = enriched,
+                IntentionalDifferences = differences,
+                PreferenceDiagnostics = new[] { read.Diagnostic, differences.Diagnostic }.OfType<string>().ToImmutableArray()
+            };
         }, cancellationToken).ConfigureAwait(false);
     }
 

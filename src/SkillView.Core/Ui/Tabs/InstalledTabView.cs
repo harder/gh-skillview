@@ -55,6 +55,8 @@ internal sealed class InstalledTabView : FrameView
     private readonly Button _detailsButton;
     private readonly Button _moreActions;
     private readonly Button _back;
+    private readonly InlineCopiesView _copies;
+    private readonly Action<InstalledSkill>? _onMoveAside;
     private readonly Button[] _facetButtons;
     private readonly Button _coverageButton;
     private readonly Button _clearFilters;
@@ -95,6 +97,7 @@ internal sealed class InstalledTabView : FrameView
     private bool _showDetails;
     private readonly SpinnerView _spinner;
     private InventorySnapshot? _snapshot;
+    private long _snapshotGeneration;
     internal InventorySnapshot? CurrentSnapshot => _snapshot;
     private IReadOnlyList<InstalledOverviewRow> _rows = Array.Empty<InstalledOverviewRow>();
     private SortMode _sort = SortMode.Name;
@@ -124,8 +127,12 @@ internal sealed class InstalledTabView : FrameView
         Action<Exception>? onRemovalError = null, Func<string, bool>? openPath = null,
         UpdateAvailabilitySession? availability = null, Action? onCheckUpdates = null,
         Action<InstalledSkill>? onReviewUpdate = null, Func<InstalledIssueEvidence?>? capturedIssues = null, Func<long>? catalogGeneration = null, Func<PackageCheckFact?>? packageCheck = null,
-        Action<PackageCheckFact, string>? onResourceReplacement = null)
+        Action<PackageCheckFact, string>? onResourceReplacement = null,
+        Func<string>? context = null, Action<InstalledSkill>? onMoveAside = null)
     {
+        _onMoveAside = onMoveAside;
+        _copies = new InlineCopiesView(runOnUi, runTask, catalogGeneration ?? (() => 0), context ?? (() => ""),
+            () => CloseCopies(restore: true), lifetimeToken, onCancellationCallbackException);
         _packageCheck = packageCheck ?? (() => null);
         _onResourceReplacement = onResourceReplacement;
         _capturedIssues = capturedIssues ?? (() => null);
@@ -152,15 +159,15 @@ internal sealed class InstalledTabView : FrameView
         BorderStyle = LineStyle.None;
         SchemeName = SchemeNames.Base;
         Visible = false;
-        _checkUpdates = new SingleRowButton { X = Pos.AnchorEnd(35), Y = 0, Text = "Check all updates (C)", Visible = availability is not null };
-        _reviewUpdate = new SingleRowButton { X = 13, Y = Pos.AnchorEnd(1), Text = "Review update (u)", Visible = onReviewUpdate is not null };
+        _checkUpdates = new SingleRowButton { X = Pos.AnchorEnd(35), Y = 0, Text = ActionLabels.CheckUpdates.ButtonText, Visible = availability is not null };
+        _reviewUpdate = new SingleRowButton { X = 13, Y = Pos.AnchorEnd(1), Text = ActionLabels.ReviewUpdate.ButtonText, Visible = onReviewUpdate is not null };
         _checkUpdates.Accepting += (_, e) => { e.Handled = true; _onCheckUpdates?.Invoke(); };
         _reviewUpdate.Accepting += (_, e) => { e.Handled = true; ReviewSelectedUpdate(); };
         _detailsButton = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Details" };
         _detailsButton.Accepting += (_, e) => { e.Handled = true; OpenSelectedDetail(); };
-        _moreActions = new SingleRowButton { X = 37, Y = Pos.AnchorEnd(1), Text = "More actions" };
+        _moreActions = new SingleRowButton { X = 37, Y = Pos.AnchorEnd(1), Text = ActionLabels.MoreActions.ButtonText };
         _moreActions.Accepting += (_, e) => { e.Handled = true; ShowMoreActions(); };
-        _back = new SingleRowButton { X = 56, Y = Pos.AnchorEnd(1), Text = "Back (Esc)", Visible = false };
+        _back = new SingleRowButton { X = 56, Y = Pos.AnchorEnd(1), Text = ActionLabels.Back.ButtonText, Visible = false };
         _back.Accepting += (_, e) => { e.Handled = true; BackToList(); };
         _searchSkills = new SingleRowButton { X = 0, Y = Pos.AnchorEnd(1), Text = "Search skills (1)", Visible = false };
         _searchSkills.Accepting += (_, e) => { e.Handled = true; _onLeaveTab(); };
@@ -270,6 +277,7 @@ internal sealed class InstalledTabView : FrameView
         _table.ValueChanged += (_, _) =>
         {
             if (_restoring) return;
+            CloseCopies();
             var row = _table.GetSelectedRow();
             if (row >= 0 && row < _rows.Count)
             {
@@ -290,6 +298,11 @@ internal sealed class InstalledTabView : FrameView
         _detail.ViewportChanged += (_, _) => ReflowDetail();
 
         KeyDown += OnKeyDown;
+        _detail.KeyDown += (_, key) =>
+        {
+            if (key.KeyCode == KeyCode.Tab) { key.Handled = true; _detailsButton.SetFocus(); }
+            else if (key.KeyCode == (KeyCode.Tab | KeyCode.ShiftMask)) { key.Handled = true; FocusList(); }
+        };
         _detail.KeyDown += OnKeyDown;
         _table.KeyDown += OnKeyDown;
         _filterField.KeyDown += OnKeyDown;
@@ -300,6 +313,7 @@ internal sealed class InstalledTabView : FrameView
         Add(filterLabel, _filterField, _table, _detail, _spinner, _footer,
             _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills, _coverage, _repositoryFilter, _controls, _coverageButton, _clearFilters);
         Add(_facetButtons);
+        Add(_copies);
         _detail.TabStop = TabBehavior.NoStop;
         foreach (var control in new View[] { _filterField, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detail, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills })
             control.HasFocusChanged += (_, _) => { if (control.HasFocus) _rememberedFocus = control; };
@@ -311,6 +325,8 @@ internal sealed class InstalledTabView : FrameView
     internal async Task LoadAsync()
     {
         if (_disposed || _lifetimeToken.IsCancellationRequested) return;
+        CloseCopies();
+        var capturedCatalog = _catalogGeneration();
         var priorSnapshot = _snapshot;
         var priorOverview = _overview;
         var loadGeneration = Interlocked.Increment(ref _loadGeneration);
@@ -333,11 +349,12 @@ internal sealed class InstalledTabView : FrameView
                 Interlocked.Exchange(ref _loadActive, 0);
                 if (ReferenceEquals(_snapshot, snapshot))
                 {
+                    _snapshotGeneration = capturedCatalog;
                     RefreshOperationStatus();
                     RestoreFocus();
                     _onStateChange?.Invoke();
                 }
-                else Populate(snapshot, overview);
+                else Populate(snapshot, overview, capturedCatalog);
             }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (loadCancellation.Token.IsCancellationRequested)
@@ -415,9 +432,10 @@ internal sealed class InstalledTabView : FrameView
         return true;
     }
 
-    private void Populate(InventorySnapshot snapshot, InstalledOverview overview)
+    private void Populate(InventorySnapshot snapshot, InstalledOverview overview, long? catalogGeneration = null)
     {
         _snapshot = snapshot;
+        _snapshotGeneration = catalogGeneration ?? _catalogGeneration();
         _overview = overview;
         var keys = overview.Groups.Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
         _knownGroups.IntersectWith(keys); _expanded.IntersectWith(keys);
@@ -603,12 +621,18 @@ internal sealed class InstalledTabView : FrameView
             else if (detailFocused && !showDetail) _table.SetFocus();
             _table.Visible = showTable;
             _detail.Visible = showDetail;
-            _back.Visible = _detailOpen;
+            _back.Visible = _detailOpen && !_copies.Open;
             _searchSkills.Visible = NoObservedCopies;
             _detailsButton.Visible = !NoObservedCopies;
             _reviewUpdate.Visible = !NoObservedCopies && _onReviewUpdate is not null;
             _moreActions.Visible = !NoObservedCopies;
             _checkUpdates.Visible = _availability is not null && (!NoObservedCopies || _availability.Running);
+            if (_copies.Open)
+            {
+                _detail.Visible = false;
+                _copies.X = _detail.X; _copies.Y = _detail.Y;
+                _copies.Width = _detail.Width; _copies.Height = _detail.Height;
+            }
             RecomputeColumnWidths();
         }
         finally { _layoutActive = false; }
@@ -684,6 +708,7 @@ internal sealed class InstalledTabView : FrameView
 
     private void RefreshAll()
     {
+        CloseCopies();
         if (_disposed || _lifetimeToken.IsCancellationRequested || _snapshot is null) return;
         CaptureIssueView();
         var detailOffset = _detail.Viewport.Location;
@@ -961,14 +986,14 @@ internal sealed class InstalledTabView : FrameView
             && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
         {
             key.Handled = true;
-            if (GetSelectedSkill() is { } selected) _onLocalReimport(selected);
+            if (GetSelectedSkill() is { } selected) { CloseCopies(); _onLocalReimport(selected); }
             return;
         }
         if (!_filterField.HasFocus && key.AsRune.Value == 'T' && _onLocalSourceSwitch is not null
             && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0)
         {
             key.Handled = true;
-            if (GetSelectedSkill() is { } selected) _onLocalSourceSwitch(selected);
+            if (GetSelectedSkill() is { } selected) { CloseCopies(); _onLocalSourceSwitch(selected); }
             return;
         }
         // `P` (capital) cycles the pin filter — handled here rather than via
@@ -1068,6 +1093,7 @@ internal sealed class InstalledTabView : FrameView
 
     private void BackToList()
     {
+        if (_copies.Open) { CloseCopies(restore: true); return; }
         _coverageOpen = false;
         _detailOpen = false;
         ApplyResponsiveLayout();
@@ -1077,14 +1103,20 @@ internal sealed class InstalledTabView : FrameView
 
     private void CheckPackage(InstalledSkill skill)
     {
+        if (_snapshotGeneration != _catalogGeneration()) return;
+        CloseCopies();
         if (_snapshot is not null && SelectedRow?.Copy is { Ambiguous: false } copy && CanActOnSelection)
             _onPackageCheck?.Invoke(_snapshot, copy.Id, skill);
     }
 
     private void ShowMoreActions()
     {
+        if (_snapshotGeneration != _catalogGeneration()) return;
         if (GetSelectedSkill() is not { } skill || !CanActOnSelection) return;
+        _copies.Retire();
         var actions = new List<(string Label, Action Run)> { ("Open exact location", () => _openPath(skill.ResolvedPath)), ("Remove exact copy", () => TryStartSelectedRemove()) };
+        actions.Insert(0, ("Compare copies (broad: same name or recorded source; not the finding's family)", OpenCopies));
+        if (_onMoveAside is not null) actions.Add(("Review standalone Move aside...", () => _onMoveAside(skill)));
         if (_onPackageCheck is not null) actions.Add(("Check package", () => CheckPackage(skill)));
         if (_onResourceReplacement is not null && CurrentResourceReplacement(skill) is { } replacement)
             actions.Add(("Review replacement for " + InstalledOverview.Text(replacement.Target, 240), () =>
@@ -1103,17 +1135,11 @@ internal sealed class InstalledTabView : FrameView
         }
         _actionsMenu?.Dispose();
         var key = _selectedKey;
-        _actionsMenu = new PopoverMenu(actions.Select(a => new MenuItem
+        _actionsMenu = AnchoredActions.Show(_moreActions, actions.Select(a => (a.Label, (Action)(() =>
         {
-            Title = a.Label,
-            Action = () =>
-        {
-            if (CanActOnSelection && _selectedKey == key && GetSelectedSkill() is { } current
+            if (_snapshotGeneration == _catalogGeneration() && CanActOnSelection && _selectedKey == key && GetSelectedSkill() is { } current
                 && current.ResolvedPath == skill.ResolvedPath) a.Run();
-        }
-        }).ToArray())
-        { App = App };
-        _actionsMenu.MakeVisible();
+        }))));
     }
 
     private (PackageCheckFact Fact, string Target)? CurrentResourceReplacement(InstalledSkill skill)
@@ -1125,6 +1151,8 @@ internal sealed class InstalledTabView : FrameView
 
     internal void ReviewSelectedUpdate()
     {
+        if (_snapshotGeneration != _catalogGeneration()) return;
+        CloseCopies();
         if (CanActOnSelection && GetSelectedSkill() is { } selected) _onReviewUpdate?.Invoke(selected);
     }
 
@@ -1139,10 +1167,11 @@ internal sealed class InstalledTabView : FrameView
     private void RefreshAvailability(bool captureIssues)
     {
         if (_disposed || _lifetimeToken.IsCancellationRequested) return;
+        _copies.ValidateObservation();
         if (captureIssues) CaptureIssueView();
         if (_availability is not null)
         {
-            _checkUpdates.Text = _availability.Running ? "Cancel check (C)" : "Check all updates (C)";
+            _checkUpdates.Text = _availability.Running ? ActionLabels.CancelCheck.ButtonText : ActionLabels.CheckUpdates.ButtonText;
             _checkUpdates.Enabled = !_availability.Stopping;
         }
         RefreshCoverage();
@@ -1160,6 +1189,7 @@ internal sealed class InstalledTabView : FrameView
 
     internal void CancelPendingWork()
     {
+        CloseCopies();
         Interlocked.Increment(ref _loadGeneration);
         if (_loadCancellations.Cancel())
         {
@@ -1221,10 +1251,13 @@ internal sealed class InstalledTabView : FrameView
     }
 
     private bool CanActOnSelection => !_disposed && !_lifetimeToken.IsCancellationRequested
+        && _snapshotGeneration == _issueView.Generation
         && Volatile.Read(ref _loadActive) == 0 && Volatile.Read(ref _removeActive) == 0;
 
     private bool TryStartSelectedRemove()
     {
+        if (_snapshotGeneration != _catalogGeneration()) return false;
+        CloseCopies();
         if (!CanActOnSelection) return false;
         var skill = GetSelectedSkill();
         if (skill is null
@@ -1306,11 +1339,46 @@ internal sealed class InstalledTabView : FrameView
     private InstalledOverviewRow? SelectedRow => FindRow(_selectedKey) is var index && index >= 0 ? _rows[index] : null;
     private bool NoObservedCopies => _snapshot is not null && _overview.Copies == 0;
 
+    private void OpenCopies()
+    {
+        if (_snapshotGeneration != _catalogGeneration()) return;
+        if (_snapshot is null || GetSelectedSkill() is not { } selected) return;
+        _detailOpen = true;
+        ApplyResponsiveLayout();
+        _copies.X = _detail.X; _copies.Y = _detail.Y;
+        _copies.Width = _detail.Width; _copies.Height = _detail.Height;
+        if (_copies.Show(_snapshot, selected, new InlineBrowseReturnState(_selectedKey, _table.RowOffset, _expanded.ToArray(), (_filters, _sort, _pinFilter, _scopeFilter), _rememberedFocus)))
+        {
+            _detail.Visible = false;
+            _back.Visible = false;
+            MoveSubViewToEnd(_copies);
+        }
+    }
+
+    private void CloseCopies(bool restore = false)
+    {
+        if (_copies is null || !_copies.Open) return;
+        var state = restore ? _copies.Request?.ReturnState as InlineBrowseReturnState : null;
+        _copies.Retire();
+        if (state is not null)
+        {
+            _selectedKey = state.Selection;
+            _table.RowOffset = Math.Clamp(state.TopRow, 0, Math.Max(0, _rows.Count - 1));
+        }
+        ApplyResponsiveLayout();
+        RefreshSelectedDetail();
+        if (Visible && !_disposed)
+        {
+            if (state?.Focus is View { Visible: true, Enabled: true } focus) focus.SetFocus();
+            else _moreActions.SetFocus();
+        }
+    }
+
     private void RefreshSelectedDetail()
     {
         if (_snapshot is null || Volatile.Read(ref _removeActive) != 0 || Volatile.Read(ref _loadActive) != 0) return;
         var row = SelectedRow;
-        _selectionReason = row is null ? NoObservedCopies ? "" : _selectedKey is null ? "Select a visible exact copy to enable actions."
+        _selectionReason = _snapshotGeneration != _issueView.Generation ? "Inventory changed; refresh Installed. Copy actions paused." : row is null ? NoObservedCopies ? "" : _selectedKey is null ? "Select a visible exact copy to enable actions."
             : "Selected copy is missing, filtered out or hidden. Select a visible exact copy to enable actions."
             : row.Copy is null ? "Select an exact copy; source groups cannot run copy actions."
             : row.Copy.Ambiguous ? "Ambiguous installation ID; all records retained, copy actions disabled." : "";

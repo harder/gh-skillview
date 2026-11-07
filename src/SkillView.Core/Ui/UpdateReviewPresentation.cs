@@ -10,6 +10,16 @@ internal static class UpdateReviewPresentation
 {
     internal const int MaxCharacters = 8192;
 
+    internal static string RefChange(ReplacementResult plan) => plan.Revision is not { } target ? "unknown"
+        : plan.Subject.Metadata.GithubRef == target.Source.Ref ? "Same source ref: " + target.Source.Ref + " (same ref/version choice; authored version is separate)"
+        : (plan.Subject.Metadata.GithubRef ?? "unknown") + " → " + target.Source.Ref;
+
+    internal static string ReplacementDisposition(ReplacementResult plan) => plan.PinPolicy is not null
+        ? "Only pin policy changes; instructions and extras are kept."
+        : plan.LocalDisposition is not null ? "Apply the reviewed local merge; inspect its exact saved result."
+        : "Whole-package replacement uses the saved candidate. Original local edits/extras are retained for Undo, "
+            + "not carried over into the new installed copy. Candidate content may match some local content; Diff shows established differences.";
+
     internal static string Selection(InstalledSkill skill) => Render("Selected installation", SelectionFields(skill),
         "**Check updates** checks availability. **Review update** prepares one saved candidate. " +
         "**Choose version...** requests a Git tag. Nothing is applied on entry.");
@@ -36,10 +46,11 @@ internal static class UpdateReviewPresentation
         yield return ("Location", plan.OriginalPath);
         var agents = plan.Subject.Agents.Select(agent => agent.AgentId).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         yield return ("Affected consumers", agents.Length == 0 ? "none recorded; coverage may be incomplete" : string.Join(", ", agents));
-        if (plan.Revision is { } target) yield return ("Ref change", (plan.Subject.Metadata.GithubRef ?? "unknown") + " → " + target.Source.Ref);
+        if (plan.Revision is not null) yield return ("Source ref", RefChange(plan));
         yield return ("Change", plan.PinPolicy is not null ? "Clear the verified pin; keep instructions, extras and source revision."
             : plan.LocalDisposition is not null ? "Apply the reviewed local merge."
             : "Replace this copy with the saved candidate; retain the original, including local edits, for undo.");
+        if (plan.PinPolicy is null && plan.LocalDisposition is null) yield return ("Local edit disposition", ReplacementDisposition(plan));
         if (plan.Revision is { } revision)
         {
             var authoredVersion = plan.LocalDisposition is { } local ? local.ResultAuthoredVersion : revision.DesiredMetadata.Version;
@@ -50,10 +61,10 @@ internal static class UpdateReviewPresentation
         }
         yield return ("Shared files", "Every consumer of this physical installation is affected.");
         yield return ("Changed paths", plan.ChangedPaths.Length.ToString());
-        foreach (var path in plan.ChangedPaths.Take(8)) yield return ("Changed", path);
+        foreach (var path in plan.ChangedPaths.Take(8)) yield return ("Saved difference", path);
         if (plan.ChangedPaths.Length > 8) yield return ("More changed paths", (plan.ChangedPaths.Length - 8).ToString());
         yield return ("State", plan.Status);
-        if (plan.SourceReview is not null) yield return ("Source review", "Inspect frozen source changes and omissions in F2 Details before declaring review. This supplies no authenticity or safety assurance.");
+        if (plan.SourceReview is not null) yield return ("Source review", "View source changes (Diff) and omissions before declaring review. This supplies no authenticity or safety assurance.");
         if (plan.SourceReviewWarning is not null) yield return ("Source notice", plan.SourceReviewWarning);
         yield return ("Undo", "The exact original is retained for explicit recovery/undo. Running-agent reload state is unknown.");
     }
@@ -66,7 +77,7 @@ internal static class UpdateReviewPresentation
                 ? "Inspect the exact merged result and affected consumers. Fresh retention approval is required before applying this reviewed merge."
             : awaitingReview
             ? "Review the changes and affected consumers. Approve retention of the original before applying. " +
-                "Local edits can be preserved or reviewed separately; replacement uses the saved candidate."
+                "Preserve installed keeps the current copy; replacement uses the saved candidate."
             : "Inspect the recorded outcome. F2 Details retains saved-plan and recovery evidence.";
         if (plan.Revision?.Source.Ref.StartsWith("refs/tags/", StringComparison.Ordinal) == true && plan.PinPolicy is null)
             guidance += " " + VersionUpdateGuidance.FutureUpdates;

@@ -3,6 +3,7 @@ using SkillView.Gh.Models;
 using SkillView.Logging;
 using SkillView.Maintenance;
 using SkillView.Ui.Tabs;
+using SkillView.Ui;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
 using Terminal.Gui.Drivers;
@@ -160,10 +161,14 @@ public sealed class MaintenanceQueueKeyboardTests
         var second = MaintenanceQueueTests.Skill("/skills/two", "https://github.com/two/repo");
         var captures = 0;
         MaintenanceQueueEntry? activated = null;
+        InstalledSkill? reviewed = null;
+        var entryCalls = 0; var copyCalls = 0;
         using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
         var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
             _ => { captures++; return Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }); },
-            static () => { }, onActivateEntry: entry => activated = entry,
+            static () => { }, onActivateEntry: entry => { entryCalls++; activated = entry; },
+            reviewCopy: skill => { copyCalls++; reviewed = skill; },
+            validateFinding: (_, _) => Task.FromResult(true),
             runTask: (work, _) => work().GetAwaiter().GetResult())
         { Width = Dim.Fill(), Height = Dim.Fill() };
         window.Add(view);
@@ -182,20 +187,37 @@ public sealed class MaintenanceQueueKeyboardTests
             Press(new Key(KeyCode.F2));
             Assert.Contains("Installation address ID", detail.Text.ToString());
             Assert.Contains("F2 Summary", view.StatusTextForTests);
-            Assert.Null(activated);
+            Assert.Null(activated); Assert.Null(reviewed);
+            Assert.Equal(0, entryCalls); Assert.Equal(0, copyCalls);
             Assert.Equal(1, captures);
             Press(new Key(KeyCode.F2));
             Assert.DoesNotContain("Installation address ID", detail.Text.ToString());
             Press(new Key('r'));
             Assert.Equal(2, captures);
-            Assert.Null(activated);
+            Assert.Null(activated); Assert.Null(reviewed);
+            Assert.Equal(0, entryCalls); Assert.Equal(0, copyCalls);
             Assert.True(table.HasFocus);
-            Press(new Key(KeyCode.CursorDown)); // A one-row family keeps its exact anchor.
-            Press(Key.Enter);
-            Assert.NotNull(activated);
-            Assert.Equal("NameCollision", activated.Issue);
-            Assert.Equal(first.InstallationId, activated.Subject.InstallationId);
-            Assert.Contains(first.ResolvedPath, activated.AffectedPaths);
+            Press(Key.Enter); // Expand only; family headers cannot mutate.
+            Assert.Null(activated); Assert.Null(reviewed);
+            Assert.Equal(0, entryCalls); Assert.Equal(0, copyCalls);
+            Assert.Equal(3, view.RowCountForTests);
+            Assert.NotEqual(table.Table![1, 1], table.Table[2, 1]);
+            Press(new Key(KeyCode.CursorDown));
+            Press(Key.Enter); // Explicit child opens inline detail, never a browser modal.
+            Assert.Null(activated); Assert.Null(reviewed);
+            Assert.Equal(0, entryCalls); Assert.Equal(0, copyCalls);
+            Assert.True(view.SubViews.OfType<SkillView.Ui.InlineCopiesView>().Single().Open);
+            Assert.Same(window, app.TopRunnableView);
+            Press(Key.Esc);
+            Assert.Equal(1, table.GetSelectedRow());
+            Assert.Null(activated); Assert.Null(reviewed);
+            Assert.Equal(0, entryCalls); Assert.Equal(0, copyCalls);
+            Press(new Key('u'));
+            Assert.Null(activated); Assert.Equal(0, entryCalls);
+            Assert.Equal(1, copyCalls); Assert.NotNull(reviewed);
+            Assert.True(ReferenceEquals(first, reviewed));
+            Assert.Equal(first.InstallationId, reviewed.InstallationId);
+            Assert.Equal(first.ResolvedPath, reviewed.ResolvedPath);
         }
         finally { app.End(session!); }
 

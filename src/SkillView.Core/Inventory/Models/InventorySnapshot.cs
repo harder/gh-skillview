@@ -31,6 +31,7 @@ public sealed record InventorySnapshot
 
     public ScanDiagnostics Diagnostics { get; init; } = ScanDiagnostics.Empty;
     public ImmutableArray<string> PreferenceDiagnostics { get; init; } = [];
+    internal SkillView.Preferences.DifferenceRead IntentionalDifferences { get; init; } = SkillView.Preferences.DifferenceRead.Empty;
 
     public static InventorySnapshot Empty { get; } = new()
     {

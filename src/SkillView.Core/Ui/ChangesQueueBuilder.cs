@@ -7,11 +7,55 @@ namespace SkillView.Ui;
 /// addresses; the first entry anchors the existing explicit copy chooser.
 internal sealed record ChangesQueueRow(string Kind, string Title, IReadOnlyList<MaintenanceQueueEntry> Entries)
 {
-    internal MaintenanceQueueEntry Entry => Entries[0];
+    // Legacy projection helpers use this only after establishing a physical entry.
+    internal MaintenanceQueueEntry Entry => Entries.Count > 0 ? Entries[0] : throw new InvalidOperationException("Registry observations have no physical entry.");
+    internal CapturedFinding? Finding { get; init; }
+    internal string Id => Finding?.Id ?? Entries.FirstOrDefault()?.Id ?? "";
+    internal string Key => IsExactChild && Entries.Count == 1
+        ? "child:" + (Finding?.Id ?? ParentKey) + "|" + Entries[0].Subject.InstallationId + "|" + Entries[0].Subject.Path
+        : Finding is { } finding ? "finding:" + finding.Id : Id;
     internal UpdateAvailability? Availability { get; init; }
     internal PackageCheckFact? PackageCheck { get; init; }
-    internal bool IsFamily => Entry.IsCopyReview;
+    internal bool IsExactChild { get; init; }
+    internal string? ParentKey { get; init; }
+    internal bool IsFamily => !IsExactChild && (Finding is { } finding
+        ? finding.Navigation.Contains(FindingNavigation.InspectCopies)
+        : Entries.FirstOrDefault()?.IsCopyReview == true);
     internal IReadOnlyList<string> LocationLabels { get; init; } = [];
+
+    internal MaintenanceQueueEntry? ExactEntry
+    {
+        get
+        {
+            if (Entries.Count != 1 || IsFamily) return null;
+            var entry = Entries[0];
+            if (IsExactChild)
+            {
+                if (Finding is null) return ParentKey is not null ? entry : null;
+                return Finding is { Subject: FindingCopies copies, Intentional: false } finding
+                    && finding.Classification != FindingClass.Coverage
+                    && ParentKey == "finding:" + finding.Id
+                    && finding.Entries.Any(member => member.Id == entry.Id
+                        && member.Subject.InstallationId == entry.Subject.InstallationId && member.Subject.Path == entry.Subject.Path)
+                    && copies.Copies.Any(copy => copy.InstallationId == entry.Subject.InstallationId && copy.Path == entry.Subject.Path)
+                    ? entry : null;
+            }
+            if (Finding is null) return entry;
+            return IsTypedExactLeaf(Finding) ? entry : null;
+        }
+    }
+
+    private bool IsTypedExactLeaf(CapturedFinding finding) => !IsFamily && !IsExactChild && Entries.Count == 1
+        && finding.Subject is FindingCopies { Copies.Length: 1 } copies
+        && finding.Entries.Length == 1 && finding.Navigation.Length == 1
+        && finding.Navigation[0] is FindingNavigation.ReviewCleanup or FindingNavigation.ReviewUpdate
+        && (finding.Navigation[0] == FindingNavigation.ReviewCleanup) == (Entries[0].Cleanup is not null)
+        && !finding.Intentional && finding.Difference is null
+        && finding.Classification is FindingClass.Problem or FindingClass.Review
+        && string.Equals(finding.Id, Entries[0].Id, StringComparison.Ordinal)
+        && string.Equals(finding.Entries[0].Id, Entries[0].Id, StringComparison.Ordinal)
+        && string.Equals(copies.Copies[0].InstallationId, Entries[0].Subject.InstallationId, StringComparison.Ordinal)
+        && string.Equals(copies.Copies[0].Path, Entries[0].Subject.Path, StringComparison.Ordinal);
 }
 
 internal sealed record ChangesQueueProjection(IReadOnlyList<ChangesQueueRow> Rows, int OmittedRows,
@@ -21,6 +65,7 @@ internal sealed record ChangesQueueProjection(IReadOnlyList<ChangesQueueRow> Row
 
     // Queue captures do not check upstream availability or establish an update count.
     internal string Counts => $"{Problems} Problems · {UpdatesNotChecked} · {ReviewSuggestions} Review";
+    internal int Informational { get; init; }
 }
 
 /// Pure UI policy over the captured queue. Never classifies paths or performs I/O.
@@ -31,14 +76,14 @@ internal static class ChangesQueueBuilder
 
     internal static ChangesQueueProjection Build(MaintenanceQueue queue, CancellationToken token)
     {
-        var rows = ProjectRows(queue.Entries, token);
+        var rows = queue.Findings.IsDefault ? ProjectRows(queue.Entries, token) : ProjectFindings(queue.Findings, token);
         var shown = new List<ChangesQueueRow>(Math.Min(MaxRows, rows.Count));
         var problems = 0;
         var reviews = 0;
         foreach (var row in rows)
         {
             token.ThrowIfCancellationRequested();
-            if (row.Kind == "Problem") problems++; else reviews++;
+            if (row.Kind == "Problem") problems++; else if (row.Kind == "Review") reviews++;
             if (shown.Count < MaxRows) shown.Add(row);
         }
         var limited = new HashSet<(string Id, string Path)>();
@@ -52,7 +97,45 @@ internal static class ChangesQueueBuilder
         {
             Diagnostics = queue.Diagnostics.Add($"Consumer discovery incomplete for {limited.Count} captured locations; other consumers may exist.")
         };
-        return new(shown, rows.Count - shown.Count, MaintenanceQueueFormatter.RenderDiagnostics(coverage, token), problems, reviews);
+        return new(shown, rows.Count - shown.Count, MaintenanceQueueFormatter.RenderDiagnostics(coverage, token), problems, reviews)
+        { Informational = rows.Count(row => row.Kind is "Info" or "Intent" or "Coverage") };
+    }
+
+    private static IReadOnlyList<ChangesQueueRow> ProjectFindings(IEnumerable<CapturedFinding> findings, CancellationToken token)
+    {
+        var rows = new List<ChangesQueueRow>();
+        var captured = findings.ToArray();
+        var exact = captured.Where(finding => finding.Subject is FindingCopies && !finding.Navigation.Contains(FindingNavigation.InspectCopies))
+            .ToDictionary(finding => finding.Id, StringComparer.Ordinal);
+        rows.AddRange(ProjectRows(exact.Values.SelectMany(finding => finding.Entries), token).Select(row => row with { Finding = exact[row.Entry.Id] }));
+        foreach (var finding in captured)
+        {
+            token.ThrowIfCancellationRequested();
+            var kind = finding.Intentional ? "Intent" : finding.Classification switch
+            { FindingClass.Problem => "Problem", FindingClass.Update => "Updates", FindingClass.Review => "Review", FindingClass.Coverage => "Coverage", _ => "Info" };
+            if (finding.Subject is FindingRegistry)
+            {
+                rows.Add(new(kind, Bound(Clean(finding.Title), 64) + " · gh record (inspect)", []) { Finding = finding });
+                continue;
+            }
+            var copies = ((FindingCopies)finding.Subject).Copies;
+            if (!finding.Navigation.Contains(FindingNavigation.InspectCopies))
+            {
+                continue;
+            }
+            var description = finding.Kind switch
+            {
+                "recorded-revisions" => "recorded revisions differ",
+                "installation-methods" => "installation methods differ",
+                "same-source-copies" => "same source; compare files",
+                _ => "sources differ / unknown"
+            };
+            var paths = DistinguishingPathLabels.Build(copies.Select(copy => copy.Path), finding.Title, 80, token);
+            rows.Add(new(kind, Bound(Clean(finding.Title), 64) + $" · {copies.Select(copy => copy.InstallationId).Distinct().Count()} captured copies · " + description
+                + (finding.Intentional ? " · intentional" : ""), finding.Entries)
+            { Finding = finding, LocationLabels = copies.Select(copy => paths[copy.Path]).ToArray() });
+        }
+        return rows.OrderBy(row => row.Kind == "Problem" ? 0 : row.Kind == "Review" ? 1 : 2).ToArray();
     }
 
     internal static IReadOnlyList<ChangesQueueRow> ProjectRows(IEnumerable<MaintenanceQueueEntry> entries, CancellationToken token)
@@ -108,14 +191,17 @@ internal static class ChangesQueueBuilder
 
     internal static string Render(ChangesQueueRow row, CancellationToken token, bool showDetails, string? homeDirectory)
     {
+        if (row.Finding is { } finding && (finding.Subject is FindingRegistry || row.IsFamily))
+            return CapturedFindingFormatter.Render(row, finding, token, showDetails);
         if (row.PackageCheck is { } package)
             return package.Detail + "\n\n**Enter:** open the retained full report. No repair action is supplied by this check.\n";
-        if (row.Availability is { } observation)
+        if (row.Availability is { } observation && row.ExactEntry is { } availableEntry)
             return "## Review update\n\n" + observation.Detail + "\nCopy: "
-                + MarkdownTableFormatter.FormatCodeSpan(row.Entry.Subject.Path)
+                + MarkdownTableFormatter.FormatCodeSpan(availableEntry.Subject.Path)
                 + "\n\n**Enter / u:** prepare the saved update review for this exact copy.\n"
                 + (showDetails ? "\n````\n" + (TerminalEscapeSanitizer.Sanitize(observation.Diagnostic) ?? "").Replace("`", "'") + "\n````\n" : "");
-        if (!row.IsFamily) return MaintenanceQueueFormatter.Render(row.Entry, token, showDetails, homeDirectory);
+        if (row.ExactEntry is { } exact) return MaintenanceQueueFormatter.Render(exact, token, showDetails, homeDirectory);
+        if (!row.IsFamily) return "## Inspect finding\n\nNo eligible exact operation target. Refresh or select an exact captured copy deliberately.";
         var rendered = MaintenanceQueueFormatter.RenderFields(FamilyFields(row, token, showDetails), token,
             (showDetails ? MaintenanceQueueFormatter.MaxDetailCharacters : MaintenanceQueueFormatter.MaxSummaryCharacters) - 768);
         return "## Same name, multiple copies\n\n" + rendered.Text

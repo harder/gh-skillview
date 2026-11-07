@@ -72,10 +72,9 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
         foreach (var (key, group) in sources)
         {
             token.ThrowIfCancellationRequested();
-            var refs = group.Copies.SelectMany(c => c.Records).Select(s => s.Revision.RepositoryRef).ToArray();
+            var revision = RecordedRevisionComparison.Observe(group.Copies.SelectMany(c => c.Records));
             groups.Add(new(key, group.Name, group.Source, group.Copies.OrderBy(c => c.Path, StringComparer.Ordinal).ToArray(),
-                refs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.Ordinal).Take(2).Count() >= 2,
-                refs.Any(string.IsNullOrWhiteSpace)));
+                revision.Different, revision.Incomplete));
         }
         // Distinct raw names/sources can become equal after sanitization/bounding;
         // same-path observations can also carry different captured IDs. Preserve
@@ -127,7 +126,7 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
                 .GroupBy(c => availability?.Invoke(c.Target!).TableLabel.ToLowerInvariant() ?? "not checked")
                 .Select(s => $"{s.Count()} {s.Key}").ToArray();
             var summary = $"{copies.Length}{(copies.Length == group.Copies.Count ? "" : " of " + group.Copies.Count)} observed {(group.Copies.Count == 1 ? "copy" : "copies")}"
-                + (group.RefsDiffer ? "; refs differ" : "") + (group.RefsIncomplete && group.Copies.Count > 1 ? "; refs incomplete" : "")
+                + (group.RefsDiffer ? "; recorded revisions differ" : "") + (group.RefsIncomplete && group.Copies.Count > 1 ? "; revision evidence incomplete" : "")
                 + (localStates.Length == 0 ? "" : "; " + string.Join(", ", localStates))
                 + (updateStates.Length == 0 ? "" : "; Updates: " + string.Join(", ", updateStates));
             Add(new(group.Key, group, null, (expanded.Contains(group.Key) ? "v " : "> ") + group.Name + " · " + group.Source, summary));

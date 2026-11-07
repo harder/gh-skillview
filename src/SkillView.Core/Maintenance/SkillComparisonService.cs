@@ -10,6 +10,10 @@ public sealed record SkillComparisonResult(string LeftInstallationId, string Rig
     ImmutableArray<string> DifferingFiles, int DifferingFileCount, bool Complete,
     bool RequiresExposureMigration, string Recommendation, ImmutableArray<string> Diagnostics)
 {
+    // Held-capture witnesses for transient UI guidance only. Internal members
+    // are deliberately absent from the public CLI wire and saved schemas.
+    internal SecureFileIdentity? LeftRootIdentity { get; init; }
+    internal SecureFileIdentity? RightRootIdentity { get; init; }
     public string? LeftObjectStateFingerprint { get; init; }
     public string? RightObjectStateFingerprint { get; init; }
     public int? LeftRootUnixMode { get; init; }
@@ -48,10 +52,13 @@ public sealed class SkillComparisonService
         var source = SourceRelationship(left, right);
         var revision = RevisionRelationship(left, right);
         var differences = inspected ? PayloadSnapshot.Differences(a!, b!) : [];
-        var aliases = left.InstallationId == right.InstallationId;
+        var sameRoot = a?.RootIdentity is { } leftRoot && b?.RootIdentity is { } rightRoot
+            && leftRoot.Volume == rightRoot.Volume && leftRoot.FileIdLow == rightRoot.FileIdLow && leftRoot.FileIdHigh == rightRoot.FileIdHigh;
+        var independentRoots = a?.RootIdentity is not null && b?.RootIdentity is not null && !sameRoot;
+        var aliases = left.InstallationId == right.InstallationId || sameRoot;
         var payload = !complete ? "incomplete" : a!.Fingerprint == b!.Fingerprint ? "byte-identical"
             : differences.IsEmpty ? "installer-metadata-only" : "different-payloads";
-        var migration = complete && inventoryComplete && !aliases && differences.IsEmpty && source == "same-source"
+        var migration = complete && inventoryComplete && independentRoots && !aliases && differences.IsEmpty && source == "same-source"
             && revision == "same-recorded-revision" && left.Validity == ValidityState.Valid
             && right.Validity == ValidityState.Valid && a!.RootUnixMode == b!.RootUnixMode && !left.AllOwnershipClaims.Any() && !right.AllOwnershipClaims.Any();
         var recommendation = !complete ? "Resolve incomplete inspection before comparing or planning changes."
@@ -68,7 +75,9 @@ public sealed class SkillComparisonService
             LeftObjectStateFingerprint = a?.ObjectStateFingerprint,
             RightObjectStateFingerprint = b?.ObjectStateFingerprint,
             LeftRootUnixMode = a?.RootUnixMode,
-            RightRootUnixMode = b?.RootUnixMode
+            RightRootUnixMode = b?.RootUnixMode,
+            LeftRootIdentity = a?.RootIdentity,
+            RightRootIdentity = b?.RootIdentity
         };
     }
 

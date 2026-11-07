@@ -104,3 +104,44 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   Name referenced-but-unscanned contexts only from explicit retained owner/link
   evidence; never enumerate unconfigured projects. Filters preserve observed
   denominators and partial coverage, and must perform no I/O or classification.
+
+- TUI local startup probes gh binary/version/help with authentication excluded.
+  Doctor and explicit Discover searches own remote auth separately; an auth
+  failure cannot clear inventory. Keep their activation token/generation checks
+  inside awaited queued completion. CLI Doctor retains its full probe.
+- TUI Locations persists only chosen workspace, exact scan-root and profile
+  inputs, reusing ScanRootResolver semantics. Explicit options override saved
+  selections per category at launch AND after every dialog Save/Reset/Compact;
+  retain immutable original CLI categories separately from latest saved and active
+  options. The dialog edits latest saved values and identifies overridden
+  categories and saved-versus-session differences. Opening/Cancel never activates
+  external changes; optimistic versions guard intervening writes. CLI subcommands
+  do not load TUI choices.
+  One immutable options value belongs to each capture. Changing selections
+  invalidates the shared catalog generation (including package, Issues and update
+  evidence), cancels old view loads and refreshes Installed with retained state.
+  Unavailable saved roots remain configured/partial; filters and draw callbacks
+  do no root resolution. LocationPreferences uses held native append-only files
+  beside maintenance state, existing-only reads, strict bounded parsing and
+  optimistic context/native-generation/byte fingerprints. Malformed/unreadable
+  state is visible and refuses ordinary writes. Keep captured state-home/CWD and
+  payload/managed exclusions. The permanent empty writer.lock is held for every
+  saved-record read/write/recovery; an existing-only no-lock bootstrap read may
+  return missing only for a held-native verified ZERO-entry root, without writes; the locations root/lock are never removed. One random
+  records child (64 records, 128 KiB each, 8 MiB total) and one raw backup are
+  allowed. Explicit Cancel-default Reset verifies a manifest-last durable backup
+  before existing held-native RemoveTree removes ONLY the reviewed records child;
+  match every entry identity/size/hash and stop on first mismatch. Compact retains
+  only the latest VALID SAVED snapshot. Unknown/link/subfolder/mount/over-limit
+  state is protected. No automatic eviction, recursive path deletion, single-file
+  delete API, move fallback or new native capability. Full errors, capacity/75%
+  warning and the one-backup external archive procedure stay visible. Interrupted
+  recovery requires matching raw/native evidence, never names alone.
+
+- B9/F2 finding projection uses captured `OwnershipRecords`, never a scan of
+  unconfigured projects. An unattached supported global gh record is an unmatched
+  Review observation only; shared schema3 records have no exclusive destination.
+  Keep unsupported/diagnostic observations protected/unknown, including global
+  lock-reader reporting limits. An attached malformed/missing-SKILL.md copy stays
+  a physical subject. Registry observations have no OperationSubject or mutation
+  route. There is no supported gh remove/uninstall capability on required hosts.

@@ -2,12 +2,18 @@ using SkillView.Gh.Models;
 using SkillView.Maintenance;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
+using Terminal.Gui.Editor;
 
 namespace SkillView.Ui.Tabs;
 
 internal sealed partial class UpdatesTabView
 {
     private readonly Button _detailsButton;
+    private readonly Button _diffButton;
+    private readonly Editor _diffPreview;
+    private ReplacementResult? _displayedPlan;
+    private bool _showDiff;
+    private bool _resetPreviewTop;
     private readonly Label _reviewHint;
     private string _summaryPreview = "";
     private string _technicalPreview = "";
@@ -22,31 +28,64 @@ internal sealed partial class UpdatesTabView
         return selected is not null && Inventory.Models.PinDisplayPolicy.From(selected).HasPin;
     }
 
-    private void ShowPreview(string summary, string technical)
+    private void ShowPreview(string summary, string technical, ReplacementResult? plan = null, bool preserveScroll = false)
     {
+        var location = _preview.Viewport.Location;
+        var wasTechnical = _showTechnical;
+        _displayedPlan = plan;
+        _showDiff = preserveScroll && _showDiff;
+        // A late package note updates the summary behind an open Diff. Keep
+        // that pane visible so its focus, caret and scroll remain the reader's.
+        _diffPreview.Visible = _showDiff;
+        _diffButton.Text = _showDiff ? "Back to review (D)" : "View source changes (D)";
         _summaryPreview = summary;
         _technicalPreview = technical;
-        _showTechnical = false;
-        _preview.Text = summary;
-        _detailsButton.Text = "Details (F2)";
+        _showTechnical = preserveScroll && wasTechnical;
+        _preview.Visible = !_showDiff;
+        _preview.Text = _showTechnical ? technical : summary;
+        _resetPreviewTop = !preserveScroll;
+        TuiHelpers.RestoreMarkdownScroll(_preview, preserveScroll ? location : System.Drawing.Point.Empty);
+        _detailsButton.Text = _showTechnical ? "Summary (F2)" : "Details (F2)";
         _reviewHint.Text = "F2 Details · Tab Move focus · Esc Back";
         _detailsButton.Enabled = technical.Length > 0;
     }
 
-    private void ShowResultPreview(UpdateResult result, bool unpinOnly) =>
-        ShowPreview(UpdateReviewPresentation.Result(result, _review is not null) + ResourcePresentation(result),
-            UpdateScreen.RenderResult(result, unpinOnly: unpinOnly) + ResourcePresentation(result));
+    private void ShowResultPreview(UpdateResult result, bool unpinOnly, bool preserveScroll = false) =>
+        ShowPreview(ResourcePresentation(result) + UpdateReviewPresentation.Result(result, _review is not null),
+            UpdateScreen.RenderResult(result, unpinOnly: unpinOnly) + ResourcePresentation(result), result.SavedPlan, preserveScroll);
 
     private void ShowPlanPreview(ReplacementResult plan, bool awaitingReview) =>
-        ShowPreview(UpdateReviewPresentation.Plan(plan, awaitingReview), UpdateScreen.RenderPlan(plan));
+        ShowPreview(UpdateReviewPresentation.Plan(plan, awaitingReview), UpdateScreen.RenderPlan(plan), plan);
+
+    private void ToggleSourceDiff()
+    {
+        if (_choosingVersion || _displayedPlan is not { PinPolicy: null } plan
+            || _operationCancellations.HasActive || _loadCancellations.HasActive || _undoReview is not null
+            || !Visible || _lifetimeToken.IsCancellationRequested) return;
+        _showDiff = !_showDiff;
+        if (_showDiff)
+        {
+            _diffPreview.Text = SourceReviewScreen.RenderDiff(plan);
+            _diffPreview.Layout();
+            _diffPreview.CaretOffset = 0;
+            _diffPreview.Viewport = _diffPreview.Viewport with { X = 0, Y = 0 };
+        }
+        RefreshPresentation();
+        if (_showDiff) _diffPreview.SetFocus(); else _diffButton.SetFocus();
+    }
 
     private void TogglePreviewDetails()
     {
         if (_choosingVersion || _technicalPreview.Length == 0) return;
+        _showDiff = false;
         _showTechnical = !_showTechnical;
         _preview.Text = _showTechnical ? _technicalPreview : _summaryPreview;
+        _resetPreviewTop = true;
+        TuiHelpers.RestoreMarkdownScroll(_preview, System.Drawing.Point.Empty);
         _detailsButton.Text = _showTechnical ? "Summary (F2)" : "Details (F2)";
         _reviewHint.Text = _showTechnical ? "F2 Summary · Tab Move focus · Esc Back" : "F2 Details · Tab Move focus · Esc Back";
+        RefreshPresentation();
+        _preview.SetFocus();
     }
 
     private void ShowSelectedPreview()
@@ -72,7 +111,12 @@ internal sealed partial class UpdatesTabView
             _tableLabel.Text = undoing ? "Review undo · F2 Details"
                 : _inventoryNeedsRefresh && _review is null ? "Refresh inventory before another review · F2 Details"
                 : reviewing ? "Review saved change · F2 Details" : "Selected physical copy · F2 Details";
-        _preview.Visible = true;
+        _preview.Visible = !_showDiff;
+        _diffPreview.Visible = _showDiff;
+        _diffButton.Visible = _displayedPlan is { PinPolicy: null } && !undoing;
+        _diffButton.Enabled = !_operationCancellations.HasActive && !_loadCancellations.HasActive && !_lifetimeToken.IsCancellationRequested;
+        _diffButton.Text = _showDiff ? "Back to review (D)" : "View source changes (D)";
+        if (_showDiff) _reviewHint.Text = "D / Esc Back to review · F2 Technical details · Tab Move focus";
         _hiddenBox.Visible = _unpinBox.Visible = !reviewing;
         _unpinBox.X = 0;
         _hiddenBox.X = Pos.Right(_unpinBox) + 2;
@@ -114,17 +158,28 @@ internal sealed partial class UpdatesTabView
             if (_undoApproval.Visible) row++;
             if (_retainBox.Visible) _retainBox.Y = Pos.AnchorEnd(row++);
             if (_sourceReviewBox.Visible) _sourceReviewBox.Y = Pos.AnchorEnd(row++);
-            if (localActions)
+            if (localActions || _diffButton.Visible)
             {
-                _preserveButton.Y = Pos.AnchorEnd(row++);
+                _diffButton.Y = _preserveButton.Y = Pos.AnchorEnd(row++);
+                _diffButton.X = 0;
+                _preserveButton.X = _diffButton.Visible ? Pos.Right(_diffButton) + 2 : 0;
             }
             footer = row - 1;
         }
         _preview.Height = Dim.Fill(footer);
+        if (!reviewing && _diffButton.Visible)
+        {
+            _diffButton.Y = Pos.AnchorEnd(5);
+            _preview.Height = Dim.Fill(6);
+        }
+        _diffPreview.Height = _preview.Height;
         SetNeedsLayout();
     }
 
     internal Button DetailsButtonForTests => _detailsButton;
     internal bool ShowingTechnicalForTests => _showTechnical;
     internal void ToggleDetailsForTests() => TogglePreviewDetails();
+    internal Button DiffButtonForTests => _diffButton;
+    internal Editor DiffPreviewForTests => _diffPreview;
+    internal void ToggleDiffForTests() => ToggleSourceDiff();
 }

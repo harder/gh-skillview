@@ -21,14 +21,18 @@ public sealed partial class SkillViewApp
     {
         try
         {
-            var probed = await GetOrProbeEnvironmentAsync(cancellationToken).ConfigureAwait(false);
-            Invoke(() =>
+            var baseline = await GetOrProbeEnvironmentAsync(cancellationToken).ConfigureAwait(false);
+            var auth = baseline.GhPath is { } path
+                ? await ProbeAuthenticationAsync(path, cancellationToken).ConfigureAwait(false)
+                : GhAuthStatus.Unknown;
+            await InvokeAsync(() =>
             {
-                if (!IsDoctorWorkspaceActive(doctorGeneration)) return;
+                if (cancellationToken.IsCancellationRequested || !IsDoctorWorkspaceActive(doctorGeneration)) return;
+                _remoteAuth = auth;
                 ClearBusy();
-                _doctorTab?.SetReport(probed, _installedTab?.CurrentSnapshot);
+                _doctorTab?.SetReport(baseline with { Auth = auth }, _installedTab?.CurrentSnapshot);
                 _doctorTab?.SetFocus();
-            });
+            }, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -41,6 +45,7 @@ public sealed partial class SkillViewApp
             {
                 if (!IsDoctorWorkspaceActive(doctorGeneration)) return;
                 ClearBusy();
+                _doctorTab?.SetProbeFailure(ex.Message);
                 SetStatus($"doctor failed: {TuiHelpers.ErrorSnippet(ex.Message)}",
                     TuiHelpers.NotificationLevel.Error);
             });
@@ -138,12 +143,15 @@ public sealed partial class SkillViewApp
             var report = await GetOrProbeEnvironmentAsync(cancellationToken).ConfigureAwait(false);
             _ghPath = report.GhPath;
 
+            var catalogGeneration = _services.ListAdapter.Generation;
             var snapshot = await CaptureStartupInventoryAsync(report, cancellationToken).ConfigureAwait(false);
 
             var overview = InstalledOverview.Build(snapshot, cancellationToken);
 
             Invoke(() =>
             {
+                RefreshLocationsButton();
+                if (catalogGeneration != _services.ListAdapter.Generation) return;
                 if (_hiddenDirsBox is not null)
                 {
                     // gh ≥ 2.94 always supports --allow-hidden-dirs.
@@ -211,9 +219,11 @@ public sealed partial class SkillViewApp
                 return cached;
             }
 
+            await _workflows.InitializeLocationsAsync(sharedCancellationToken).ConfigureAwait(false);
             var report = await _services.EnvironmentProbe
-                .ProbeAsync(sharedCancellationToken)
+                .ProbeAsync(sharedCancellationToken, includeAuthentication: false)
                 .ConfigureAwait(false);
+            sharedCancellationToken.ThrowIfCancellationRequested();
             Volatile.Write(ref _lastReport, report);
             return report;
         }, cancellationToken).ConfigureAwait(false);

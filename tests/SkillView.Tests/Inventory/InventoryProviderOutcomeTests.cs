@@ -104,7 +104,6 @@ public sealed class InventoryProviderOutcomeTests : IDisposable
                 Assert.Equal(CleanupClassifier.CandidateKind.Untracked, candidate.Kind);
                 Assert.True(candidate.ReviewOnly);
             }
-            Assert.DoesNotContain(candidates, candidate => candidate.Kind == CleanupClassifier.CandidateKind.SourceOrphaned);
         }
         Assert.Equal(succeeded ? 1 : 2, calls["default"]);
         Assert.Equal(succeeded ? 1 : 2, calls[root]);

@@ -1,8 +1,21 @@
 # Quarantine and undo
 
 SkillView can temporarily relocate one standalone skill directory, then return
-that same directory to its original location. This first workflow is CLI-only.
-Use it for an independently installed copy under an explicit custom scan root.
+that same directory to its original location. Use it for an independently
+installed copy under an explicit custom scan root. This guide describes the
+development checkout; consult the installed binary's help for available commands.
+
+In the TUI, select one exact copy in **Installed → More actions → Review standalone
+Move aside...**. Review the fresh Preview and its fingerprint, then approve the
+standalone declaration and the move separately. Cancel changes no installed files.
+After an attempted move, **Inspect retained** makes a fresh observation; **Review
+Undo** opens a separate review and restoration approval. The result distinguishes
+the native move from subsequent inventory verification. No comparison result,
+family selection or Keep both preference supplies these approvals.
+
+After restart use the CLI history and Undo commands below in the same captured
+context. **F4 / History** lists saved replacements; quarantine has its own journal
+and `quarantine-history`. See the [action matrix](supported-actions.md).
 
 Preview with global discovery flags before the command:
 
@@ -67,5 +80,8 @@ immediately after preparing but before moving. SkillView cannot infer whether an
 interrupted rename ran. Do not delete the retained data or journals to clear an
 error. History reports recorded states; undo preview checks live evidence.
 
-Broader owner-aware updates, consolidation, manager-record repair, generic
-plan/apply and automated recovery of ambiguous operations remain follow-up work.
+Tracked or owner-managed copies cannot use standalone Move aside. Matching
+files do not establish redundancy, non-use or complete consumer coverage. A gh
+record without a matched physical copy remains inspection guidance; this workflow
+does not edit records, consolidate copies or recover ambiguous operations
+automatically. Preserve refused or interrupted evidence for explicit inspection.
