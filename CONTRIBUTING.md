@@ -50,7 +50,7 @@ Views under `src/SkillView.Core/Ui/Tabs/` render the primary and temporary
 workspaces. Advanced install, remove, and cleanup flows use owned modals.
 See the [architecture guide](docs/architecture.md) for the current boundaries.
 
-SkillView requires GitHub CLI 2.97.0 or newer and checks `gh skill --help`
+SkillView requires GitHub CLI 2.102.0 or newer and checks `gh skill --help`
 before enabling the app. When launched as an extension by GitHub CLI 2.101.0
 or newer, it uses the host-provided `GH_PATH` for subprocesses.
 
@@ -84,7 +84,7 @@ changes, and confirm `dotnet restore --locked-mode` still passes. See
 CI also verifies formatting with `dotnet format SkillView.sln --no-restore
 --verify-no-changes`, lints GitHub Actions, and checks the static site.
 Run scoped formatting from the repository root with repository-relative
-`--include` paths. The pinned SDK 10.0.113 formatter can select zero files for
+`--include` paths. The earlier SDK 10.0.113 formatter was observed to select zero files for
 absolute-only paths and exit 0; confirm selection using reports or diagnostics.
 Always run the full solution formatting check above before finishing. See
 [scoped formatting](agent_docs/running-tests.md#scoped-formatting) for details.

@@ -25,11 +25,12 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   documented native/legacy paths separately. Shared `.agents` placements are
   not evidence that every compatible agent is installed or enabled.
 
-- SkillView requires `gh` 2.97.0 or newer (`GhBinaryLocator.MinimumVersion`);
-  that version guarantees the full `gh skill` surface SkillView relies on,
-  including its current Devin and Grok agent selectors, so
-  there is no per-flag capability probe — only a single `gh skill --help`
-  smoke check.
+- SkillView requires a stable `gh` 2.102.0 or newer. This is a security floor:
+  GHSA-qcwj-mr2r-2cx7 fixes interactive skill-search option injection and
+  GHSA-39wj-f2f4-978v fixes symlink-destination writes. The previously required
+  2.97.0 command surface is retained; keep one `gh skill --help` smoke check,
+  not per-flag probes. A prerelease is not evidence of a patched stable release.
+  Recommend 2.103.3; checksum-pinned current proof tools use that version.
 
 - `GhSkillInstallService.BuildArgs` and `BuildListArgs` must place trusted
   flags before `--`, with repository and skill selectors after it. Search
@@ -65,7 +66,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   not waive SkillView source/retention approval.
 
 - `InstallAgentCatalog` tracks the full `gh skill install --help` `--agent`
-  list verified through `gh` 2.103.1 (48 entries; gh 2.97.0 replaced `windsurf`
+  list verified through `gh` 2.103.3 (48 entries; gh 2.97.0 replaced `windsurf`
   with `devin` and added `grok`, cli/cli#13987 and cli/cli#13864; gh 2.99.0
   makes Pi's `PI_CODING_AGENT_DIR` override authoritative).
   `HomeRelativePath` is best-effort and
@@ -218,3 +219,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   source-subpath evidence; a missing, empty or untrustworthy path stays unknown (explicit `SKILL.md` or `.` can identify a root skill). The tabular
   install listing contains selectors/descriptions, not source paths, and cannot
   fill this adapter evidence gap from an authored name.
+
+- gh 2.103.3 explains expired expiring credentials under `--no-refresh` after
+  HTTP 401; unrelated 403/503/transport failures are not expiry evidence. Keep
+  production authentication delegated to ordinary gh behavior. Fake-output
+  regressions cover nonzero stdout/stderr and mixed-account output without
+  launching auth commands, reading credentials or rotating accounts. gh 2.103.2's
+  installation-token file-attachment change is not a skill-install quota fix.

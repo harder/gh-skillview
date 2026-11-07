@@ -7,8 +7,8 @@
     <!-- Keep its lock file consistent when either AOT host restores this
          referenced project with PublishAot propagated from the host. -->
     <PublishAot>true</PublishAot>
-    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.5.0</TerminalGuiVersion>
-    <TerminalGuiEditorVersion Condition="'$(TerminalGuiEditorVersion)' == ''">2.5.7</TerminalGuiEditorVersion>
+    <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.5.1-develop.183</TerminalGuiVersion>
+    <TerminalGuiEditorVersion Condition="'$(TerminalGuiEditorVersion)' == ''">2.5.8-develop.6</TerminalGuiEditorVersion>
     <!-- Terminal.Gui is centrally pinned here so CI can override it via
          MSBuild while the app host keeps the modern AOT-safe lifecycle and the
          gh extension's separate TG2 NoWarn review stays local to that project. -->
@@ -20,13 +20,15 @@
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
     <!-- Service Terminal.Gui's runtime dependencies independently of its release
          cadence. Keep these overrides together and verify all AOT targets. -->
-    <PackageReference Include="Markdig" Version="1.4.2" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.13" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.13" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />
+    <PackageReference Include="Markdig" Version="1.6.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14" />
     <PackageReference Include="System.IO.Abstractions" Version="22.3.0" />
+    <PackageReference Include="TextMateSharp" Version="2.0.5" />
+    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.5" />
   </ItemGroup>
 
   <ItemGroup>

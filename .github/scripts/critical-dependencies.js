@@ -5,24 +5,41 @@ const LABEL = 'critical-dependency';
 const TERMINAL_GUI_REPO = 'Terminal.Gui';
 
 function versionParts(value) {
-  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value);
-  return match ? match.slice(1).map(Number) : null;
+  const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z.-]+)?$/.exec(value);
+  if (!match) return null;
+  const core = match.slice(1, 4).map(Number);
+  if (!core.every(Number.isSafeInteger)) return null;
+  return { core, prerelease: match[4]?.split('.') || [] };
 }
 
 function compareVersions(left, right) {
   const a = versionParts(left);
   const b = versionParts(right);
-  if (!a || !b) throw new Error(`Expected stable versions, got ${left} and ${right}`);
-  for (let index = 0; index < a.length; index++) {
-    if (a[index] !== b[index]) return a[index] - b[index];
+  if (!a || !b) throw new Error(`Expected semantic versions, got ${left} and ${right}`);
+  for (let index = 0; index < a.core.length; index++) {
+    if (a.core[index] !== b.core[index]) return a.core[index] - b.core[index];
+  }
+  if (!a.prerelease.length || !b.prerelease.length) {
+    return Number(!a.prerelease.length) - Number(!b.prerelease.length);
+  }
+  for (let index = 0; index < Math.max(a.prerelease.length, b.prerelease.length); index++) {
+    const x = a.prerelease[index];
+    const y = b.prerelease[index];
+    if (x === y) continue;
+    if (x === undefined || y === undefined) return x === undefined ? -1 : 1;
+    const numericX = /^\d+$/.test(x);
+    const numericY = /^\d+$/.test(y);
+    if (numericX && numericY) return BigInt(x) < BigInt(y) ? -1 : 1;
+    if (numericX !== numericY) return numericX ? -1 : 1;
+    return x < y ? -1 : 1;
   }
   return 0;
 }
 
 function propertyVersion(project, property) {
-  const expression = new RegExp(`<${property}(?:\\s[^>]*)?>(\\d+\\.\\d+\\.\\d+)<\\/${property}>`);
+  const expression = new RegExp(`<${property}(?:\\s[^>]*)?>([^<]+)<\\/${property}>`);
   const match = expression.exec(project);
-  if (!match) throw new Error(`Could not read ${property} from SkillView.Core.csproj`);
+  if (!match || !versionParts(match[1])) throw new Error(`Could not read ${property} from SkillView.Core.csproj`);
   return match[1];
 }
 
@@ -94,7 +111,7 @@ async function stableNugetVersion(packageName, fetchImpl) {
   });
   if (!response.ok) throw new Error(`NuGet returned HTTP ${response.status} for ${packageName}`);
   const data = await response.json();
-  const stable = (data.versions || []).filter(version => versionParts(version));
+  const stable = (data.versions || []).filter(version => versionParts(version)?.prerelease.length === 0);
   if (!stable.length) throw new Error(`No stable NuGet versions found for ${packageName}`);
   stable.sort((left, right) => compareVersions(right, left));
   return stable[0];
@@ -141,15 +158,16 @@ async function checkTerminalGui(github, core, owner, repo, project, fetchImpl, n
     ['Terminal.Gui', propertyVersion(project, 'TerminalGuiVersion')],
     ['Terminal.Gui.Editor', propertyVersion(project, 'TerminalGuiEditorVersion')],
   ];
-  const { data: releases } = await github.rest.repos.listReleases({
-    owner: 'tui-cs', repo: TERMINAL_GUI_REPO, per_page: 30,
-  });
   for (const [packageName, current] of packages) {
     const latest = await stableNugetVersion(packageName, fetchImpl);
     if (compareVersions(latest, current) <= 0) {
       core.info(`${packageName} is current at ${current}`);
       continue;
     }
+    const upstreamRepo = packageName === 'Terminal.Gui.Editor' ? 'Editor' : TERMINAL_GUI_REPO;
+    const { data: releases } = await github.rest.repos.listReleases({
+      owner: 'tui-cs', repo: upstreamRepo, per_page: 30,
+    });
     const release = releases.find(item => !item.draft && item.tag_name.toLowerCase() === `v${latest}`);
     const notes = release?.body || '';
     const number = await createOnce(github, core, owner, repo,
@@ -157,7 +175,7 @@ async function checkTerminalGui(github, core, owner, repo, project, fetchImpl, n
 SkillView pins **${packageName} ${current}**; NuGet now has **${latest}**.
 
 - [NuGet package](https://www.nuget.org/packages/${packageName}/${latest})
-- [Upstream release](${release?.html_url || 'https://github.com/tui-cs/Terminal.Gui/releases'})
+- [Upstream release](${release?.html_url || `https://github.com/tui-cs/${upstreamRepo}/releases`})
 - Find the Dependabot PR and review both Terminal.Gui packages together when appropriate.
 - Run locked tests and all four Native AOT publishes; check the extension's remaining trim suppressions.
 - Exercise keyboard selection, scrolling, resizing, install dialogs, and shutdown in a real terminal.

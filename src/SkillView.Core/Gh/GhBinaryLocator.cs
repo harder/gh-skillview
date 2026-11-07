@@ -9,15 +9,11 @@ namespace SkillView.Gh;
 /// the version meets SkillView's hard minimum.
 public sealed class GhBinaryLocator
 {
-    /// Minimum supported `gh`. 2.95.0 fixed atomic in-place skill updates
-    /// (cli/cli#13449), which SkillView's Updates tab relies on. 2.97.0 then
-    /// added the Devin and Grok agent hosts (cli/cli#13987 and cli/cli#13864),
-    /// both exposed by SkillView's install selector. The minimum is therefore
-    /// 2.97.0. The Codex and Pi location corrections in 2.99.0 improve
-    /// placement and inventory discovery, but are not required to use the
-    /// supported command surface. Meeting this minimum guarantees that surface,
-    /// so SkillView does not probe each individual `gh skill` flag.
-    public static readonly SemVer MinimumVersion = new(2, 97, 0);
+    /// Security floor: gh 2.102.0 fixes interactive skill-search option injection
+    /// (GHSA-qcwj-mr2r-2cx7) and symlink-destination writes
+    /// (GHSA-39wj-f2f4-978v). Keep trusted flags before -- independently.
+    /// The earlier 2.97.0 command surface remains available above this floor.
+    public static readonly SemVer MinimumVersion = new(2, 102, 0);
 
     private readonly ProcessRunner _runner;
     private readonly Logger _logger;
@@ -130,6 +126,13 @@ public sealed class GhBinaryLocator
 
     /// True when `version` parses and is at or above `MinimumVersion`. Unparseable
     /// or missing versions return false — callers should treat that as degraded.
-    public static bool SatisfiesMinimum(string? version) =>
-        SemVer.TryParse(version, out var v) && v >= MinimumVersion;
+    public static bool SatisfiesMinimum(string? version)
+    {
+        if (version is null) return false;
+        version = version.Trim();
+        var prerelease = version.IndexOf('-');
+        var suffix = version.IndexOfAny(['+', ' ', '(']);
+        var stable = prerelease < 0 || (suffix >= 0 && prerelease > suffix);
+        return stable && SemVer.TryParse(version, out var v) && v >= MinimumVersion;
+    }
 }

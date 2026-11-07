@@ -8,9 +8,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   COMMON_DIR and GIT_CONFIG_COUNT=0, or strip inherited GIT_* before configuring
   a dedicated private redirected-worktree fixture.
 
-- Current package compatibility: SkillView is pinned to Terminal.Gui `2.5.0`
-  and Terminal.Gui.Editor `2.5.7`. Test projects use `Microsoft.NET.Test.Sdk` `18.11.0`, `xunit.v3`
-  `4.0.2`, and `xunit.runner.visualstudio` `4.0.1`. If tests fail to compile on
+- Current package compatibility: SkillView is pinned to Terminal.Gui `2.5.1-develop.183`
+  and Terminal.Gui.Editor `2.5.8-develop.6`. Test projects use `Microsoft.NET.Test.Sdk` `18.11.0`, `xunit.v3`
+  `4.0.2`, and `xunit.runner.visualstudio` `4.0.1`. The compatible Microsoft Testing Platform
+  components are explicitly serviced at `2.5.2`, and test-only BCL async interfaces at `10.0.14`. If tests fail to compile on
   missing `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are
   replaced. `tests/SkillView.Tests/Build/PackageReferenceTests.cs` and
   `CliDispatcherHelpTests.VersionFlag_IncludesTerminalGuiVersion` hardcode the
@@ -28,16 +29,16 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   `TerminalGuiVersion` property. Keep the `PackageReference` on
   `Version="$(TerminalGuiVersion)"` so CI can override it via MSBuild without
   editing source.
-  Core also explicitly services seven Terminal.Gui runtime dependency roots
-  (Markdig, Microsoft.Extensions, and System.IO.Abstractions). Review those
+  Core also explicitly services nine Terminal.Gui runtime dependency roots
+  (Markdig, Microsoft.Extensions, System.IO.Abstractions, and TextMateSharp). Review those
   overrides together with all six lock files and the four native AOT targets;
-  see `agent_docs/dependency-refresh-2026-10.md`.
+  see `agent_docs/dependency-refresh-2026-11.md` (the October guide is historical).
 
 - CI's standalone AOT smoke publish now promotes `IL2026`, `IL3050`, and
   `IL3053` to errors for `SkillView.App`; keep the gh extension's project-level
   suppression local until that host gets its separate re-evaluation.
 
-- Terminal.Gui 2.5.0 `Application.InstanceCreated`/`InstanceDisposed` subscribers
+- Terminal.Gui 2.5.x `Application.InstanceCreated`/`InstanceDisposed` subscribers
   are thread-local. Async app-owned task draining can resume teardown on another
   thread, so facade notifications cannot prove disposal after an awaited run.
   Observe the exact instance's `InitializedChanged(false)` notification (emitted
@@ -53,3 +54,19 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   quota through an unrelated event-loop watchdog. Keep the watchdog and exact
   counts/boundary assertions. Isolate startup History via the existing app-owned
   loader seam, and record the quit-request time separately from total teardown.
+
+- The exact Terminal.Gui/Editor prerelease pair is an explicit maintainer-approved
+  exception to the stable-only dependency default. Never float `develop` or select
+  a preview by version order alone: the older `2.6.0-develop.61` is not the chosen
+  published stream. Preserve real-package Markdown partial/full styled-grid,
+  Unicode, raw Editor document/selection/read-only, owned modal and teardown tests.
+- Current products use SDK `10.0.403` and runtime/AOT/linker `10.0.14`. Frozen
+  native producers retain their own exact SDKs (`10.0.402` or `10.0.113`) and
+  immutable globals/locks. Verify the actual SDK in each source CWD, and bind
+  source SDK/global/lock hashes separately from current tools in schema-3 receipts.
+  A historical audit failure is a real gate failure. The sole owner-approved
+  compiler13/high/GHSA-p3jp-9v83-76w9 exception is fixed in the native-input helper's
+  five-source disposition data and requires a fresh complete default audit before
+  accepting/building historical tools. No other suppression or source rewrite is
+  authorized. Current/release packages remain fully audited at14+; see the CI
+  runtime guide for exact guards and current-run evidence boundaries.

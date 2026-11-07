@@ -60,7 +60,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   `packaging/winget/New-WinGetManifest.ps1` verifies published Windows assets
   against their checksums and renders copy-ready multi-file manifests. Keep
   the standalone WinGet package portable, its command alias `skillview`, and
-  its `GitHub.cli >= 2.97.0` dependency in sync with the product contract.
+  its `GitHub.cli >= 2.102.0` dependency in sync with the product contract.
 
 - If Copilot-specific, Claude-specific, or other agent-platform guidance turns
   out to matter for this repo, capture the repo-relevant part here so future

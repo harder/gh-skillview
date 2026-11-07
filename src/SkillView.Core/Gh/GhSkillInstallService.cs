@@ -6,7 +6,7 @@ using SkillView.Maintenance;
 
 namespace SkillView.Gh;
 
-/// Wraps `gh skill install`. SkillView requires gh ≥ 2.97.0, so every flag it
+/// Wraps `gh skill install`. SkillView requires gh ≥ 2.102.0, so every flag it
 /// emits (`--all`, `--allow-hidden-dirs`, `--upstream`, `--agent` repeatable,
 /// `--from-local`, `--scope`, `--dir`, `--pin`, `--force`) is guaranteed to
 /// exist — there is no per-flag capability gating. A custom directory maps to

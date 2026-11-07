@@ -22,7 +22,7 @@ Each RID's `aot-build` job publishes the current standalone app and extension
 sequentially, builds the complete maintenance proof host, and prepares both
 checksum-verified gh versions. Only frozen historical producer binaries and
 their source/recipe receipts enter the reusable cache. Cache identity includes
-RID, exact source commits, SDK, lockfiles, publish recipe, helper hash and runner
+RID, exact source commits, each frozen SDK/global/locks, publish recipe, helper hash and runner
 image. Every cache hit rechecks tracked-clean source, receipt identity and binary
 hash, then executes the producer's version command. Corrupt entries fail; they
 cannot authorize using stale producers. Current binaries, proof results and
@@ -53,3 +53,63 @@ Focused offline checks:
 node --test .github/scripts/ci-change-scope.test.js
 python3 -m unittest discover -s .github/scripts -p test_native_proof_inputs.py
 ```
+
+
+The current native-input helper uses schema 3 (`native-producers-v3`): the current
+SDK is selected by the current checkout, while each frozen source must resolve its
+own `global.json` from that source CWD. CI installs SDKs 10.0.402 and 10.0.113 beside
+current 10.0.403. The pinned setup-dotnet action supports the multiline versions
+and `global-json-file` together. Planning and publication both verify actual
+versions. Source receipts bind actual frozen SDK, independently re-read source
+SDK/global/locks, source commit, recipe, RID, tracked cleanliness and binary hash;
+transferred inputs are checked against exact freshly verified frozen checkouts,
+not only the artifact's own receipt. Old schema-1/2 receipts are refused.
+
+The key conservatively still includes current SDK/locks as extra invalidators;
+this can cause additional historical rebuilds, never reuse of a mismatched binary.
+Only binary/source receipts are cached, never proof results. All families, three
+shards, both current product hosts, four RIDs and supported historical schemas
+remain required. Current/release audit and warning behavior stays strict. On
+2026-11-06 the owner explicitly approved the narrow historical-fixture exception
+recorded in `.github/scripts/frozen-audit-exception.json`. Only compiler10.0.13,
+the exact high-severity GHSA-p3jp-9v83-76w9 URL and the five listed source commits,
+SDKs and seven input hashes qualify. Frozen tracked source/global/six locks and the
+base publish tuple remain unchanged; the additional generated-props recipe is
+explicitly versioned and bound. These old CI-only producers remain vulnerable and
+must never be shipped as current/release artifacts.
+
+Before constructing or accepting any cached producer, the helper performs a fresh
+UNSUPPRESSED graph-faithful locked App restore in the exact source CWD/SDK. It
+requires the complete original-policy Core error/App warning for only the known
+compiler13/high/advisory tuple. Different or missing diagnostics, other packages,
+URLs/severities, feed failures, NU1004, partial output or any unexpected warning
+fail closed. No TreatWarningsAsErrors override, audit-mode/level change, NoWarn or
+blanket NU1903 tolerance is used. Fresh results live outside the reusable baseline
+cache. Their complete bounded streams and source/SDK/disposition/recipe identities
+are transferred for this run and rechecked against independent frozen inputs;
+proof success is never cached. An earlier same-run artifact remains identifiable
+by its run/commit, not an assertion of a new audit at the consumer.
+
+Only after that admission, one exact-byte/hash-checked regular props file outside
+tracked source supplies a single advisory-URL `NuGetAuditSuppress` through
+`CustomBeforeMicrosoftCommonProps` to the historical publish. The URL item itself
+is advisory-wide: exact source/SDK/lock guards and the default audit are what
+restrict its package scope. Recheck props immediately before use. Current/release
+source and additional properties/recipes are refused. Any NuGet diagnostic token
+in either publish stream still fails, as does a nonzero exit. Compiler/linker
+warnings retain the original frozen recipe's policy, including its strict
+IL2026/IL3050/IL3053 flags; this exception adds no blanket warning rule. Cache/transfer schema3 binds disposition and props hashes; older,
+missing, extra or mixed receipts cannot inherit this exception. All other
+advisories still block. Download-only runtime-pack audit coverage is UNKNOWN;
+absence of output is not proof of coverage. Revisit this explicit exception when
+the family/schema is retired or the advisory ceases to apply; never expand it
+automatically.
+
+
+The always-run native-build-receipts artifact retains the exact named per-family
+audit stdout/stderr, publish stdout/stderr, command/exit/audit JSON and STOP JSON
+leaves, including hidden paths. This preserves refused/default-audit and failed
+publish evidence even when packaging native proof inputs is never reached. No
+recursive HOME, configuration, package/cache, bin/obj or private payload path is
+included by this receipt selection. Retention, permissions and failure semantics
+are unchanged.
