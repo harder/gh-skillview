@@ -1,5 +1,10 @@
 # GitHub CLI 2.103.1 compatibility review
 
+> Historical review: the minimum-version statements below describe the October
+> review. The November [dependency/security refresh](dependency-refresh-2026-11.md)
+> supersedes them with the gh 2.102.0 security floor; the original observations
+> and dated recipes below are preserved.
+
 Reviewed October 23, 2026 for [issue #89](https://github.com/harder/gh-skillview/issues/89).
 [gh 2.103.1](https://github.com/cli/cli/releases/tag/v2.103.1) was published that day.
 SkillView on merged main `3e6b69e27b3663b2748d9ca9e1c919b46fdc895e` is compatible

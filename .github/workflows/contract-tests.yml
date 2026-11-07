@@ -20,13 +20,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - gh-version: '2.97.0'
+          - gh-version: '2.102.0'
           - gh-version: 'latest'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
           cache: true
@@ -56,13 +56,16 @@ jobs:
               && sudo apt update \
               && sudo apt install gh -y
           else
-            # Install pinned version from GitHub release tarball
-            ARCH="$(dpkg --print-architecture)"
-            URL="https://github.com/cli/cli/releases/download/v${VERSION}/gh_${VERSION}_linux_${ARCH}.tar.gz"
-            curl -fsSL "$URL" -o /tmp/gh.tar.gz
-            tar -xzf /tmp/gh.tar.gz -C /tmp
-            sudo cp "/tmp/gh_${VERSION}_linux_${ARCH}/bin/gh" /usr/local/bin/gh
-            sudo chmod +x /usr/local/bin/gh
+            # Reuse the bounded official-checksum verifier used by native proof hosts.
+            case "$(dpkg --print-architecture)" in
+              amd64) RID=linux-x64 ;;
+              arm64) RID=linux-arm64 ;;
+              *) echo "Unsupported contract runner architecture" >&2; exit 1 ;;
+            esac
+            TOOL_ROOT="$RUNNER_TEMP/skillview-contract-gh-$VERSION"
+            python3 tests/native/prepare-gh-proof-tool.py --version "$VERSION" --rid "$RID" --output "$TOOL_ROOT"
+            echo "$TOOL_ROOT" >> "$GITHUB_PATH"
+            export PATH="$TOOL_ROOT:$PATH"
           fi
           gh --version
 
@@ -117,7 +120,7 @@ jobs:
       issues: write
     steps:
       - name: Create or reuse compatibility issue
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { owner, repo } = context.repo;

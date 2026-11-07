@@ -11,7 +11,7 @@ weaken tests, change lock files, merge PRs, or establish recurring automation.
    commit, outside any dirty development checkout. Fetch the `v1.0.1` tag if
    missing. Record the SHA and `git status --porcelain`; stop on a mismatch or
    dirty source. Do not stash, reset or clean someone else's work.
-2. Check Git, Python 3.9+, gh >=2.97.0 and the exact SDK in `global.json`.
+2. Check Git, Python 3.9+, gh >=2.102.0 and the exact SDK in `global.json`.
    Record OS, filesystem, terminal and architecture. If a prerequisite is
    missing, install only those prerequisites from official sources into user-owned
    locations when your session permits. Use a private SDK installation rather

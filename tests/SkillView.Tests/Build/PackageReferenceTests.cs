@@ -10,7 +10,7 @@ public sealed class PackageReferenceTests
     {
         var text = ReadProjectFile("src", "SkillView.Core", "SkillView.Core.csproj");
 
-        Assert.Contains("""<TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.5.0</TerminalGuiVersion>""", text);
+        Assert.Contains("""<TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.5.1-develop.183</TerminalGuiVersion>""", text);
         Assert.Contains("""<PackageReference Include="Terminal.Gui" Version="$(TerminalGuiVersion)" />""", text);
     }
 
@@ -20,7 +20,7 @@ public sealed class PackageReferenceTests
         var text = ReadProjectFile("src", "SkillView.Core", "SkillView.Core.csproj");
 
         // Terminal.Gui.Editor must be present and paired with base Terminal.Gui.
-        Assert.Contains("""<TerminalGuiEditorVersion Condition="'$(TerminalGuiEditorVersion)' == ''">2.5.7</TerminalGuiEditorVersion>""", text);
+        Assert.Contains("""<TerminalGuiEditorVersion Condition="'$(TerminalGuiEditorVersion)' == ''">2.5.8-develop.6</TerminalGuiEditorVersion>""", text);
         Assert.Contains("""<PackageReference Include="Terminal.Gui.Editor" Version="$(TerminalGuiEditorVersion)" />""", text);
     }
 

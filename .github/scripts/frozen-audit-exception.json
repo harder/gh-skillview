@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "scope": "historical-ci-fixture-only/non-release",
+  "advisory": "https://github.com/advisories/GHSA-p3jp-9v83-76w9",
+  "package": "Microsoft.DotNet.ILCompiler",
+  "version": "10.0.13",
+  "severity": "high",
+  "ownerDecision": "Owner explicitly approved the narrow five-fixture exception on 2026-11-06. Current and release products remain patched 10.0.14+ and fully audited. Historical binaries remain vulnerable CI-only tools; do not ship them.",
+  "removalTrigger": "Revisit when the historical source family/schema is retired or this advisory no longer applies. Never automatically expand package, version, advisory, source or SDK scope.",
+  "families": {
+    "legacy": {
+      "sourceCommit": "0dba59be59776e6e654123aa1ce1e5496074763e",
+      "sdk": "10.0.402",
+      "dependencies": {
+        "global.json": "ab4eed8da9aaee0671a10b49fe4ff1b27b3341b264f317ee88785607c0711e9a",
+        "src/SkillView.App/packages.lock.json": "40acd0ac1af95c620a13ef5f5fa066449724d06bd8286c24a0fb53ed99c59165",
+        "src/SkillView.Core/packages.lock.json": "d4aae93e92d5f289e7aa7f732646121f608becc6871df91a35d3a81dfe482e6a",
+        "src/SkillView.GhExtension/packages.lock.json": "40acd0ac1af95c620a13ef5f5fa066449724d06bd8286c24a0fb53ed99c59165",
+        "tests/SkillView.IntegrationTests/packages.lock.json": "d44d63f9d0e0b108f89b207a5b940bdf6fbdb122ddaf3f3707dd2072713f7167",
+        "tests/SkillView.MaintenanceProof/packages.lock.json": "5560a17cb83d845674863a6e2117bbc303af69501137ca6e48e58e77e07a8dca",
+        "tests/SkillView.Tests/packages.lock.json": "d44d63f9d0e0b108f89b207a5b940bdf6fbdb122ddaf3f3707dd2072713f7167"
+      }
+    },
+    "reviewed-merge": {
+      "sourceCommit": "27efe94ddbde31ef3c8e6e7dbbee41c00c8b7177",
+      "sdk": "10.0.113",
+      "dependencies": {
+        "global.json": "6f12f93aad9e9e51781fa01b9cb934becc659407de4481e89297bfbc3353f288",
+        "src/SkillView.App/packages.lock.json": "0910bc519abe5a9bbb0174e92c8fba073af7f88954f3cf739fb29056244c4459",
+        "src/SkillView.Core/packages.lock.json": "cdd5e0c577ee1585814099768e2b8bc18e7a48cec3994fce9c9fc9f59b3554a4",
+        "src/SkillView.GhExtension/packages.lock.json": "0910bc519abe5a9bbb0174e92c8fba073af7f88954f3cf739fb29056244c4459",
+        "tests/SkillView.IntegrationTests/packages.lock.json": "aec3464cd7c0865fe719b91a60b7617b69ffdd624e8e41a2ad42715ecd6c3020",
+        "tests/SkillView.MaintenanceProof/packages.lock.json": "598a9df5ff692fd2437a9b44144b49bca3839d32f875e563eb0205cbc404a335",
+        "tests/SkillView.Tests/packages.lock.json": "aec3464cd7c0865fe719b91a60b7617b69ffdd624e8e41a2ad42715ecd6c3020"
+      }
+    },
+    "unpin": {
+      "sourceCommit": "c919199a6861b9aaf9301e31c4b2945e098da799",
+      "sdk": "10.0.402",
+      "dependencies": {
+        "global.json": "ab4eed8da9aaee0671a10b49fe4ff1b27b3341b264f317ee88785607c0711e9a",
+        "src/SkillView.App/packages.lock.json": "40acd0ac1af95c620a13ef5f5fa066449724d06bd8286c24a0fb53ed99c59165",
+        "src/SkillView.Core/packages.lock.json": "d4aae93e92d5f289e7aa7f732646121f608becc6871df91a35d3a81dfe482e6a",
+        "src/SkillView.GhExtension/packages.lock.json": "40acd0ac1af95c620a13ef5f5fa066449724d06bd8286c24a0fb53ed99c59165",
+        "tests/SkillView.IntegrationTests/packages.lock.json": "d44d63f9d0e0b108f89b207a5b940bdf6fbdb122ddaf3f3707dd2072713f7167",
+        "tests/SkillView.MaintenanceProof/packages.lock.json": "5560a17cb83d845674863a6e2117bbc303af69501137ca6e48e58e77e07a8dca",
+        "tests/SkillView.Tests/packages.lock.json": "d44d63f9d0e0b108f89b207a5b940bdf6fbdb122ddaf3f3707dd2072713f7167"
+      }
+    },
+    "reimport": {
+      "sourceCommit": "4649d75fc3a4f9fdd7c22ca5593e629a1b559298",
+      "sdk": "10.0.402",
+      "dependencies": {
+        "global.json": "ab4eed8da9aaee0671a10b49fe4ff1b27b3341b264f317ee88785607c0711e9a",
+        "src/SkillView.App/packages.lock.json": "40acd0ac1af95c620a13ef5f5fa066449724d06bd8286c24a0fb53ed99c59165",
+        "src/SkillView.Core/packages.lock.json": "d4aae93e92d5f289e7aa7f732646121f608becc6871df91a35d3a81dfe482e6a",
+        "src/SkillView.GhExtension/packages.lock.json": "40acd0ac1af95c620a13ef5f5fa066449724d06bd8286c24a0fb53ed99c59165",
+        "tests/SkillView.IntegrationTests/packages.lock.json": "d44d63f9d0e0b108f89b207a5b940bdf6fbdb122ddaf3f3707dd2072713f7167",
+        "tests/SkillView.MaintenanceProof/packages.lock.json": "5560a17cb83d845674863a6e2117bbc303af69501137ca6e48e58e77e07a8dca",
+        "tests/SkillView.Tests/packages.lock.json": "d44d63f9d0e0b108f89b207a5b940bdf6fbdb122ddaf3f3707dd2072713f7167"
+      }
+    },
+    "source-switch": {
+      "sourceCommit": "5822f81077a8675724012670c6acd4c4c6abc0c9",
+      "sdk": "10.0.402",
+      "dependencies": {
+        "global.json": "ab4eed8da9aaee0671a10b49fe4ff1b27b3341b264f317ee88785607c0711e9a",
+        "src/SkillView.App/packages.lock.json": "40acd0ac1af95c620a13ef5f5fa066449724d06bd8286c24a0fb53ed99c59165",
+        "src/SkillView.Core/packages.lock.json": "d4aae93e92d5f289e7aa7f732646121f608becc6871df91a35d3a81dfe482e6a",
+        "src/SkillView.GhExtension/packages.lock.json": "40acd0ac1af95c620a13ef5f5fa066449724d06bd8286c24a0fb53ed99c59165",
+        "tests/SkillView.IntegrationTests/packages.lock.json": "d44d63f9d0e0b108f89b207a5b940bdf6fbdb122ddaf3f3707dd2072713f7167",
+        "tests/SkillView.MaintenanceProof/packages.lock.json": "5560a17cb83d845674863a6e2117bbc303af69501137ca6e48e58e77e07a8dca",
+        "tests/SkillView.Tests/packages.lock.json": "d44d63f9d0e0b108f89b207a5b940bdf6fbdb122ddaf3f3707dd2072713f7167"
+      }
+    }
+  }
+}

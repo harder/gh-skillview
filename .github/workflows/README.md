@@ -7,7 +7,7 @@ each project. `AGENTS.md` is the project-wide source of build and safety rules.
 | --- | --- | --- |
 | `ci.yml` | `main`, PR, manual | Action lint, monitor tests, dependency review, site check, three-OS tests, and four-RID AOT smoke |
 | `codeql.yml` | `main`, PR, weekly, manual | C# and GitHub Actions security analysis |
-| `contract-tests.yml` | Daily, manual | Required live `gh` tests at the 2.97.0 minimum and latest release; open an assigned issue on failure |
+| `contract-tests.yml` | Daily, manual | Required live `gh` tests at the 2.102.0 minimum and latest release; open an assigned issue on failure |
 | `critical-dependencies.yml` | Daily, manual | Check stable Terminal.Gui packages and latest GitHub CLI; open deduplicated, assigned review issues with release highlights, then add a bounded Copilot assessment |
 | `pages.yml` | Site changes, manual | Build and deploy `site/` to GitHub Pages |
 | `release.yml` | `v*` tag, manual | Build, attest, verify, and publish release assets; generate a stable-release Homebrew formula and optionally generate WinGet manifests |

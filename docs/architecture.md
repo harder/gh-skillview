@@ -9,7 +9,7 @@ so CLI behavior and the terminal interface share the same services.
 - `src/SkillView.App/` and `src/SkillView.GhExtension/` contain the entrypoints.
 - `src/SkillView.Core/Bootstrapping/` parses global arguments and creates
   application services. `GhBinaryLocator` resolves `gh` and requires version
-  2.97.0 or newer. `EnvironmentProbe` checks `gh skill --help` once; SkillView
+  2.102.0 or newer. `EnvironmentProbe` checks `gh skill --help` once; SkillView
   does not probe individual flags at runtime.
 - `src/SkillView.Core/Cli/` dispatches commands and formats text or JSON output.
   The small command surface uses explicit parsers so it stays Native AOT safe.

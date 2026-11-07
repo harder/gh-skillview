@@ -50,13 +50,13 @@ subsystem rules in these guides; keep this root file short. The
   to implement discovery. Read-only inventory and package checks must not launch AI clients.
 - Use the existing application-owned cancellation, background-task and UI-dispatch
   helpers. Preserve lifetime/ownership checks through queued UI completion.
-- Keep gh authentication delegated to gh. Require gh 2.97.0 or newer. Put trusted
+- Keep gh authentication delegated to gh. Require gh 2.102.0 or newer. Put trusted
   flags before `--` and untrusted repository/skill selectors after it.
 
 ## Build and verification
 
-- Keep .NET runtime/AOT at **10.0.13** and the SDK selected by `global.json`
-  (**10.0.113**, roll-forward disabled). SDK changes require intentional lock-file
+- Keep .NET runtime/AOT at **10.0.14** and the SDK selected by `global.json`
+  (**10.0.403**, roll-forward disabled). SDK changes require intentional lock-file
   regeneration because compiler/linker package versions come from the SDK.
 - All six projects commit NuGet locks covering the four supported native RIDs.
   Use `dotnet restore --locked-mode`. Dependency changes require intentional
@@ -64,7 +64,7 @@ subsystem rules in these guides; keep this root file short. The
 - Build: `dotnet build`; style: `dotnet format SkillView.sln --no-restore --verify-no-changes`;
   full tests: `dotnet test --no-build`.
 - Run scoped formatting from the repository root with repository-relative
-  `--include` paths. SDK 10.0.113 can select zero files for absolute-only paths
+  `--include` paths. SDK 10.0.113 was observed to select zero files for absolute-only paths
   and exit 0. Confirm selection with reports/diagnostics; always run the full
   solution style check above before finishing.
 - Specific test project: `dotnet test --project PATH`. xUnit 4 uses MTP-native

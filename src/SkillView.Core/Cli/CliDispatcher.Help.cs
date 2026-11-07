@@ -1,3 +1,4 @@
+using System.Reflection;
 using SkillView.Bootstrapping;
 
 namespace SkillView.Cli;
@@ -114,7 +115,7 @@ public static partial class CliDispatcher
 
             ## Notes
 
-            - SkillView requires `gh` 2.97.0 or newer and checks that `gh skill` is available.
+            - SkillView requires `gh` 2.102.0 or newer and checks that `gh skill` is available.
             - `--debug` is the only global flag accepted after a subcommand. Put other global flags before the subcommand.
             - `SKILLVIEW_LOG=debug` is the environment-variable alternative to `--debug`.
             - On Apple Silicon macOS and x86_64 Linux, install the standalone app with `brew install harder/tap/skillview`.
@@ -147,7 +148,9 @@ public static partial class CliDispatcher
             : version.Revision == 0
                 ? $"{version.Major}.{version.Minor}.{version.Build}"
                 : version.ToString();
-        var terminalGuiVersion = typeof(Terminal.Gui.Views.Window).Assembly.GetName().Version?.ToString() ?? "unknown";
+        var terminalGuiAssembly = typeof(Terminal.Gui.Views.Window).Assembly;
+        var terminalGuiVersion = terminalGuiAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? terminalGuiAssembly.GetName().Version?.ToString() ?? "unknown";
 
         return $"{GetCommandName(options.InvocationMode)} {versionText} (Terminal.Gui {terminalGuiVersion})";
     }
