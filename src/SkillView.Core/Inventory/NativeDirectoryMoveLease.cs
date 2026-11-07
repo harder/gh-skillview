@@ -17,6 +17,9 @@ internal abstract class NativeDirectoryMoveLease : IDisposable
     internal abstract PayloadSnapshot Capture(CancellationToken token);
     internal abstract PayloadSnapshot CaptureInto(Action<NativePayloadItem, PayloadEntry> sink,
         Action<NativePayloadItem>? observeRoot, CancellationToken token);
+    internal virtual PayloadSnapshot CaptureRawInto(Action<NativePayloadItem, PayloadEntry> sink,
+        Action<NativePayloadItem>? observeRoot, CancellationToken token) =>
+        throw new IOException("Raw damaged-original capture is unavailable on this backend.");
     internal virtual PayloadSnapshot FlushPayload(CancellationToken token) => Capture(token);
     internal virtual System.Collections.Immutable.ImmutableArray<LinuxLinkMountObservation> CaptureLinuxLinkAuthorities(LinuxLinkProcAuthority authority, CancellationToken token) =>
         throw new IOException("Linux target preservation authority unavailable.");
@@ -37,6 +40,19 @@ internal abstract class NativeDirectoryMoveLease : IDisposable
         return OperatingSystem.IsWindows()
             ? WindowsSecureRemovalBackend.OpenDirectoryMove(rootPath, path, token)
             : UnixSecureRemovalBackend.OpenDirectoryMove(rootPath, path, token);
+    }
+
+    // Only the dedicated registry restore planner/executor uses this entry.
+    // Native identity, directory policy, Git and rename guards remain identical;
+    // the caller must bind the complete damaged original and attached record.
+    internal static NativeDirectoryMoveLease OpenRegistryDamaged(string rootPath, string path, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!SecureRemovalBackend.IsSupported)
+            throw new IOException("Native directory relocation is unavailable: " + SecureRemovalBackend.UnsupportedReason);
+        return OperatingSystem.IsWindows()
+            ? WindowsSecureRemovalBackend.OpenDirectoryMove(rootPath, path, token, registryDamaged: true)
+            : UnixSecureRemovalBackend.OpenDirectoryMove(rootPath, path, token, registryDamaged: true);
     }
 
     internal static bool SameObject(SecureFileIdentity left, SecureFileIdentity right) =>

@@ -256,3 +256,11 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   identity/generation/address fields across those leases, but do not compare the
   two fingerprint hashes to each other. Retain both independent repeated witness
   checks, same-file raw reads and the real registry data-file lock.
+
+- Only dedicated registry-recorded restore may open a missing-SKILL original via
+  `OpenRegistryDamaged`. Its caller binds the complete raw damaged original and
+  one already-attached compatible record; ordinary relocation still requires
+  SKILL.md. Preserve every held native directory/Git/identity/generation/rename
+  guard. Raw bound capture is separate from historical parsed capture. Require
+  supported full native metadata and revalidate archive-bound live metadata on
+  each transition; no capability refusal may become review-only approval.

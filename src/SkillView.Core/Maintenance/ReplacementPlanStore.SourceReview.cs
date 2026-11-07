@@ -8,10 +8,11 @@ internal sealed partial class ReplacementPlanStore
     private ReplacementPlan FreezeSourceReview(ReplacementPlan plan, NativeStateDirectory operation,
         NativeDirectoryMoveLease original, NativeDirectoryMoveLease candidate, CancellationToken token)
     {
-        if (!sourceReviewRequired || plan.PinPolicy is not null) return plan;
+        if ((!sourceReviewRequired && plan.Purpose != RegistryRestorePurpose) || plan.PinPolicy is not null) return plan;
         var suffix = plan.LocalDisposition?.MergedSlot ?? "candidate";
         var oldName = "review-installed-" + suffix; var newName = "review-source-" + suffix;
-        CapturedPayloadArchive.Capture(operation, oldName, original, token);
+        if (plan.Purpose == RegistryRestorePurpose) CapturedPayloadArchive.CaptureDamagedOriginal(operation, oldName, original, token);
+        else CapturedPayloadArchive.Capture(operation, oldName, original, token);
         CapturedPayloadArchive.Capture(operation, newName, candidate, token);
         return ReviewFromArchives(plan, operation, oldName, newName, token);
     }

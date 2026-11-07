@@ -22,6 +22,40 @@ public sealed class CapturedPayloadArchiveTests : IDisposable
     }
 
     [Fact]
+    public void OrdinaryNativeLeaseStillRefusesMissingSkillWhileDedicatedCaptureIsRawAndEmpty()
+    {
+        Directory.CreateDirectory(Target);
+        var root = Path.GetDirectoryName(Target)!;
+        Assert.Throws<IOException>(() => NativeDirectoryMoveLease.Open(root, Target, Token));
+        using var damaged = NativeDirectoryMoveLease.OpenRegistryDamaged(root, Target, Token);
+        var capture = damaged.Capture(Token);
+        Assert.Empty(capture.Entries);
+        Assert.NotNull(capture.RootIdentity);
+        Assert.Null(capture.FrontMatter);
+    }
+
+    [Fact]
+    public void DedicatedRawCaptureRetainsDamagedBytesWhileHistoricalParsedCaptureRefuses()
+    {
+        Directory.CreateDirectory(Target);
+        var bytes = new byte[] { 255, 0, 13, 10 };
+        File.WriteAllBytes(Path.Combine(Target, "SKILL.md"), bytes);
+        using var original = NativeDirectoryMoveLease.Open(Path.GetDirectoryName(Target)!, Target, Token);
+        var raw = original.Capture(Token);
+        using var observed = new MemoryStream();
+        var bound = original.CaptureRawInto((item, entry) =>
+        {
+            item.Content!.Position = 0;
+            item.Content.CopyTo(observed);
+        }, null, Token);
+        Assert.Equal(bytes, observed.ToArray());
+        Assert.Equal(raw.Fingerprint, bound.Fingerprint);
+        Assert.Equal(raw.ObjectStateFingerprint, bound.ObjectStateFingerprint);
+        Assert.Null(bound.FrontMatter);
+        Assert.Throws<IOException>(() => original.CaptureInto((_, _) => { }, null, Token));
+    }
+
+    [Fact]
     public void RetainsExactIndependentBytesAndEmptyDirectoriesWithoutCreatingPayloadLinks()
     {
         using var original = CreateOriginal();

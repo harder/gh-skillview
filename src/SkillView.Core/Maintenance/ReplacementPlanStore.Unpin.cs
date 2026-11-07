@@ -14,7 +14,7 @@ internal sealed partial class ReplacementPlanStore
 
     private static void RequirePurpose(ReplacementPlan plan, string? expectedPurpose)
     {
-        if (expectedPurpose is null ? plan.PinPolicy is not null || plan.LocalImport is not null : plan.Purpose != expectedPurpose)
+        if (expectedPurpose is null ? plan.PinPolicy is not null || plan.LocalImport is not null || plan.RegistryRestore is not null : plan.Purpose != expectedPurpose)
             throw new IOException("This command cannot operate on the saved " + plan.Purpose + " purpose.");
     }
 

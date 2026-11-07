@@ -13,6 +13,9 @@ namespace SkillView.Maintenance;
 internal sealed partial class SavedUpdateCoordinator(ReplacementPlanStore plans,
     SkillUpdateCoordinator availability, GhSkillListAdapter catalog, Logger logger)
 {
+    internal Task<UpdateResult> PrepareRegistryRestoreAsync(string ghPath, InstalledSkill target,
+        InventorySnapshot inventory, CancellationToken token) => PrepareLocalImportAsync(ghPath, target, null, inventory, token, registryRestore: true);
+
     internal Task<UpdateResult> PrepareLocalReimportAsync(string ghPath, InstalledSkill target,
         InventorySnapshot inventory, CancellationToken token) => PrepareLocalImportAsync(ghPath, target, null, inventory, token);
 
@@ -24,11 +27,13 @@ internal sealed partial class SavedUpdateCoordinator(ReplacementPlanStore plans,
     }
 
     private async Task<UpdateResult> PrepareLocalImportAsync(string ghPath, InstalledSkill target, string? newSourcePath,
-        InventorySnapshot inventory, CancellationToken token)
+        InventorySnapshot inventory, CancellationToken token, bool registryRestore = false)
     {
         try
         {
-            var preparation = newSourcePath is null
+            var preparation = registryRestore
+                ? ReplacementPreparation.Saved(await plans.PlanRegistryRestoreAsync(ghPath, target, inventory, token).ConfigureAwait(false))
+                : newSourcePath is null
                 ? await plans.PlanLocalReimportAsync(ghPath, target, inventory, token).ConfigureAwait(false)
                 : await plans.PlanLocalSourceSwitchAsync(ghPath, target, newSourcePath, inventory, token).ConfigureAwait(false);
             return Empty(false) with
@@ -221,7 +226,7 @@ internal sealed partial class SavedUpdateCoordinator(ReplacementPlanStore plans,
     {
         var requiredDisposition = review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchDisposition : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportDisposition
             : review.PinPolicy is not null ? "unpin-only" : review.LocalDisposition is null ? "retain-original" : "merge-reviewed";
-        var purpose = review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchPurpose
+        var purpose = review.RegistryRestore is not null ? ReplacementPlanStore.RegistryRestorePurpose : review.LocalSourceSwitch is not null ? ReplacementPlanStore.LocalSourceSwitchPurpose
             : review.LocalImport is not null ? ReplacementPlanStore.LocalReimportPurpose : review.PinPolicy is not null ? "unpin-only" : null;
         if (disposition != requiredDisposition)
             return UpdateResult.Failure(false, 2, "Explicit " + requiredDisposition + " approval is required.", []) with
