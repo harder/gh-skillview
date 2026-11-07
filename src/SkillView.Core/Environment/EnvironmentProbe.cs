@@ -8,7 +8,7 @@ namespace SkillView.Diagnostics;
 /// `EnvironmentReport`. Each probe tolerates the previous failing — a missing
 /// `gh` yields an empty report rather than throwing.
 ///
-/// SkillView requires gh ≥ 2.97.0, which guarantees the full `gh skill`
+/// SkillView requires gh ≥ 2.102.0, which guarantees the full `gh skill`
 /// surface, so there is no per-flag capability probe — a single
 /// `gh skill --help` smoke check confirms the command is present.
 public sealed class EnvironmentProbe
@@ -54,7 +54,7 @@ public sealed class EnvironmentProbe
 
         var versionRaw = await _locator.GetVersionAsync(path, cancellationToken).ConfigureAwait(false);
         SemVer? version = SemVer.TryParse(versionRaw, out var v) ? v : null;
-        var meets = version is SemVer sv && sv >= GhBinaryLocator.MinimumVersion;
+        var meets = GhBinaryLocator.SatisfiesMinimum(versionRaw);
 
         if (version is null)
         {

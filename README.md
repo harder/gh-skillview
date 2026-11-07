@@ -12,7 +12,7 @@
 
 ## Install
 
-You need [GitHub CLI](https://cli.github.com/) **2.97.0 or newer**. Sign in with `gh auth login` to search and install skills.
+You need [GitHub CLI](https://cli.github.com/) **2.102.0 or newer**. Sign in with `gh auth login` to search and install skills.
 
 ### GitHub CLI extension (recommended)
 

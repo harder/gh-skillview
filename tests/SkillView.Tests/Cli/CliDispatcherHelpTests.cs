@@ -43,7 +43,7 @@ public class CliDispatcherHelpTests
         Assert.Contains("| `restore-apply` |", stdout);
         Assert.Contains("| `undo` |", stdout);
         Assert.Contains("| `quarantine-history` |", stdout);
-        Assert.Contains("SkillView requires `gh` 2.97.0 or newer", stdout);
+        Assert.Contains("SkillView requires `gh` 2.102.0 or newer", stdout);
         Assert.DoesNotContain("capability-gated flags", stdout);
         Assert.Contains("| `130` | Canceled by the caller or Ctrl+C |", stdout);
     }
@@ -121,7 +121,7 @@ public class CliDispatcherHelpTests
 
         Assert.Equal(ExitCodes.Success, exitCode);
         Assert.Contains("Terminal.Gui", stdout, StringComparison.Ordinal);
-        Assert.Contains("2.5.0", stdout, StringComparison.Ordinal);
+        Assert.Contains("2.5.1-develop.183", stdout, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -73,7 +73,7 @@ internal sealed partial class SkillViewWorkflowCoordinator
                 {
                     var observation = !report.BaselineOk
                         ? new UpdateAvailability(UpdateAvailabilityStatus.Unsupported,
-                            "A supported gh (2.97.0 or newer) with gh skill is required. Open Doctor for setup.", DateTimeOffset.Now)
+                            "A supported gh (2.102.0 or newer) with gh skill is required. Open Doctor for setup.", DateTimeOffset.Now)
                         : snapshot.IsPartial || !snapshot.ConfiguredRootsComplete
                             ? new UpdateAvailability(UpdateAvailabilityStatus.Unknown,
                                 "Inventory coverage is incomplete. Refresh and resolve discovery failures before checking upstream.", DateTimeOffset.Now)

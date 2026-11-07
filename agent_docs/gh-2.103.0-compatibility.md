@@ -1,5 +1,10 @@
 # GitHub CLI 2.103.0 compatibility review
 
+> Historical review: the minimum-version statements below describe the October
+> review. The November [dependency/security refresh](dependency-refresh-2026-11.md)
+> supersedes them with the gh 2.102.0 security floor; the original observations
+> and dated recipes below are preserved.
+
 Reviewed on October 22, 2026. The latest stable release is
 [2.103.0, published October 21](https://github.com/cli/cli/releases/tag/v2.103.0).
 The previous documented SkillView baseline was 2.102.0; the intervening

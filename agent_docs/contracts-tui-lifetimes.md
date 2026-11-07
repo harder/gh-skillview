@@ -199,7 +199,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   doctor orchestration plus the shared inventory capture/rescan flow. Put new
   workflow-level behavior there unless it truly belongs to the search shell.
 
-- Terminal.Gui `2.5.0` supports `Application.Create().Init()`. Keep using
+- Terminal.Gui `2.5.x` supports `Application.Create().Init()`. Keep using
   `TuiConfigurationBuilder` and check the documented lifecycle, `View.Text`,
   and `IAcceptTarget` API changes before a later package upgrade.
 
@@ -208,7 +208,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   intentionally centralizing whole-screen actions (search/install/open/logs,
   installed-screen filter/sort/remove, cleanup actions, etc.).
 
-- On Terminal.Gui `2.5.0`, `TableView.CollectionNavigator = null` is the
+- On Terminal.Gui `2.5.x`, `TableView.CollectionNavigator = null` is the
   supported way to disable type-to-search. Do not restore the custom matcher.
 
 - Sanitize untrusted text before assigning it to preview/detail/log panes.
@@ -216,7 +216,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   markdown, search metadata, installed-skill detail markdown, cleanup/remove
   summaries, and rendered log text.
 
-- Terminal.Gui `2.5.0` enables bracketed-paste mode. SkillView does not need
+- Terminal.Gui `2.5.x` enables bracketed-paste mode. SkillView does not need
   custom handling for it: editable `TextField` inputs accept terminal-native
   paste through Terminal.Gui's default `Command.Paste` pipeline, while read-only
   panes ignore paste events. `TerminalEscapeSanitizer` still applies to rendered
@@ -462,3 +462,12 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   version gets the existing safe notice, with no new source resolution; changing
   back only restores anchor eligibility under the existing current context,
   generation and exact G1 verification checks.
+
+- The current explicit preview pair is Terminal.Gui `2.5.1-develop.183` and Editor
+  `2.5.8-develop.6`; see the November dependency review. The package supplies
+  Markdown partial-redraw and output/timer fixes, but those do not replace
+  app-owned cancellation, generation/session checks, started-modal completion or
+  drain-before-dispose. New framework `InvokeAsync` adoption is a separate
+  lifetime change requiring focused parity tests. The current refresh retains
+  the existing dispatch/staging helpers. Editor's typed and polymorphic Text
+  setters must keep its document/raw text coherent and read-only input inert.

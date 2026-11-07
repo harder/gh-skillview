@@ -21,7 +21,9 @@ spec = importlib.util.spec_from_file_location('api_budget', Path(__file__).with_
 budget = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(budget)
 
-BASE_HASHES = {'.github/workflows/ci.yml': 'a9250a7c4d6238b86002f551a47119b81442e456401e25c0b82251cafe5fc692', 'tests/native/prove-registry-recorded-restore.py': '509489c6a38123f3fda245c5d5b26fea7fef6aeee8cea1aef77a1578668afac9', 'tests/native/prove-registry-recorded-retirement.py': '3443b9564fbb5136a967c2909469e2157d6b4851e47e36b055f5965f73b039e9'}
+# Workflow baseline: main f169a9d security refresh plus PR125 9a6e83f proof steps,
+# before the strictly removed API observers below. Native body baselines stay frozen.
+BASE_HASHES = {'.github/workflows/ci.yml': '01a003f9ea8e6c33ef768cf62781eab338b4b3b23c73d5ce98275d8c358d3af5', 'tests/native/prove-registry-recorded-restore.py': '509489c6a38123f3fda245c5d5b26fea7fef6aeee8cea1aef77a1578668afac9', 'tests/native/prove-registry-recorded-retirement.py': '3443b9564fbb5136a967c2909469e2157d6b4851e47e36b055f5965f73b039e9'}
 
 CORE = dict(limit=5000, used=5000, remaining=0, reset=1793219888)
 

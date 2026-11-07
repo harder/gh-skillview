@@ -753,7 +753,7 @@ If you open a bug, include:
 
 ## GitHub CLI compatibility
 
-SkillView requires `gh` 2.97.0 or newer and a terminal with ANSI support. It complements `gh skill`; use the [upstream commands](https://cli.github.com/manual/gh_skill) for options SkillView does not expose, including [`gh skill publish`](https://cli.github.com/manual/gh_skill_publish).
+SkillView requires `gh` 2.102.0 or newer and a terminal with ANSI support. It complements `gh skill`; use the [upstream commands](https://cli.github.com/manual/gh_skill) for options SkillView does not expose, including [`gh skill publish`](https://cli.github.com/manual/gh_skill_publish).
 
 Inventory scans conventional user skill locations as well as `CLAUDE_CONFIG_DIR` for Claude Code and `PI_CODING_AGENT_DIR` for Pi.
 

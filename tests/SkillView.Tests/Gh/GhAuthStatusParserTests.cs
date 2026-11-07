@@ -84,6 +84,32 @@ public class GhAuthStatusParserTests
         Assert.Equal(output, status.RawOutput);
     }
 
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    public void Expired_gh_2_103_3_credentials_remain_unauthenticated_on_either_stream(int stream, bool refreshExpired)
+    {
+        var output = "github.com\n  X Token for github.com account monalisa (keyring) has expired\n"
+            + "  - Active account: true\n  - Expiring token that gh refreshes automatically\n"
+            + "  - Token expires: 2000-01-01T00:00:00Z (expired about 2 days ago)\n"
+            + (refreshExpired
+                ? "  - Refresh token expires: 2000-01-02T00:00:00Z (expired about 1 day ago)\n  - To re-authenticate, run: gh auth login -h github.com"
+                : "  - Refresh token expires: 2000-01-13T00:00:00Z (in about 10 days)\n  - To refresh it, run gh auth status (without --no-refresh)");
+        // Even another successful account marker must not override a failed command.
+        var stdout = stream == 0 ? output : stream == 2 ? "  ✓ Logged in to example.com account other (keyring)" : null;
+        var status = GhAuthStatusParser.Parse(stdout, stream == 0 ? null : output, 1);
+
+        Assert.False(status.LoggedIn);
+        Assert.Null(status.Account);
+        Assert.Equal("github.com", status.ActiveHost);
+        Assert.Equal(["github.com"], status.Hosts);
+        Assert.Contains(output, status.RawOutput, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Handles_not_logged_in()
     {

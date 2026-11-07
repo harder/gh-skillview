@@ -18,6 +18,7 @@ or release verdict.
   [source review](maintenance-update-source-review.md), and
   [maintenance queue](maintenance-queue.md).
 - [Version selection scope](version-selection-scope.md).
+- [November dependency/security refresh](dependency-refresh-2026-11.md) (current SDK, explicit GUI preview pair, versions and compatibility limits).
 - [GitHub CLI 2.103.0 compatibility](gh-2.103.0-compatibility.md)
   (authentication/extension baseline) and
   [2.103.1 compatibility](gh-2.103.1-compatibility.md) (patch review).

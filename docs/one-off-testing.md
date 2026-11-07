@@ -59,7 +59,7 @@ blocked coverage stated plainly. Do not commit personal reports or device eviden
 ## What the agent will run
 
 Prerequisites are Git, Python 3.9+, the exact .NET SDK from `global.json`, and
-`gh` 2.97.0+. Existing GitHub authentication enables the remote proofs. Agents
+`gh` 2.102.0+. Existing GitHub authentication enables the remote proofs. Agents
 should check what is already installed before installing anything. Missing
 prerequisites may be installed from official sources into user-owned locations
 when the session permits; lengthy native-toolchain setup can be reported instead.

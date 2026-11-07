@@ -177,3 +177,36 @@ test('fails visibly when a critical version cannot be determined', async () => {
     core: { info: () => {} }, project: '<Project/>', locator,
   }), /TerminalGuiVersion/);
 });
+
+
+test('explicit preview properties compare semantically without opting the monitor into preview feeds', () => {
+  const preview = '<TerminalGuiVersion>2.5.1-develop.183</TerminalGuiVersion>';
+  assert.equal(monitor.propertyVersion(preview, 'TerminalGuiVersion'), '2.5.1-develop.183');
+  assert.ok(monitor.compareVersions('2.5.0', '2.5.1-develop.183') < 0);
+  assert.ok(monitor.compareVersions('2.5.1', '2.5.1-develop.183') > 0);
+  assert.ok(monitor.compareVersions('2.5.1-develop.184', '2.5.1-develop.183') > 0);
+  assert.ok(monitor.compareVersions('2.5.1-develop.9', '2.5.1-develop.10') < 0);
+  assert.equal(monitor.compareVersions('2.5.1+build.1', '2.5.1+build.2'), 0);
+  assert.throws(() => monitor.propertyVersion('<TerminalGuiVersion>latest</TerminalGuiVersion>', 'TerminalGuiVersion'));
+});
+
+test('older stable releases do not downgrade an approved preview or fetch unrelated release metadata', async () => {
+  const previewProject = project.replace('2.5.0', '2.5.1-develop.183').replace('2.5.7', '2.5.8-develop.6');
+  const github = { paginate: async method => (await method()).data, rest: {
+    issues: {
+      getLabel: async () => ({ data: {} }),
+      listForRepo: async () => ({ data: [{ number: 12, title: 'GitHub CLI v2.102.0 compatibility review' }] }),
+      listComments: async () => ({ data: [] }),
+    },
+    repos: {
+      listReleases: async () => { throw new Error('No newer stable TG/Editor release; metadata must not be fetched.'); },
+      getLatestRelease: async () => ({ data: { tag_name: 'v2.102.0', draft: false, prerelease: false } }),
+    },
+  } };
+  const core = { info: () => {}, setOutput: () => {} };
+  await monitor({ github, context: { repo: { owner: 'fixture', repo: 'fixture' } }, core,
+    project: previewProject, locator: 'MinimumVersion = new(2, 102, 0);',
+    fetchImpl: async url => ({ ok: true, json: async () => ({ versions: url.includes('editor')
+      ? ['2.5.7', '2.5.8-develop.6'] : ['2.5.0', '2.6.0-develop.61', '2.5.1-develop.183'] }) }),
+  });
+});
