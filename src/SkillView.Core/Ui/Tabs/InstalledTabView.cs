@@ -112,6 +112,63 @@ internal sealed class InstalledTabView : FrameView
     private int _removeActive;
     private string? _idleStatusMessage;
     private string? _removalErrorDetail;
+    private long _refreshRevision;
+
+    // Lives only on one synchronous RefreshAll stack. Other refresh entrypoints
+    // keep their original responsibilities and invalidate an enclosing pass.
+    private sealed class RefreshPass(long revision)
+    {
+        internal long Revision { get; } = revision;
+        internal Func<bool>? FilterIsCurrent { get; set; }
+        internal Func<bool>? DetailIsCurrent { get; set; }
+        internal Dictionary<InstalledSkill, UpdateAvailability> FilterAvailability { get; } = new(ReferenceEqualityComparer.Instance);
+        internal Dictionary<InstalledSkill, UpdateAvailability> DetailAvailability { get; } = new(ReferenceEqualityComparer.Instance);
+    }
+
+    private UpdateAvailability ObserveAvailability(InstalledSkill skill, Dictionary<InstalledSkill, UpdateAvailability> observations)
+    {
+        var observation = _availability!.Get(skill);
+        observations[skill] = observation;
+        return observation;
+    }
+
+    private Func<bool> CaptureRefreshGuard(RefreshPass pass, Dictionary<InstalledSkill, UpdateAvailability> observations, bool detail = false)
+    {
+        var snapshot = _snapshot;
+        var overview = _overview;
+        var rows = _rows;
+        var table = _table.Table;
+        var tableState = (_table.Frame, _table.Viewport, _table.ColumnOffset, _table.Value?.SelectedCell);
+        var issues = _issueView;
+        var package = _packageView;
+        var expanded = _expanded.ToArray();
+        var values = Values();
+        var labels = _chosenLabels.ToArray();
+        var detailValues = DetailValues();
+        // Copy the observations: a later render must not overwrite the facts
+        // supporting an earlier projection. Get is session-local, never I/O.
+        var availability = observations.ToArray();
+        return () => pass.Revision == _refreshRevision && !_disposed && !_lifetimeToken.IsCancellationRequested
+            && ReferenceEquals(snapshot, _snapshot) && ReferenceEquals(overview, _overview)
+            && ReferenceEquals(rows, _rows) && ReferenceEquals(table, _table.Table)
+            && tableState == (_table.Frame, _table.Viewport, _table.ColumnOffset, _table.Value?.SelectedCell)
+            && ReferenceEquals(issues.Evidence, _issueView.Evidence) && issues.Generation == _issueView.Generation
+            && ReferenceEquals(package, _packageView) && _expanded.SetEquals(expanded) && values == Values()
+            && availability.All(pair => Equals(pair.Value, _availability!.Get(pair.Key)))
+            && (!detail || (detailValues == DetailValues() && labels.SequenceEqual(_chosenLabels)));
+
+        // Include restoration outputs as well as query inputs: a reentrant
+        // selection/scroll change must not skip the second restoration.
+        (string, SortMode, PinFilter, ScopeFilter, InstalledFilterSelection, string?, string?, string?, bool, int, int, int, long, long, int, int, bool, string?, string?) Values() =>
+            (GetFilterText(), _sort, _pinFilter, _scopeFilter, _filters, _repositoryBrowse,
+                _selectedKey, _topRowKey, _topRowHidden, _lastRestoredTop, _table.RowOffset, _table.GetSelectedRow(),
+                _snapshotGeneration, _loadGeneration, Volatile.Read(ref _loadActive), Volatile.Read(ref _removeActive),
+                _copies.Open, _idleStatusMessage, _removalErrorDetail);
+        (bool, bool, bool, int?, string, string, bool, bool, int, int, string?) DetailValues() =>
+            (_detailOpen, _coverageOpen, _showDetails, _descriptionWidth, _selectionReason, _detail.Text,
+                _availability?.Running ?? false, _availability?.Stopping ?? false,
+                _availability?.Completed ?? 0, _availability?.Total ?? 0, _availability?.Summary);
+    }
 
     internal InstalledTabView(
         Func<Action, Task> runOnUi,
@@ -462,15 +519,19 @@ internal sealed class InstalledTabView : FrameView
                 : PinDisplayPolicy.From(s).State == PinDisplayState.Unpinned));
     }
 
-    private void ApplyFilter()
+    private void ApplyFilter(RefreshPass? pass = null)
     {
+        if (pass is null) _refreshRevision++;
+        else if (pass.FilterIsCurrent?.Invoke() == true) return;
+        pass?.FilterAvailability.Clear();
         // Each table row occupies one terminal line, so its within-row offset is
         // zero. Keep a hidden anchor through collapse/filter until it reappears;
         // an explicit scroll to another offset establishes a new anchor.
         if (!_topRowHidden || _table.RowOffset != _lastRestoredTop)
             _topRowKey = _table.RowOffset >= 0 && _table.RowOffset < _rows.Count ? _rows[_table.RowOffset].Key : _topRowKey;
         _viewRows = _overview.View(Matches, _sort.ToString().ToLowerInvariant(), _expanded,
-            _availability is null ? null : _availability.Get, _lifetimeToken);
+            _availability is null ? null : pass is null ? _availability.Get
+                : skill => ObserveAvailability(skill, pass.FilterAvailability), _lifetimeToken);
         _rows = _viewRows.Rows;
         if (_repositoryBrowse is null) _selectedKey ??= _rows.FirstOrDefault()?.Key;
         BuildTableSource();
@@ -495,6 +556,7 @@ internal sealed class InstalledTabView : FrameView
             _lastRestoredTop = _table.RowOffset;
         }
         finally { _restoring = false; }
+        if (pass is not null) pass.FilterIsCurrent = CaptureRefreshGuard(pass, pass.FilterAvailability);
     }
 
     private int FindRow(string? key)
@@ -708,17 +770,19 @@ internal sealed class InstalledTabView : FrameView
 
     private void RefreshAll()
     {
+        _refreshRevision++;
         CloseCopies();
         if (_disposed || _lifetimeToken.IsCancellationRequested || _snapshot is null) return;
         CaptureIssueView();
+        var pass = new RefreshPass(_refreshRevision);
         var detailOffset = _detail.Viewport.Location;
         var emptyListHadFocus = _rows.Count == 0 && _detail.HasFocus;
-        ApplyFilter();
+        ApplyFilter(pass);
         ApplyResponsiveLayout();
         if (_rows.Count == 0 && _table.HasFocus) _detail.SetFocus();
         else if (emptyListHadFocus && _rows.Count > 0) _table.SetFocus();
-        RefreshOperationStatus(captureIssues: false);
-        RefreshSelectedDetail();
+        RefreshOperationStatus(captureIssues: false, pass);
+        RefreshSelectedDetail(pass);
         TuiHelpers.RestoreMarkdownScroll(_detail, detailOffset);
         _onStateChange?.Invoke();
     }
@@ -1053,9 +1117,10 @@ internal sealed class InstalledTabView : FrameView
         }
     }
 
-    private string RenderDetail(InstalledSkill skill, int? recordedPlacementCount)
+    private string RenderDetail(InstalledSkill skill, int? recordedPlacementCount, RefreshPass? pass = null)
     {
-        var observation = _availability?.Get(skill);
+        var observation = _availability is null ? null : pass is null ? _availability.Get(skill)
+            : ObserveAvailability(skill, pass.DetailAvailability);
         var package = _snapshot is not null && _packageView?.Matches(_snapshot, _issueView.Generation, skill) == true ? _packageView : null;
         return InstalledScreen.RenderDetail(skill, _showDetails, showShortcuts: false, descriptionWidth: _descriptionWidth, recordedPlacementCount: recordedPlacementCount)
             + "\n\n" + (package?.Detail ?? "Package not checked for this inventory capture. **K:** explicit local package check.\n\n" + PackageCheckFact.InventoryLifetimeNotice)
@@ -1158,14 +1223,16 @@ internal sealed class InstalledTabView : FrameView
 
     private void CaptureIssueView()
     {
+        _refreshRevision++;
         _issueView = (_capturedIssues(), _catalogGeneration());
         _packageView = _packageCheck();
     }
 
     internal void RefreshAvailability() => RefreshAvailability(captureIssues: true);
 
-    private void RefreshAvailability(bool captureIssues)
+    private void RefreshAvailability(bool captureIssues, RefreshPass? pass = null)
     {
+        if (pass is null) _refreshRevision++;
         if (_disposed || _lifetimeToken.IsCancellationRequested) return;
         _copies.ValidateObservation();
         if (captureIssues) CaptureIssueView();
@@ -1176,11 +1243,11 @@ internal sealed class InstalledTabView : FrameView
         }
         RefreshCoverage();
         _reviewUpdate.Enabled = CanActOnSelection && GetSelectedSkill() is not null;
-        ApplyFilter();
+        ApplyFilter(pass);
         ApplyResponsiveLayout();
         RefreshFooter();
         var detailOffset = _detail.Viewport.Location;
-        RefreshSelectedDetail();
+        RefreshSelectedDetail(pass);
         TuiHelpers.RestoreMarkdownScroll(_detail, detailOffset);
     }
 
@@ -1277,8 +1344,9 @@ internal sealed class InstalledTabView : FrameView
         return true;
     }
 
-    private void RefreshOperationStatus(bool captureIssues = true)
+    private void RefreshOperationStatus(bool captureIssues = true, RefreshPass? pass = null)
     {
+        if (pass is null) _refreshRevision++;
         if (captureIssues) CaptureIssueView();
         var loading = Volatile.Read(ref _loadActive) != 0;
         var removing = Volatile.Read(ref _removeActive) != 0;
@@ -1301,7 +1369,7 @@ internal sealed class InstalledTabView : FrameView
         }
 
         SetSpinnerActive(false);
-        RefreshSelectedDetail();
+        RefreshSelectedDetail(pass);
         if (_removalErrorDetail is not null) _detail.Text = _removalErrorDetail;
         if (_idleStatusMessage is not null)
         {
@@ -1311,7 +1379,7 @@ internal sealed class InstalledTabView : FrameView
         }
 
         RefreshFooter();
-        RefreshAvailability(captureIssues: false);
+        RefreshAvailability(captureIssues: false, pass);
     }
 
     private void SetContentVisibility(bool loading, bool removing)
@@ -1374,8 +1442,9 @@ internal sealed class InstalledTabView : FrameView
         }
     }
 
-    private void RefreshSelectedDetail()
+    private void RefreshSelectedDetail(RefreshPass? pass = null)
     {
+        if (pass is null) _refreshRevision++;
         if (_snapshot is null || Volatile.Read(ref _removeActive) != 0 || Volatile.Read(ref _loadActive) != 0) return;
         var row = SelectedRow;
         _selectionReason = _snapshotGeneration != _issueView.Generation ? "Inventory changed; refresh Installed. Copy actions paused." : row is null ? NoObservedCopies ? "" : _selectedKey is null ? "Select a visible exact copy to enable actions."
@@ -1386,6 +1455,13 @@ internal sealed class InstalledTabView : FrameView
         _detailsButton.Text = "Details";
         _reviewUpdate.Enabled = CanActOnSelection && GetSelectedSkill() is not null;
         _moreActions.Enabled = CanActOnSelection && GetSelectedSkill() is not null;
+        if (pass?.DetailIsCurrent?.Invoke() == true)
+        {
+            if (_coverageOpen) _detailsButton.Enabled = _reviewUpdate.Enabled = _moreActions.Enabled = false;
+            RefreshCoverage();
+            return;
+        }
+        pass?.DetailAvailability.Clear();
         if (_coverageOpen)
         {
             _detail.Text = (_overview.Filters?.CoverageDetail ?? "Inventory not loaded") + "\n\n" + FilterDescription();
@@ -1396,7 +1472,7 @@ internal sealed class InstalledTabView : FrameView
             int? placementCount = copy.Records.All(s => string.Equals(s.ResolvedPath, copy.Path, StringComparison.Ordinal))
                 ? copy.Records.SelectMany(s => s.Agents).Distinct().Count() : null;
             _detail.Text = (copy.Ambiguous ? "## Ambiguous copy\n\n" + _selectionReason + "\n\n" : "")
-                + string.Join("\n\n---\n\n", copy.Records.Select(skill => RenderDetail(skill, placementCount))) + "\n\n" + FilterDescription();
+                + string.Join("\n\n---\n\n", copy.Records.Select(skill => RenderDetail(skill, placementCount, pass))) + "\n\n" + FilterDescription();
         }
         else if (row?.Group is { } group)
             _detail.Text = "## " + MarkdownTableFormatter.FormatTableCell(group.Name) + "\n\nSource: " + MarkdownTableFormatter.FormatCodeSpan(group.Source)
@@ -1413,6 +1489,7 @@ internal sealed class InstalledTabView : FrameView
                 : _selectionReason;
         if (!_coverageOpen && row?.Copy is null) _detail.Text += "\n\n" + FilterDescription();
         RefreshCoverage();
+        if (pass is not null) pass.DetailIsCurrent = CaptureRefreshGuard(pass, pass.DetailAvailability, detail: true);
     }
 
     private void SetSpinnerActive(bool active)
