@@ -3,6 +3,7 @@
 import argparse
 import codecs
 import datetime
+import errno
 import hashlib
 import json
 import math
@@ -10,6 +11,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import select
 import shutil
 import signal
 import subprocess
@@ -20,6 +22,25 @@ import unicodedata
 
 from inventory_fixture import fixture_environment, flags, generate, snapshot, write_json
 from test_once import ROOT, execute, make_output, stop_tree
+
+
+_QUIT_SECONDS = 5
+_OWNER_JOIN_SECONDS = 10
+_PTY_TRANSCRIPT_LIMIT = 32 * 1024 * 1024
+
+
+def error_type(error):
+    # Closed labels only; never persist exception messages or custom class names.
+    kinds = (OSError, PermissionError, FileNotFoundError, TimeoutError, RuntimeError,
+             ValueError, IndexError, KeyError, TypeError, KeyboardInterrupt,
+             subprocess.TimeoutExpired)
+    return type(error).__name__ if type(error) in kinds else 'other'
+
+
+def write_owner(path, receipt):
+    with path.open('x', encoding='utf-8') as stream:
+        json.dump(receipt, stream, indent=2)
+        stream.write('\n')
 
 
 def digest(path):
@@ -288,22 +309,146 @@ class Terminal:
         raise TimeoutError('Expected rendered cells were not observed before PTY deadline')
 
     def close(self, graceful=True):
-        try:
-            self.exit_code = None
-            if graceful:
-                self.send(b'\x11')
-                self.process.wait(timeout=5)
-                self.exit_code = self.process.returncode
-        except (OSError, subprocess.TimeoutExpired):
-            self.exit_code = None
-        finally:
-            # Kill the owned group even if its leader has already exited.
-            os.close(self.master)
+        if getattr(self, '_close_receipt', None) is not None:
+            return self._close_receipt
+        receipt = dict(pid=self.process.pid, declaredPgid=self.process.pid,
+                       declaredSid=self.process.pid, quitRequestedNs=None,
+                       exitObservedNs=None, actualExit=None, naturalExitObserved=False,
+                       terminalEof=False, rawBytes=self.bytes_read, waiterJoined=False,
+                       fallbackEntered=False, cleanupReturned=False, status='unknown',
+                       firstFailure='none', errorType=None)
+        self._close_receipt = receipt
+        self.exit_code = None
+        finished = threading.Event()
+        exit_result = {}
+        waiter = None
+        last_cells = None
+
+        def fail(reason, error=None):
+            if receipt['firstFailure'] == 'none':
+                receipt['firstFailure'] = reason
+                receipt['errorType'] = error_type(error) if error is not None else None
+
+        def observe_exit():
             try:
-                stop_tree(self.process, self.raw)
+                exit_result['actualExit'] = self.process.wait()  # blocking, exact Popen
+            except BaseException as error:
+                exit_result['errorType'] = error_type(error)
             finally:
-                self.output.with_suffix('.screen.txt').write_text(self.screen.text, encoding='utf-8')
+                exit_result['exitObservedNs'] = time.perf_counter_ns()
+                finished.set()
+
+        def observe_result():
+            if finished.is_set():
+                receipt['exitObservedNs'] = exit_result['exitObservedNs']
+                receipt['actualExit'] = exit_result.get('actualExit')
+                if 'errorType' in exit_result and receipt['firstFailure'] == 'none':
+                    receipt['firstFailure'] = 'wait-error'
+                    receipt['errorType'] = exit_result['errorType']
+
+        try:
+            last_cells = self.screen.text  # Freeze the measured cell state before quit.
+            write_owner(self.output.with_suffix('.owner-start.json'), receipt)
+            try:
+                waiter = threading.Thread(target=observe_exit, name='inventory-pty-exit', daemon=True)
+                waiter.start()
+            except BaseException as error:
+                fail('wait-error', error)
+            if graceful and receipt['firstFailure'] == 'none':
+                receipt['quitRequestedNs'] = time.perf_counter_ns()
+                deadline = time.monotonic() + _QUIT_SECONDS
+                try:
+                    self.send(b'\x11')
+                except OSError as error:
+                    fail('quit-write-error', error)
+                while receipt['firstFailure'] == 'none' and not receipt['terminalEof']:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        fail('quit-deadline')
+                        break
+                    try:
+                        ready, _, _ = select.select([self.master], [], [], min(.05, remaining))
+                        if not ready:
+                            if finished.is_set() and 'errorType' in exit_result:
+                                observe_result()
+                            continue
+                        try:
+                            data = os.read(self.master, 65536)
+                        except OSError as error:
+                            if error.errno == errno.EIO:
+                                receipt['terminalEof'] = True
+                                break
+                            raise
+                        if not data:
+                            receipt['terminalEof'] = True
+                            break
+                        self.bytes_read += len(data)
+                        receipt['rawBytes'] = self.bytes_read
+                        if self.bytes_read > _PTY_TRANSCRIPT_LIMIT:
+                            fail('output-cap')
+                            break
+                        # Shutdown is outside every measurement window. Keep raw
+                        # evidence without decoding or mutating the frozen cells.
+                        self.raw.write(data)
+                        self.raw.flush()
+                    except OSError as error:
+                        fail('read-error', error)
+                if receipt['firstFailure'] == 'none':
+                    if not finished.wait(max(0, deadline - time.monotonic())):
+                        fail('quit-deadline')
+                observe_result()
+                receipt['naturalExitObserved'] = finished.is_set() and 'actualExit' in exit_result
+        except BaseException as error:
+            fail('cleanup-error', error)
+        finally:
+            try:
+                os.close(self.master)
+            except OSError as error:
+                fail('cleanup-error', error)
+            natural_complete = (graceful and receipt['firstFailure'] == 'none'
+                                and receipt['naturalExitObserved'] and receipt['actualExit'] == 0
+                                and receipt['terminalEof'])
+            if natural_complete:
+                receipt['cleanupReturned'] = True  # No fallback needed after exit0 + EOF.
+            else:
+                receipt['fallbackEntered'] = True
+                try:
+                    stop_tree(self.process, self.raw)  # Existing owned, bounded fallback.
+                    receipt['cleanupReturned'] = True
+                except BaseException as error:
+                    fail('cleanup-error', error)
+            if waiter is not None and waiter.ident is not None:
+                try:
+                    waiter.join(timeout=_OWNER_JOIN_SECONDS)
+                    receipt['waiterJoined'] = not waiter.is_alive()
+                except BaseException as error:
+                    fail('waiter-unsettled', error)
+            if not receipt['waiterJoined']:
+                fail('waiter-unsettled')
+            observe_result()
+            if receipt['actualExit'] is None and type(self.process.returncode) is int:
+                # A fallback wait may establish a final code, never natural success.
+                receipt['actualExit'] = self.process.returncode
+            try:
+                if last_cells is not None:
+                    self.output.with_suffix('.screen.txt').write_text(last_cells, encoding='utf-8')
+            except OSError as error:
+                fail('cleanup-error', error)
+            try:
                 self.raw.close()
+            except OSError as error:
+                fail('cleanup-error', error)
+            clean = (natural_complete and receipt['waiterJoined'] and receipt['cleanupReturned']
+                     and receipt['firstFailure'] == 'none' and not receipt['fallbackEntered'])
+            receipt['status'] = ('settled' if clean else 'unknown'
+                                 if not receipt['waiterJoined'] or receipt['actualExit'] is None else 'failed')
+            try:
+                write_owner(self.output.with_suffix('.owner.json'), receipt)
+            except OSError as error:
+                fail('cleanup-error', error)
+                receipt['status'] = 'failed' if receipt['waiterJoined'] else 'unknown'
+            self.exit_code = receipt['actualExit'] if receipt['status'] == 'settled' else None
+        return receipt
 
 
 def log_text(root):
@@ -387,16 +532,27 @@ def pty_measure(app, root, manifest, env, output, transitions=30, local=False):
         result['status'] = 'observed'
         result.pop('reason', None)
     except (OSError, RuntimeError, TimeoutError, ValueError, IndexError) as error:
-        result['reason'] = str(error)
+        result['reason'] = 'PTY observation did not complete'
+        result['measurementErrorType'] = error_type(error)
         for metric in metrics:
             if result[metric]['status'] == 'unmeasured':
-                result[metric]['reason'] = str(error)
+                result[metric]['reason'] = result['reason']
     finally:
         if terminal:
-            terminal.close(graceful=result['status'] == 'observed')
-            result['cleanExit'] = terminal.exit_code == 0
-        result['logs'] = log_evidence(log_text(root))
-        output.with_suffix('.log').write_text(log_text(root), encoding='utf-8')
+            owner = terminal.close(graceful=result['status'] == 'observed')
+            result['owner'] = owner
+            result['cleanExit'] = owner['status'] == 'settled'
+            if not result['cleanExit'] and result['status'] == 'observed':
+                result.update(status='unmeasured', reason='PTY owner settlement was not verified')
+        try:
+            text = log_text(root)
+            result['logs'] = log_evidence(text)
+            output.with_suffix('.log').write_text(text, encoding='utf-8')
+        except (OSError, UnicodeError) as error:
+            result['logs'] = dict(status='unmeasured', reason='PTY log evidence unavailable')
+            result['logErrorType'] = error_type(error)
+            if result['status'] == 'observed':
+                result.update(status='unmeasured', reason='PTY log evidence unavailable')
     return result
 
 
@@ -477,6 +633,89 @@ def run_cli(app, root, manifest, env, output, timeout):
     return step, document
 
 
+
+def pty_qualified(result, local):
+    if (result.get('status') != 'observed' or result.get('cleanExit') is not True
+            or result.get('inputsUnchanged') is not True):
+        return False
+    if type(result.get('shellSamples')) is not int or result['shellSamples'] != 1:
+        return False
+    paint, response = result.get('firstShellPaintMs'), result.get('inputResponseUpperBoundMs')
+    if not (all(type(v) in (int, float) and math.isfinite(v) and v >= 0 for v in (paint, response))
+            and response >= paint):
+        return False
+    owner = result.get('owner', {})
+    required = {'pid', 'declaredPgid', 'declaredSid', 'quitRequestedNs', 'exitObservedNs',
+                'actualExit', 'naturalExitObserved', 'terminalEof', 'rawBytes', 'waiterJoined',
+                'fallbackEntered', 'cleanupReturned', 'status', 'firstFailure', 'errorType'}
+    if type(owner) is not dict or set(owner) != required:
+        return False
+    if not (owner.get('status') == 'settled' and type(owner.get('actualExit')) is int
+            and owner['actualExit'] == 0 and owner.get('naturalExitObserved') is True
+            and owner.get('terminalEof') is True and owner.get('waiterJoined') is True
+            and owner.get('cleanupReturned') is True and owner.get('fallbackEntered') is False
+            and owner.get('firstFailure') == 'none' and owner.get('errorType') is None):
+        return False
+    if not all(type(owner.get(key)) is int and owner[key] > 0
+               for key in ('pid', 'declaredPgid', 'declaredSid', 'quitRequestedNs', 'exitObservedNs')):
+        return False
+    if (owner['declaredPgid'] != owner['pid'] or owner['declaredSid'] != owner['pid']
+            or owner['exitObservedNs'] < owner['quitRequestedNs']
+            or type(owner.get('rawBytes')) is not int or not 0 <= owner['rawBytes'] <= _PTY_TRANSCRIPT_LIMIT):
+        return False
+
+    def metric_ready(name, status):
+        metric = result.get(name, {})
+        values = metric.get('milliseconds')
+        return (metric.get('status') == status and type(metric.get('samples')) is int
+                and metric['samples'] == 30 and type(values) is list and len(values) == 30
+                and all(type(v) in (int, float) and math.isfinite(v) and v >= 0 for v in values)
+                and type(metric.get('p95Ms')) in (int, float)
+                and metric['p95Ms'] == sorted(values)[28])
+
+    if local:
+        activity = result.get('localActivity', {})
+        return (metric_ready('navigation', 'observed') and metric_ready('filtering', 'observed')
+                and all(type(activity.get(k)) is int and activity[k] == 1
+                        for k in ('capturesBefore', 'capturesAfter')))
+    tabs = result.get('tabTransitions', {})
+    return (metric_ready('tabTransitions', 'measured')
+            and all(type(tabs.get(k)) is int and tabs[k] == 1
+                    for k in ('capturesBefore', 'capturesAfter')))
+
+
+def run_pty_workload(app, output, name, kind, copies, roots, adapter, record=None):
+    result = record if record is not None else {}
+    result.update(status='unmeasured', reason='PTY observation did not complete')
+    root = output / (name + '-pty')
+    root.mkdir(mode=0o700)
+    manifest, _ = generate(root, kind, copies, roots)
+    env = fixture_environment(root, adapter)
+    env['PATH'] = str(adapter.parent)
+    write_json(root / 'environment.json', env)
+    before = snapshot(root, manifest, identities=True)
+    before_file = output / (name + '-pty-inputs-before.json')
+    write_owner(before_file, before)  # Exclusive, before the host starts; not timed.
+    result.update(pty_measure(app, root, manifest, env, output / (name + '-pty'), local=name == 'large'))
+    result.update(environment=env, fixture=manifest, root=str(root))
+    try:
+        result['inputIdentitiesBefore'] = dict(path=str(before_file), sha256=digest(before_file), bytes=before_file.stat().st_size)
+        owner = result.get('owner', {})
+        if owner.get('waiterJoined') is True and owner.get('cleanupReturned') is True:
+            after = snapshot(root, manifest, identities=True)
+            after_file = output / (name + '-pty-inputs-after.json')
+            write_owner(after_file, after)
+            result['inputIdentitiesAfter'] = dict(path=str(after_file), sha256=digest(after_file), bytes=after_file.stat().st_size)
+            result['inputsUnchanged'] = after == before
+        else:
+            result.update(inputsUnchanged=None, inputIdentitiesAfter=dict(status='unmeasured', reason='Owned PTY did not settle'))
+    except (OSError, ValueError, RuntimeError) as error:
+        result.update(inputsUnchanged=None, identityErrorType=error_type(error))
+        if result['status'] == 'observed':
+            result.update(status='unmeasured', reason='PTY input evidence unavailable')
+    return result
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--app', type=Path, required=True, help='Already built current executable; never dotnet run')
@@ -485,7 +724,9 @@ def main(argv=None):
     parser.add_argument('--output', type=Path)
     parser.add_argument('--samples', type=int, default=5)
     parser.add_argument('--timeout', type=int, default=60)
-    parser.add_argument('--cli-only', action='store_true', help='Remeasure CLI only; retain earlier PTY receipts as separate historical observations')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--cli-only', action='store_true', help='Remeasure CLI only; retain earlier PTY receipts as separate historical observations')
+    mode.add_argument('--pty-only', action='store_true', help='Measure only the existing typical/large PTY scenarios; no CLI product launches')
     args = parser.parse_args(argv)
     def interrupted(signum, frame):
         raise KeyboardInterrupt
@@ -521,6 +762,8 @@ def main(argv=None):
     report['toolFiles'] = {p.name: digest(p) for p in (Path(__file__), ROOT / 'tools/inventory_fixture.py', ROOT / 'tools/test_once.py')}
     report['requiredSdk'] = json.loads((ROOT / 'global.json').read_text())['sdk']['version']
     report['parameters'] = dict(cliSamples=args.samples, cliTimeoutSeconds=args.timeout, ptyRequested=not args.cli_only,
+                                mode='pty-only' if args.pty_only else 'cli-only' if args.cli_only else 'all',
+                                ptyOwnerReceiptSchema=1,
                                 ptyDeadlineSeconds=120, ptyConditionTimeoutSeconds=30,
                                 ptyTranscriptLimitBytes=32 * 1024 * 1024, columns=160, rows=48)
     report['binaryKind'] = 'managed apphost' if app.with_suffix('.dll').exists() else 'native or single-file (not inferred further)'
@@ -536,65 +779,63 @@ def main(argv=None):
         report['runtimeConfig'] = json.loads(runtime_config.read_text()) if runtime_config.exists() else None
         report['measurements'] = {}
         for name, kind, copies, roots in [('messy', 'messy', 200, 50), ('typical', 'performance', 200, 50), ('large', 'performance', 1000, 50)]:
-            root = output / name
-            root.mkdir(mode=0o700)
-            manifest, _ = generate(root, kind, copies, roots)
-            env = fixture_environment(root, adapter)
-            env['PATH'] = str(adapter.parent)
-            write_json(root / 'environment.json', env)
-            before = snapshot(root, manifest, identities=True)
-            write_json(root / 'manifest.json', snapshot(root, manifest))
-            results = dict(fixture=manifest, environment=env, fixtureSha256=digest(root / 'fixture.json'),
-                           environmentSha256=digest(root / 'environment.json'), manifestSha256=digest(root / 'manifest.json'),
-                           sampleScope='one first-process observation; no distribution estimated' if name != 'typical'
-                           else 'one first-process and repeated warm fresh-process observations')
-            before_file = output / f'{name}-inputs-before.json'
-            write_json(before_file, before)
-            results['inputIdentitiesBefore'] = dict(path=str(before_file), sha256=digest(before_file))
+            if args.pty_only and name == 'messy':
+                continue
+            results = {}
             report['measurements'][name] = results
-            for i in range(args.samples if name == 'typical' else 1):
-                step, document = run_cli(app, root, manifest, env, output / f'{name}-{i:02d}', args.timeout)
-                results.setdefault('cli', []).append(step)
-                step['cohort'] = 'first-process' if i == 0 else 'warm-process'
-                if kind == 'performance' and (step['inventory']['rows'] != copies or step['inventory']['partial']
-                                             or not all(p['succeeded'] for p in document['providers'])):
-                    raise RuntimeError(f'{name}: generated workload count/coverage did not match; no performance claim')
-                if name == 'messy':
-                    results['storyEvidence'] = verify_story(root, manifest, document)
+            if args.pty_only:
+                results.update(cli=[], cliStatus='not-run', cliReason='--pty-only requested; earlier CLI receipts are separate observations')
+            else:
+                root = output / name
+                root.mkdir(mode=0o700)
+                manifest, _ = generate(root, kind, copies, roots)
+                env = fixture_environment(root, adapter)
+                env['PATH'] = str(adapter.parent)
+                write_json(root / 'environment.json', env)
+                before = snapshot(root, manifest, identities=True)
+                write_json(root / 'manifest.json', snapshot(root, manifest))
+                results.update(fixture=manifest, environment=env, fixtureSha256=digest(root / 'fixture.json'),
+                               environmentSha256=digest(root / 'environment.json'), manifestSha256=digest(root / 'manifest.json'),
+                               sampleScope='one first-process observation; no distribution estimated' if name != 'typical'
+                               else 'one first-process and repeated warm fresh-process observations')
+                before_file = output / f'{name}-inputs-before.json'
+                write_json(before_file, before)
+                results['inputIdentitiesBefore'] = dict(path=str(before_file), sha256=digest(before_file))
+                for i in range(args.samples if name == 'typical' else 1):
+                    step, document = run_cli(app, root, manifest, env, output / f'{name}-{i:02d}', args.timeout)
+                    results.setdefault('cli', []).append(step)
+                    step['cohort'] = 'first-process' if i == 0 else 'warm-process'
+                    if kind == 'performance' and (step['inventory']['rows'] != copies or step['inventory']['partial']
+                                                 or not all(p['succeeded'] for p in document['providers'])):
+                        raise RuntimeError('CLI workload count/coverage did not match')
+                    if name == 'messy':
+                        results['storyEvidence'] = verify_story(root, manifest, document)
             if name != 'messy':
                 if args.cli_only:
                     results['pty'] = dict(status='not-run', reason='--cli-only requested; no new PTY measurement')
-                elif sys.platform in ('linux', 'darwin'):
-                    # A new private environment/log sink separates PTY capture counts from CLI samples.
-                    pty_root = output / (name + '-pty')
-                    pty_root.mkdir(mode=0o700)
-                    pm, _ = generate(pty_root, kind, copies, roots)
-                    pe = fixture_environment(pty_root, adapter)
-                    pe['PATH'] = str(adapter.parent)
-                    write_json(pty_root / 'environment.json', pe)
-                    pty_before = snapshot(pty_root, pm, identities=True)
-                    results['pty'] = pty_measure(app, pty_root, pm, pe, output / (name + '-pty'), local=name == 'large')
-                    results['pty'].update(environment=pe, fixture=pm, root=str(pty_root))
-                    results['pty']['inputsUnchanged'] = snapshot(pty_root, pm, identities=True) == pty_before
-                    if not results['pty']['inputsUnchanged']:
-                        raise RuntimeError(f'{name}: PTY fixture inputs changed')
                 else:
-                    results['pty'] = dict(status='unmeasured', reason='POSIX PTY observer requires Linux or macOS')
-            after = snapshot(root, manifest, identities=True)
-            after_file = output / f'{name}-inputs-after.json'
-            write_json(after_file, after)
-            results['inputIdentitiesAfter'] = dict(path=str(after_file), sha256=digest(after_file))
-            results['inputsUnchanged'] = after == before
-            if not results['inputsUnchanged']:
-                raise RuntimeError(f'{name}: input topology/bytes/modes changed')
+                    results['pty'] = {}
+                    run_pty_workload(app, output, name, kind, copies, roots, adapter, record=results['pty'])
+            if not args.pty_only:
+                after = snapshot(root, manifest, identities=True)
+                after_file = output / f'{name}-inputs-after.json'
+                write_json(after_file, after)
+                results['inputIdentitiesAfter'] = dict(path=str(after_file), sha256=digest(after_file))
+                results['inputsUnchanged'] = after == before
+                if not results['inputsUnchanged']:
+                    raise RuntimeError('CLI fixture inputs changed')
+            if name != 'messy' and not args.cli_only and not pty_qualified(results['pty'], local=name == 'large'):
+                raise RuntimeError('PTY qualification failed')
         report['status'] = 'completed'
     except (OSError, RuntimeError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired, KeyboardInterrupt) as error:
-        report.update(status='incomplete', error=str(error) or 'Interrupted')
+        report.update(status='incomplete', error='Measurement did not qualify', errorType=error_type(error))
     finally:
         report['appHashUnchanged'] = digest(app) == report['appSha256']
         # Record all managed runtime payloads: apphost hash alone does not identify .NET code.
         report['binaryFilesUnchanged'] = report['binaryFiles'] == {
             p.name: digest(p) for p in sorted(app.parent.iterdir()) if p.is_file()}
+        if not report['appHashUnchanged'] or not report['binaryFilesUnchanged']:
+            report.update(status='incomplete', integrityError='Measured binary files changed')
         write_json(output / 'report.json', report)
         print(output / 'report.json', flush=True)
     return 0 if report['status'] == 'completed' and report['appHashUnchanged'] and report['binaryFilesUnchanged'] else 1

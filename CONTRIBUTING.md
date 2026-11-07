@@ -112,7 +112,11 @@ JSON/stderr, and PTY ANSI/screen/log files. Results identify dirty source and
 exact binaries; they do not certify release budgets. No credentials or network
 cohort is required: local gh list is real, auth status is an explicit offline stub.
 For a CLI-only timing correction, add `--cli-only` and retain any earlier PTY
-receipt separately with its original hash. Schema-2 CLI receipts include direct
+receipt separately with its original hash. For an independently reviewed PTY-only
+method correction, use `--pty-only`: it runs only the existing 200-copy/50-root
+tab and 1,000-copy/50-root navigation/full-filter scenarios, without launching
+CLI product samples. It is mutually exclusive with `--cli-only`. Keep the new
+cohort separate from earlier CLI/PTY observations; do not pool their p95 values. Schema-2 CLI receipts include direct
 host start/exit-observation counters and hashes for the raw sample artifacts;
 messy/large CLI timings each represent one observation, not a distribution.
 

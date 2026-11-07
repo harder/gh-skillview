@@ -334,10 +334,33 @@ are not measured. Proposed budgets above remain calibration targets; no metric
 is a release gate or permission to rewrite product behavior.
 
 Each CLI sample has a default 60-second deadline (configurable 5–120 seconds;
-2–10 typical samples). Each PTY session has a 120-second total deadline,
-30-second condition deadlines and a 32 MiB transcript cap. Success sends Ctrl+Q
-and allows five seconds to exit; failure closes the PTY and kills/waits for the
-owned process group. The one-off runner's cooperative termination gives the
+2–10 typical samples). Each PTY session has a 120-second measurement deadline,
+30-second condition deadlines and a 32 MiB transcript cap. Success sends the same
+Ctrl+Q and uses one five-second quit deadline to drain raw PTY output concurrently
+with a blocking exact-child exit waiter. The measured cell snapshot is frozen;
+shutdown bytes are retained without decoding or changing any timing endpoint.
+Both EOF (including Linux PTY EIO) and natural direct exit 0 are required, followed
+by a joined waiter and error-free receipt. Nonzero exit, missing EOF, timeout,
+read/cap/wait/receipt errors or fallback termination cannot qualify a clean quit.
+The existing owned process-group fallback remains bounded by its 10-second wait;
+the observer join is also bounded at 10 seconds. No further workload starts while
+an owner is unverified. Fixed owner-start/final JSON receipts record the exact
+Popen PID, declared group/session, counters, observed return code, EOF/join and
+fallback outcomes; they do not prove an escaped-descendant trace. Primary
+measurement failure stays primary even if cleanup also fails.
+
+Both already-computed PTY input identity snapshots are now serialized and hashed
+outside sample windows. Overall success requires every requested metric under its
+existing endpoint/cache guard, unchanged inputs and verified owner settlement;
+parent exit 0 or a completed report alone is insufficient. Latency targets remain
+observations, not runner pass/fail limits. `--pty-only` runs only the existing
+200/50-root and 1,000/50-root PTY scenarios (no messy or CLI product launches),
+with the same 30-sample sequences and deadlines. Label it as a separate cohort;
+never manufacture historical before identities or pool old/new p95s. Per-key
+latency is not added by this option; the 50-ms filter target still means the whole
+Ctrl+A plus nine-character replacement burst.
+
+The one-off runner's cooperative termination gives the
 harness time to close nested PTY sessions before its final kill. A CLI timeout or
 interruption ends the run; a PTY timeout ends that session and marks its remaining
 metrics unmeasured. Both retain diagnostics. Fixtures are retained for
