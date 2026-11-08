@@ -36,6 +36,15 @@ internal sealed partial class WindowsSecureRemovalBackend
                 throw new IOException("Windows junction/mount/unknown reparse types require a dedicated metadata transition.");
             if (borrowed is null) throw new IOException("Windows metadata requires the captured native object handle.");
             borrowed.DangerousAddRef(ref retained);
+            // Link topology is available on an ordinary held read handle. Keep
+            // that independently verified observation even if full SACL/stream
+            // capture below is unavailable; Supported still requires all of it.
+            if (!Matches(item.Identity, ReadIdentity(borrowed))) throw new IOException("Windows metadata source native object changed before inspection.");
+            var observed = ReadMetadataInformation(borrowed);
+            if (!Matches(item.Identity, ReadIdentity(borrowed)) || observed != ReadMetadataInformation(borrowed)
+                || observed.DeletePending || observed.Directory != item.Identity.IsDirectory)
+                throw new IOException("Windows link topology changed during inspection.");
+            links = observed.Links;
             using var privilege = WindowsMetadataPrivilege.Enter();
             var handle = borrowed;
             if (item.NativeParentHandle is SafeFileHandle parent && item.NativeName is { } name)

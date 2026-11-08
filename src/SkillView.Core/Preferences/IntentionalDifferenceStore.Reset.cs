@@ -230,7 +230,7 @@ internal sealed partial class IntentionalDifferenceStore
             || !SameObject(manifest.StoreIdentity, Identity(state, token))) throw new IOException("Unsupported or moved reset manifest.");
         if (!manifest.RecordsIdentity.IsDirectory || manifest.RecordsIdentity.IsReparsePoint
             || manifest.RecordsIdentity.Volume != manifest.StoreIdentity.Volume
-            || manifest.RecordsIdentity.CanonicalPath != Path.Combine(Root, manifest.Records)) throw new IOException("Reset source binding is invalid.");
+            || manifest.RecordsIdentity.CanonicalPath != Path.Combine(state.CanonicalPath, manifest.Records)) throw new IOException("Reset source binding is invalid.");
         if (backup.Length != manifest.Files.Length + 1) throw new IOException("Reset backup is incomplete.");
         foreach (var entry in manifest.Files)
         {
@@ -279,7 +279,7 @@ internal sealed partial class IntentionalDifferenceStore
             mutationObserved?.Invoke(); Checkpoint?.Invoke("backup-created");
             foreach (var file in current.Files)
             {
-                CompleteFile(backup, file.Name, file.Data.AsSpan(), MaxRecordBytes, token);
+                CompleteFile(backup, state, file.Name, file.Data.AsSpan(), MaxRecordBytes, token);
                 Checkpoint?.Invoke("backup-file:" + file.Name);
             }
             var copied = current.Files.Select(file => CaptureFile(backup, file.Name, MaxRecordBytes, token)).ToImmutableArray();
@@ -287,15 +287,15 @@ internal sealed partial class IntentionalDifferenceStore
             var bytes = ManifestBytes(manifest);
             if (bytes.Length > MaxManifestBytes) throw new IOException("Reset manifest exceeds its 512 KiB bound; originals remain intact.");
             Checkpoint?.Invoke("before-manifest");
-            CompleteFile(backup, ManifestName, bytes, MaxManifestBytes, token);
-            backup.FlushPublication(token); state.FlushNamespace(token);
+            CompleteFile(backup, state, ManifestName, bytes, MaxManifestBytes, token);
+            backup.FlushNamespace(token); state.FlushPublication(token);
             Checkpoint?.Invoke("manifest-published");
         }
         VerifyCompleteBackup(state, backupName, exclusions, token);
         Checkpoint?.Invoke("backup-verified");
         if (current.Records is { } recordsName)
         {
-            var path = Path.Combine(Root, recordsName);
+            var path = Path.Combine(state.CanonicalPath, recordsName);
             OwnedDirectoryLease ownership;
             using (var records = OpenChild(state, recordsName, exclusions, token))
             {
@@ -342,16 +342,16 @@ internal sealed partial class IntentionalDifferenceStore
             }
             catch (ResetStopped ex) { throw new IOException($"Reset incomplete. Backup: {backupPath}. Use Reset again after inspecting the exact remaining bytes. {ex.Message}", ex); }
             if (!removed) throw new IOException($"Reset incomplete at {path}. Backup: {backupPath}; use Reset again.");
-            state.FlushNamespace(token); Checkpoint?.Invoke("records-removed");
+            state.FlushPublication(token); Checkpoint?.Invoke("records-removed");
         }
         if (Layout(state, token).Records is not null) throw new IOException("Records namespace changed before fresh preference publication.");
         Checkpoint?.Invoke("before-fresh-generation"); token.ThrowIfCancellationRequested();
-        using (var fresh = state.CreateStagingDirectory("records-" + Guid.NewGuid().ToString("N"), token)) fresh.FlushPublication(token);
-        state.FlushNamespace(token); Checkpoint?.Invoke("fresh-generation-published");
+        using (var fresh = state.CreateStagingDirectory("records-" + Guid.NewGuid().ToString("N"), token)) fresh.FlushNamespace(token);
+        state.FlushPublication(token); Checkpoint?.Invoke("fresh-generation-published");
         return new("reset", backupPath, $"Saved intentional-difference acknowledgements/history reset. Raw backup: {backupPath}. " + BackupGuidance(backupPath));
     }
 
-    private static void CompleteFile(NativeStateDirectory state, string name, ReadOnlySpan<byte> desired, int limit, CancellationToken token)
+    private static void CompleteFile(NativeStateDirectory state, NativeStateDirectory writer, string name, ReadOnlySpan<byte> desired, int limit, CancellationToken token)
     {
         // Existing partial copies may only be extended from an exact reviewed
         // prefix. No truncation, replacement, file deletion or unknown overwrite.
@@ -376,8 +376,11 @@ internal sealed partial class IntentionalDifferenceStore
                 if (live.Identity != capturedPrefix.Identity || !live.Data.AsSpan().SequenceEqual(capturedPrefix.Data.AsSpan()))
                     throw new IOException("Backup object/bytes changed before prefix completion.");
             }
-            file.Position = length; token.ThrowIfCancellationRequested(); file.Write(desired[length..]); file.Flush(true); state.FlushPublication(token);
+            file.Position = length; token.ThrowIfCancellationRequested(); file.Write(desired[length..]); file.Flush(true);
         }
+        // The permanent root owns the live writer handle for macOS F_FULLFSYNC.
+        // A reopened child has none, and a resumed prefix's writer closes above.
+        state.FlushNamespace(token); writer.FlushPublication(token);
         var verified = CaptureFile(state, name, limit, token);
         if (!verified.Data.AsSpan().SequenceEqual(desired)) throw new IOException("Backup readback differs.");
     }

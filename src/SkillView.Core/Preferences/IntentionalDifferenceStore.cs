@@ -205,8 +205,8 @@ internal sealed partial class IntentionalDifferenceStore(string root, int maxRec
         mutationObserved?.Invoke();
         RequireLock(state, held, token);
         using (var file = records.OpenFile(record.Sequence.ToString("D12", CultureInfo.InvariantCulture) + ".json", false, token))
-        { token.ThrowIfCancellationRequested(); file.Write(envelope); file.Flush(true); records.FlushPublication(token); }
-        state.FlushNamespace(token);
+        { token.ThrowIfCancellationRequested(); file.Write(envelope); file.Flush(true); }
+        records.FlushNamespace(token); state.FlushPublication(token);
         return Path.Combine(records.CanonicalPath, record.Sequence.ToString("D12", CultureInfo.InvariantCulture) + ".json");
     }
 

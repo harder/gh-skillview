@@ -420,6 +420,11 @@ public sealed class InlineAdapterTests
             await host.WaitAsync(fixture.View.LoadAsync(), "load fixture Issues");
             fixture.View.LoadRowsForTests([row]);
             Assert.Same(row, Assert.Single(fixture.View.RowsForTests));
+            // The child was added after Run began. Apply its layout before
+            // sending Enter; a zero-width viewport takes the wide action path.
+            fixture.Window.Layout();
+            Assert.True(fixture.View.Viewport.Width > 0);
+            Assert.Equal(width < 110, fixture.View.Viewport.Width < 110);
             fixture.View.SubViews.OfType<TableView>().Single().SetFocus();
             await scenario(fixture);
         }, test);
