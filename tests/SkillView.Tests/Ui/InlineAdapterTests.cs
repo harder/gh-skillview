@@ -406,6 +406,10 @@ public sealed class InlineAdapterTests
             [CallerMemberName] string test = "") => UiHost.Run(width, height, async host =>
         {
             var fixture = new ViewFixture(host);
+            // Reproduce a driver resize after Run begins on every platform.
+            // The test window must retain its requested narrow/wide viewport.
+            host.App.Driver!.SetScreenSize(width + 40, height + 8);
+            fixture.Window.SetNeedsLayout(); fixture.Window.Layout();
             var skill = CapturedFindingTests.Copy("/fixture/placeholder", "v1") with { Validity = ValidityState.InvalidMetadata };
             fixture.View = new ChangesTabView(host.DispatchAsync,
                 _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [skill] }), () => { },
@@ -467,7 +471,10 @@ public sealed class InlineAdapterTests
             try
             {
                 App.Init("ansi"); App.Driver!.SetScreenSize(width, height);
-                Window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
+                // The ANSI driver may re-observe the physical Windows console
+                // when Run starts. Keep this fixture's requested geometry even
+                // when the host console is wider than its simulated screen.
+                Window = new Window { Width = width, Height = height };
             }
             catch { App.Dispose(); _lifetime.Dispose(); throw; }
         }
