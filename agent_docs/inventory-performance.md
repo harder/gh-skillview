@@ -1,12 +1,19 @@
 # Inventory and tab performance
 
-This analysis covers startup, Installed, Changes, refresh, and the boundary into
-maintenance operations. Measurements were taken on the maintainer's ARM64 Mac
-with SDK 10.0.113 / runtime 10.0.13 and the existing local inventory: 168 physical
-skill rows, 67 discovered root/context observations, 133 owner records, and 236 Changes observations.
-These are observations from this machine, not cross-platform performance guarantees.
+For the integrated SDK 10.0.403/runtime 10.0.14 results and remaining target
+misses, read [the 2026-11-07 Linux addendum](inventory-performance-results-2026-11-07.md).
+This guide also retains the historical regression analysis and current
+capture/display ownership and reproduction boundaries.
 
-## Where the regression came from
+The ARM64 Mac observations below were recorded in commit
+`346c1f8406811569e2c632ba05003c70a8b57dd0` on **2026-10-24 UTC**;
+that is the record date, not a retained exact run timestamp. They used
+SDK 10.0.113/runtime 10.0.13 and the then-current local inventory: 168 physical
+skill rows, 67 discovered root/context observations, 133 owner records and 236
+Changes observations. They are historical machine-specific observations,
+not measurements of the current Linux build or cross-platform guarantees.
+
+## Historical regression context (October 2026)
 
 The PR history added necessary discovery and ownership semantics without a
 corresponding index/cache boundary for ordinary browsing:
@@ -27,8 +34,8 @@ corresponding index/cache boundary for ordinary browsing:
   Do not attribute the startup cost to all later features indiscriminately.
 
 History establishes when these paths appeared. It is not a benchmark of each old
-commit, whose SDK/dependencies/discovery coverage differ. The before/after
-comparison here uses the current inventory and current toolchain.
+commit, whose SDK/dependencies/discovery coverage differ. The historical before/after
+comparison used the same then-current inventory and toolchain.
 
 The previous UI change also hid old rows during refresh. That made the existing
 full-capture wait more apparent. It did not create the expensive matching loop.
@@ -67,7 +74,7 @@ Saving Locations advances catalog generation, retires earlier context evidence
 and refreshes Installed. It is not a global cache shared across contexts or a
 persisted authority record.
 
-## Measurements
+## Historical Mac measurements (recorded 2026-10-24 UTC)
 
 Before optimization, three read-only captures took 51.9 s, 43.3 s, and 36.9 s.
 One instrumented baseline captured these stages:
@@ -157,6 +164,12 @@ produce extra verification hits. Managed prefix comparisons remain bounded
 nested comparisons. Their filesystem work has been removed from the inner loop.
 
 ## Freshness, cancellation and memory
+
+Installed's `RefreshPass` is passed only through one synchronous `RefreshAll`
+chain and is never stored between events. Reuse requires unchanged captured
+facts, availability observations, selection/anchors and relevant view state;
+reentrant refreshes invalidate it and fall back to the original work. It is
+presentation-work reuse, not operation admission or a cross-event cache.
 
 - A display snapshot expires one minute after successful completion. `r` from a list explicitly invalidates it; existing mutation invalidations also advance
   the display generation. Failed, partial or root-incomplete captures are not retained for reuse.
@@ -372,6 +385,7 @@ apply recursive permission changes to an unverified parent.
 There is no product removal or recursive-deletion fallback in this tooling.
 
 See [development commands](../CONTRIBUTING.md#offline-inventory-measurements) and
-the [recorded Linux baseline](inventory-performance-linux-baseline.md). Do not run
+the [historical October Linux baseline](inventory-performance-linux-baseline.md)
+and [2026-11-07 integrated results](inventory-performance-results-2026-11-07.md). Do not run
 builds, tests or other CPU-heavy work alongside a timing cohort. The baseline is
 implementation evidence; human UX and release acceptance remain separate.

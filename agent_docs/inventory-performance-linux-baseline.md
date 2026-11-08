@@ -1,5 +1,10 @@
 # Linux inventory baseline: corrected CLI and historical PTY cohorts
 
+**Historical record (2026-10-26/27 UTC).** For the integrated November build,
+qualified PTY method, ABBA comparison and remaining targets, see the
+[2026-11-07 results](inventory-performance-results-2026-11-07.md). The original
+measurements and qualifications below are retained unchanged.
+
 This is an offline implementation measurement on the reviewed UX1 product tree, before the auth/startup changes. It is not human UX acceptance, release certification, or an optimization mandate. The CLI cohort below was remeasured on 2026-10-27 UTC after review exposed a quantized parent-process endpoint. The independently bound 2026-10-26 PTY cohort is retained unchanged; no new terminal measurements are implied.
 
 - Product HEAD: `3ae4c5fe1a29185b913797716bd8d294422f2b19`; tooling/docs were uncommitted and unstaged.
