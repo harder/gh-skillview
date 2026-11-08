@@ -211,7 +211,11 @@ public sealed partial class LocationPreferencesTests
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Long POSIX address fixture; Windows path policy belongs to native CI.");
         var parent = _temp.FullName;
-        for (var i = 0; i < 9; i++) parent = Directory.CreateDirectory(Path.Combine(parent, new string('x', 180) + i)).FullName;
+        // Darwin's PATH_MAX is 1024 including the existing temp prefix. Stay
+        // below it while retaining a long canonical address in every manifest.
+        var components = OperatingSystem.IsMacOS() ? 4 : 9;
+        for (var i = 0; i < components; i++) parent = Directory.CreateDirectory(Path.Combine(parent, new string('x', 180) + i)).FullName;
+        Assert.True(parent.Length >= 700);
         var store = new LocationPreferences(Path.Combine(parent, "locations"));
         var first = Selection(); var second = Selection("workspace", "other"); var read = store.Read([], Token);
         for (var i = 0; i < LocationPreferences.MaxRecords; i++)

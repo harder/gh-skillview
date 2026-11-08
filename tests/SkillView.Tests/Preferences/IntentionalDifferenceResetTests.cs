@@ -29,6 +29,13 @@ public sealed class IntentionalDifferenceResetTests : IDisposable
     }
     private string Records => Directory.GetDirectories(Root, "records-*").Single();
     private string Backup => Directory.GetDirectories(Root, "backup-*").Single();
+    private static void WritePrivateFile(string path, byte[] bytes)
+    {
+        if (File.Exists(path)) { File.WriteAllBytes(path, bytes); return; }
+        using var parent = NativeStateDirectory.OpenOrCreate(Path.GetDirectoryName(path)!, [], Token, allowCreate: false);
+        using var file = parent.OpenFile(Path.GetFileName(path), false, Token);
+        file.Write(bytes); file.Flush(true);
+    }
     public void Dispose() => _temp.Delete(true);
 
     [Fact]
@@ -112,7 +119,7 @@ public sealed class IntentionalDifferenceResetTests : IDisposable
         var store = Store(checkpoint: phase =>
         {
             if (!manifest && phase == "backup-created")
-            { var path = Path.Combine(Backup, Path.GetFileName(record)); File.WriteAllBytes(path, File.ReadAllBytes(record)[..12]); if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite); canceled.Cancel(); canceled.Token.ThrowIfCancellationRequested(); }
+            { var path = Path.Combine(Backup, Path.GetFileName(record)); WritePrivateFile(path, File.ReadAllBytes(record)[..12]); canceled.Cancel(); canceled.Token.ThrowIfCancellationRequested(); }
             if (manifest && phase == "manifest-published")
             { var path = Path.Combine(Backup, "manifest.json"); File.WriteAllBytes(path, File.ReadAllBytes(path)[..24]); canceled.Cancel(); canceled.Token.ThrowIfCancellationRequested(); }
         });
@@ -148,6 +155,22 @@ public sealed class IntentionalDifferenceResetTests : IDisposable
         Assert.Throws<IOException>(() => store.Reset(review, Inventory, "different HOME/state/cwd", Token));
         Set(2); Assert.Throws<IOException>(() => store.Reset(review, Inventory, Context, Token));
         Assert.Empty(Directory.GetDirectories(Root, "backup-*")); Assert.Equal(2, Directory.GetFiles(Records).Length);
+    }
+
+    [Fact]
+    public void ResetThroughAncestorAliasReopensCanonicalBackupAndRejectsOldApproval()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Unix ancestor-alias regression, including macOS /var.");
+        var actual = Directory.CreateDirectory(Path.Combine(_temp.FullName, "actual")).FullName;
+        var alias = Path.Combine(_temp.FullName, "alias"); Directory.CreateSymbolicLink(alias, actual);
+        var store = new IntentionalDifferenceStore(Path.Combine(alias, "choices"));
+        store.Set(Binding(), store.Read([], Token).Version, false, Inventory, Token);
+        var review = store.InspectReset(Inventory, Context, Token);
+        store.Reset(review, Inventory, Context, Token);
+        var reopened = new IntentionalDifferenceStore(Path.Combine(alias, "choices")).Read([], Token);
+        Assert.Null(reopened.Diagnostic); Assert.Empty(reopened.Records);
+        Assert.Single(Directory.GetDirectories(Path.Combine(actual, "choices"), "backup-*"));
+        Assert.Throws<IOException>(() => store.Reset(review, Inventory, Context, Token));
     }
 
     [Theory]
@@ -206,8 +229,7 @@ public sealed class IntentionalDifferenceResetTests : IDisposable
         var bytes = Enumerable.Repeat((byte)255, 2048).ToArray();
         for (var index = 1; index <= 512; index++)
         {
-            var path = Path.Combine(records, index.ToString("D12") + ".json"); File.WriteAllBytes(path, bytes);
-            if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            var path = Path.Combine(records, index.ToString("D12") + ".json"); WritePrivateFile(path, bytes);
         }
         var store = Store(); var review = store.InspectReset(Inventory, Context, Token);
         Assert.Equal(512, review.Files.Length); store.Reset(review, Inventory, Context, Token);

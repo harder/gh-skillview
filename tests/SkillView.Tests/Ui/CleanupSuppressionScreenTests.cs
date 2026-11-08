@@ -117,8 +117,13 @@ public sealed class CleanupSuppressionScreenTests
             {
                 using var app = Application.Create().Init("ansi"); app.Driver!.SetScreenSize(80, 24);
                 Dialog? window = null; var logger = new Logger();
+                var path = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "skillview-review-only-fixture"));
+                var skill = CapturedFindingTests.Copy(path, "v1") with
+                {
+                    Agents = [new("fixture", path, false, Context: new string('x', MaintenanceQueueFormatter.MaxDetailCharacters + 1))]
+                };
                 var candidate = new CleanupClassifier.Candidate(CleanupClassifier.CandidateKind.EmptyDirectory,
-                    reviewOnly ? "/fixture/shared" : "/fixture/" + new string('x', MaintenanceQueueFormatter.MaxDetailCharacters + 1), "review", null, reviewOnly);
+                    path, "review", reviewOnly ? null : skill, reviewOnly);
                 var screen = new CleanupScreen(app, new RemoveService(logger), logger, [candidate], [], []);
                 app.AddTimeout(TimeSpan.FromSeconds(8), () => { timedOut = true; app.RequestStop(); return false; });
                 app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>

@@ -21,6 +21,30 @@ public sealed class PayloadNativeMetadataTests : IDisposable
         return NativeDirectoryMoveLease.Open(Path.GetDirectoryName(Target)!, Target, Token);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WindowsPrivateStateHandleReportsLinkTopologyWithoutClaimingFullMetadata(bool hardLinked)
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows held-handle metadata rights regression.");
+        using var state = NativeStateDirectory.OpenOrCreate(Path.Combine(temp.FullName, "private-state"), [], Token);
+        using (var created = state.OpenFile("record.json", false, Token))
+        { created.Write([1, 2, 3]); created.Flush(true); }
+        if (hardLinked) Assert.True(Native.CreateHardLinkW(Path.Combine(temp.FullName, "peer"), Path.Combine(state.CanonicalPath, "record.json"), IntPtr.Zero));
+        using var file = state.OpenExistingFile("record.json", false, Token);
+        PayloadNativeMetadata? captured = null;
+        WindowsSecureRemovalBackend.CaptureRegularFile(file, item =>
+        {
+            captured = PayloadNativeMetadata.Capture(item, Token);
+            item.Content!.Position = 0;
+            var bytes = new byte[3]; item.Content.ReadExactly(bytes);
+            return new(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)), bytes.Length);
+        }, Token);
+        Assert.NotNull(captured); Assert.Equal(hardLinked ? 2UL : 1UL, captured.LinkCount);
+        // Native state handles deliberately lack complete SACL capture rights.
+        Assert.False(captured.Supported); Assert.NotEmpty(captured.Refusals);
+    }
+
     [Fact]
     public void MetadataIsBoundToTheCapturedNativeObjectsAndUnknownCoverageIsExplicit()
     {
@@ -203,6 +227,9 @@ public sealed class PayloadNativeMetadataTests : IDisposable
 
     private static class Native
     {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool CreateHardLinkW(string destination, string source, IntPtr security);
         [DllImport("libc", SetLastError = true)] internal static extern int link(string source, string destination);
         [DllImport("libc", SetLastError = true)] internal static extern int linkat(Microsoft.Win32.SafeHandles.SafeFileHandle descriptor, string source, int destinationDirectory, string destination, int flags);
         [DllImport("libc", SetLastError = true)] internal static extern int mkfifo(string path, uint mode);
