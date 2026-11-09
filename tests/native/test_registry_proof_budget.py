@@ -163,6 +163,32 @@ class LogsTests(unittest.TestCase):
         self.assertIs(calls[-1]['env'], env)
 
 
+class CorroborationFixtureTests(unittest.TestCase):
+    def test_actual_fixture_keeps_nested_resource_bytes_modes_and_refuses_missing_or_nested_skill(self):
+        source = ast.parse((ROOT / 'tests/native/prove-registry-recorded-restore.py').read_text())
+        damage = next(n for n in ast.walk(source) if isinstance(n, ast.For)
+                      and isinstance(n.target, ast.Name) and n.target.id == 'damage')
+        checks = next(n for n in damage.body if isinstance(n, ast.If)
+                      and ast.unparse(n.test) == "damage == 'missing-corroborated'")
+        code = compile(ast.fix_missing_locations(ast.Module(body=copy.deepcopy(checks.body), type_ignores=[])),
+                       '<actual-corroboration-fixture>', 'exec')
+        with tempfile.TemporaryDirectory() as name:
+            payload = Path(name) / 'payload'; payload.mkdir()
+            scripts = payload / 'scripts'; scripts.mkdir()
+            resource = scripts / 'inspect.sh'
+            # This is retained source content, never executable proof machinery.
+            resource.write_bytes(b'#!/bin/sh\nexit 97\n'); resource.chmod(0o755)
+            before = resource.read_bytes(), stat.S_IMODE(resource.stat().st_mode)
+            exec(code, {'payload': payload})
+            self.assertEqual((resource.read_bytes(), stat.S_IMODE(resource.stat().st_mode)), before)
+            nested = scripts / 'SKILL.md'; nested.write_bytes(b'nested skill')
+            with self.assertRaisesRegex(AssertionError, 'Nested skill'):
+                exec(code, {'payload': payload})
+            nested.unlink(); resource.rename(scripts / 'retained-inspect.sh')
+            with self.assertRaises(AssertionError):
+                exec(code, {'payload': payload})
+
+
 class TemplateTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -294,7 +320,7 @@ class TemplateTests(unittest.TestCase):
             for pin in (True,False):
                 for kind in ('corrupt-yaml','missing-empty','missing-corroborated'):
                     case = self.root / f'case-{tool_index}-{pin}-{kind}'; case.mkdir(); home=case/'home';home.mkdir()
-                    source = '.github/skills/cli-exercise' if kind=='missing-corroborated' else 'skills/gh-skill'
+                    source = '.github/skills/vhs-demo' if kind=='missing-corroborated' else 'skills/gh-skill'
                     def command(argv):
                         calls.append(argv)
                         self.install(home)
