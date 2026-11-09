@@ -74,8 +74,11 @@ internal sealed class GhRecordedTreeStager(ProcessRunner runner)
         var repo = uri.AbsolutePath.Trim('/');
         if (repo.EndsWith(".git", StringComparison.Ordinal)) repo = repo[..^4];
         if (repo.Split('/').Length != 2) throw new IOException("Recorded repository is ambiguous.");
+        // Only full immutable object IDs use gh's own response cache. Every
+        // returned tree/blob still passes the identity and byte checks below;
+        // mutable ref resolution remains a separate uncached request.
         var result = await runner.RunAsync(ghPath,
-            ["api", "--hostname", "github.com", "--", $"repos/{repo}/git/trees/{treeSha}?recursive=1"],
+            ["api", "--cache", "1h", "--hostname", "github.com", "--", $"repos/{repo}/git/trees/{treeSha}?recursive=1"],
             cancellationToken: token).ConfigureAwait(false);
         if (result.StdOutTruncated || result.StdErrTruncated) throw new GhSourceRequestException("Recorded tree capture was truncated.", result);
         if (!result.Succeeded) throw new GhSourceRequestException($"Recorded tree is inaccessible: {result.StdErr}", result);
@@ -84,7 +87,7 @@ internal sealed class GhRecordedTreeStager(ProcessRunner runner)
         await MaterializeAsync(tree, treeSha, destination, async (blobSha, ct) =>
         {
             var blob = await runner.RunAsync(ghPath,
-                ["api", "--hostname", "github.com", "--jq", ".content", "--", $"repos/{repo}/git/blobs/{blobSha}"],
+                ["api", "--cache", "1h", "--hostname", "github.com", "--jq", ".content", "--", $"repos/{repo}/git/blobs/{blobSha}"],
                 cancellationToken: ct).ConfigureAwait(false);
             if (blob.StdOutTruncated || blob.StdErrTruncated) throw new GhSourceRequestException("Recorded blob capture was truncated.", blob);
             if (!blob.Succeeded) throw new GhSourceRequestException($"Recorded blob is inaccessible: {blob.StdErr}", blob);
