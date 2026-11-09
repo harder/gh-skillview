@@ -22,6 +22,7 @@ public sealed class TagUpdateWorkflowTests : IDisposable
     private string Payload => Path.Combine(Skills, "demo");
     private string Gh => Path.Combine(root.FullName, "gh-fixture");
     private string Calls => Path.Combine(root.FullName, "calls");
+    private string CallArguments => Path.Combine(root.FullName, "call-arguments");
     private readonly TuiServices services;
     private readonly string originalTree;
     private readonly string selectedTree;
@@ -51,6 +52,7 @@ public sealed class TagUpdateWorkflowTests : IDisposable
             "HTTP/1.1 200 OK\n\n" + JsonSerializer.Serialize(new { sha = Commit, tree = new { sha = selectedTree } });
         var script = new StringBuilder("#!/bin/sh\nfor endpoint do :; done\n");
         script.AppendLine("printf '%s\\n' \"$endpoint\" >> " + Quote(Calls));
+        script.AppendLine("printf '%s\\n' \"$*\" >> " + Quote(CallArguments));
         script.AppendLine("case \"$endpoint\" in");
         var index = 0;
         foreach (var (endpoint, response) in responses)
@@ -107,6 +109,13 @@ public sealed class TagUpdateWorkflowTests : IDisposable
         var inventory = Inventory();
         var prepared = await services.SavedUpdates.PrepareAsync(Gh, new(Targets: [Target(inventory)], Tag: "older"), inventory, Token);
         Assert.True(prepared.Succeeded, prepared.ErrorMessage);
+        var arguments = File.ReadAllLines(CallArguments);
+        Assert.Contains(arguments, line => line.Contains("/git/trees/", StringComparison.Ordinal));
+        Assert.Contains(arguments, line => line.Contains("/git/blobs/", StringComparison.Ordinal));
+        Assert.Contains(arguments, line => line.Contains("/git/ref/tags/older", StringComparison.Ordinal));
+        Assert.All(arguments, line => Assert.Equal(
+            line.Contains("/git/trees/", StringComparison.Ordinal) || line.Contains("/git/blobs/", StringComparison.Ordinal),
+            line.Contains("--cache 1h", StringComparison.Ordinal)));
         var plan = Assert.IsType<ReplacementResult>(prepared.SavedPlan);
         Assert.Equal("refs/tags/older", plan.Revision!.Source.Ref);
         Assert.Equal(Commit, plan.Revision.Source.Commit);

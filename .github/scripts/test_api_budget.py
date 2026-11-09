@@ -185,41 +185,6 @@ APPROVED_PROOF_ADDITIONS = {'tests/native/prove-registry-recorded-restore.py': [
                                                          "'missing-nonempty', "
                                                          'product_counts=product_counts)\n')]}
 
-# Exact fixture-only delta; historical proof hashes below remain unchanged.
-RESTORE_FIXTURE_CHANGES = [("                    name = 'cli-exercise' if damage == 'missing-corroborated' else 'gh-skill'\n"
-  "                    source = '.github/skills/cli-exercise' if name == 'cli-exercise' else "
-  "'skills/gh-skill'\n",
-  "                    name = 'vhs-demo' if damage == 'missing-corroborated' else 'gh-skill'\n"
-  "                    source = '.github/skills/vhs-demo' if name == 'vhs-demo' else 'skills/gh-skill'\n"),
- ('                        # The actual source has a genuine root .gitignore. Keep\n'
-  '                        # its exact installed bytes/mode as corroboration; retain\n'
-  '                        # nested source resources outside the damaged subject so\n'
-  '                        # discovery selects one ordinary nonnested copy.\n'
-  "                        removed = case_root / 'removed-resource-directories'; removed.mkdir()\n"
-  '                        for directory in list(payload.iterdir()):\n'
-  '                            if directory.is_dir(): directory.rename(removed / directory.name)\n'
-  "                        assert payload.joinpath('.gitignore').is_file()\n"
-  '                        assert not any(p.is_dir() for p in payload.iterdir())\n',
-  '                        # Five genuine upstream files exercise the same native\n'
-  '                        # corroboration/Undo boundaries without fetching the 77\n'
-  '                        # blobs in cli-exercise on every repeated plan. Retain\n'
-  '                        # every installed resource and its mode, never run it.\n'
-  "                        assert payload.joinpath('scripts/inspect.sh').is_file()\n"
-  "                        assert not list(payload.rglob('SKILL.md')), 'Nested skill is not a corroboration "
-  "fixture'\n"),
- ("                        with payload.joinpath('.gitignore').open('ab') as stream: "
-  "stream.write(b'\\nDeliberate corroboration mismatch\\n')\n",
-  "                        with payload.joinpath('scripts/inspect.sh').open('ab') as stream: "
-  "stream.write(b'\\nDeliberate corroboration mismatch\\n')\n")]
-
-def before_small_fixture(test, text):
-    for original, replacement in RESTORE_FIXTURE_CHANGES:
-        test.assertTrue(replacement)
-        test.assertEqual(text.count(replacement), 1)
-        text = text.replace(replacement, original, 1)
-    return text
-
-
 def before_d2b(test, name, text):
     for original, addition in APPROVED_PROOF_ADDITIONS[name]:
         test.assertTrue(addition)
@@ -463,14 +428,14 @@ class ProofAndWorkflowGuards(unittest.TestCase):
 
     def test_restore_cases_plans_negatives_hashes_markers_and_native_guards_unchanged(self):
         name = 'tests/native/prove-registry-recorded-restore.py'
-        text = before_d2b(self, name, before_small_fixture(self, (ROOT / name).read_text()))
+        text = before_d2b(self, name, (ROOT / name).read_text())
         self.assertEqual(text.count(DIAGNOSTICS), 1)
         self.assertEqual(text.count(RESTORE_COUNT), 1)
         restored = text.replace(DIAGNOSTICS, '').replace(RESTORE_COUNT, '')
         self.assertEqual(hashlib.sha256(restored.encode()).hexdigest(), BASE_HASHES[name])
 
-    def test_restore_delta_from_published_head_is_constructor_and_fixture_only(self):
-        text = before_small_fixture(self, (ROOT / 'tests/native/prove-registry-recorded-restore.py').read_text())
+    def test_restore_delta_from_published_head_is_constructor_only(self):
+        text = (ROOT / 'tests/native/prove-registry-recorded-restore.py').read_text()
         old = "InstallTemplates(root / 'install-templates')"
         new = "InstallTemplates(root / 'install-templates', report['commandDiagnostics'])"
         self.assertEqual(text.count(new), 1)

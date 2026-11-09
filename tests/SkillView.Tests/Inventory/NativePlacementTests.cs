@@ -5,7 +5,12 @@ namespace SkillView.Tests.Inventory;
 
 public sealed class NativePlacementTests : IDisposable
 {
-    private readonly DirectoryInfo temp = Directory.CreateTempSubdirectory("skillview-placement-");
+    // Placement retries restart from the filesystem root. Other test classes
+    // create/delete shared temp children, changing an ancestor's ctime before
+    // the targeted hook is reached. Keep this class's fixtures with its build
+    // output, outside the shared temporary namespace used by those writers.
+    private readonly DirectoryInfo temp = Directory.CreateDirectory(
+        Path.Combine(AppContext.BaseDirectory, "skillview-placement-" + Guid.NewGuid().ToString("N")));
     private CancellationToken Token => TestContext.Current.CancellationToken;
     public void Dispose() => temp.Delete(true);
 
@@ -218,7 +223,38 @@ public sealed class NativePlacementTests : IDisposable
         var refused = Assert.ThrowsAny<IOException>(() => UnixSecureRemovalBackend.OpenPlacement(child, Token,
             beforeParentCheckForTests: beforeOpenedChildCheck ? null : Change,
             beforeChildCheckForTests: beforeOpenedChildCheck ? Change : null));
+        TestContext.Current.TestOutputHelper!.WriteLine($"Named child hooks: [{string.Join(",", attempts)}]; refusal: {refused.Message}");
         Assert.Equal(Enumerable.Range(0, UnixSecureRemovalBackend.PlacementCaptureAttempts), attempts);
+        Assert.Contains(parent, refused.Message);
+        Assert.Contains(beforeOpenedChildCheck ? "opened child" : "named child", refused.Message);
+        Assert.Contains("ctime", refused.Message);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnixAncestorChurnConsumesTheSameBoundBeforeNamedChildHook(bool beforeOpenedChildCheck)
+    {
+        if (OperatingSystem.IsWindows()) { Assert.Skip("Unix relative placement capture requires native Unix execution."); return; }
+        var ancestor = Directory.CreateDirectory(Path.Combine(temp.FullName, "ancestor")).FullName;
+        var parent = Directory.CreateDirectory(Path.Combine(ancestor, "parent")).FullName;
+        var child = Directory.CreateDirectory(Path.Combine(parent, "child")).FullName;
+        var attempts = new HashSet<int>();
+        var namedAttempts = new List<int>();
+        void Change(int attempt, string _, string name)
+        {
+            attempts.Add(attempt);
+            if (attempt == 0 && name == "ancestor")
+                File.WriteAllText(Path.Combine(ancestor, "earlier-component-change"), "changed");
+            if (name != "parent") return;
+            namedAttempts.Add(attempt);
+            File.WriteAllText(Path.Combine(parent, "sibling-" + attempt), "changed");
+        }
+        var refused = Assert.ThrowsAny<IOException>(() => UnixSecureRemovalBackend.OpenPlacement(child, Token,
+            beforeParentCheckForTests: beforeOpenedChildCheck ? null : Change,
+            beforeChildCheckForTests: beforeOpenedChildCheck ? Change : null));
+        Assert.Equal(Enumerable.Range(0, UnixSecureRemovalBackend.PlacementCaptureAttempts), attempts.Order());
+        Assert.Equal(Enumerable.Range(1, UnixSecureRemovalBackend.PlacementCaptureAttempts - 1), namedAttempts);
         Assert.Contains(parent, refused.Message);
         Assert.Contains(beforeOpenedChildCheck ? "opened child" : "named child", refused.Message);
         Assert.Contains("ctime", refused.Message);

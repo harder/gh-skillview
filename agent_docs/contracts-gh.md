@@ -32,6 +32,13 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   not per-flag probes. A prerelease is not evidence of a patched stable release.
   Recommend 2.103.3; checksum-pinned current proof tools use that version.
 
+- Recorded-tree materialization requests use `gh api --cache 1h` only for full
+  immutable tree/blob IDs. Keep mutable ref resolution uncached. Cache data is
+  transport input, never authority: retain complete-tree validation, Git object
+  hash/size checks, capture bounds and all native publication/approval checks.
+  Authentication and response-cache storage stay delegated to gh; do not export
+  credentials, add retries or accept partial/mismatched cached content.
+
 - `GhSkillInstallService.BuildArgs` and `BuildListArgs` must place trusted
   flags before `--`, with repository and skill selectors after it. Search
   results can supply those selectors; GitHub CLI 2.102.0 fixed an option
