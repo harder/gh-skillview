@@ -8,6 +8,14 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   COMMON_DIR and GIT_CONFIG_COUNT=0, or strip inherited GIT_* before configuring
   a dedicated private redirected-worktree fixture.
 
+- Registry-recorded restore's missing/corroborated native fixture uses the real
+  `cli/cli` `.github/skills/vhs-demo` installation. Keep its surviving resources
+  and modes, refuse nested skills, and retain the positive exact-native Undo and
+  changed-resource refusal. Do not use the much larger `cli-exercise` tree merely
+  to supply corroborating bytes: repeated plans fetch each immutable blob again
+  across both hosts, gh versions and platforms. Fixture contents are evidence,
+  never executed tools; smaller source data must not reduce proof cases or gates.
+
 - Current package compatibility: SkillView is pinned to Terminal.Gui `2.5.1-develop.183`
   and Terminal.Gui.Editor `2.5.8-develop.6`. Test projects use `Microsoft.NET.Test.Sdk` `18.11.0`, `xunit.v3`
   `4.0.2`, and `xunit.runner.visualstudio` `4.0.1`. The compatible Microsoft Testing Platform

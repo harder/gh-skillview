@@ -124,8 +124,8 @@ def main():
                     command(['git', '-C', work, 'init', '--quiet'])
                     env.update(GIT_DIR=str(work / '.git'), GIT_WORK_TREE=str(work), GIT_COMMON_DIR=str(work / '.git'))
                     # A genuine source with nonroot resources supplies corroboration.
-                    name = 'cli-exercise' if damage == 'missing-corroborated' else 'gh-skill'
-                    source = '.github/skills/cli-exercise' if name == 'cli-exercise' else 'skills/gh-skill'
+                    name = 'vhs-demo' if damage == 'missing-corroborated' else 'gh-skill'
+                    source = '.github/skills/vhs-demo' if name == 'vhs-demo' else 'skills/gh-skill'
                     install = [gh, 'skill', 'install', '--agent', 'universal', '--scope', 'user', '--allow-hidden-dirs']
                     if pinned: install += ['--pin=v2.103.2']
                     before_install = templates.before(home)
@@ -148,15 +148,12 @@ def main():
                     else: file.rename(case_root / 'removed-SKILL.md')
                     if damage == 'missing-empty': assert not list(payload.iterdir())
                     if damage == 'missing-corroborated':
-                        # The actual source has a genuine root .gitignore. Keep
-                        # its exact installed bytes/mode as corroboration; retain
-                        # nested source resources outside the damaged subject so
-                        # discovery selects one ordinary nonnested copy.
-                        removed = case_root / 'removed-resource-directories'; removed.mkdir()
-                        for directory in list(payload.iterdir()):
-                            if directory.is_dir(): directory.rename(removed / directory.name)
-                        assert payload.joinpath('.gitignore').is_file()
-                        assert not any(p.is_dir() for p in payload.iterdir())
+                        # Five genuine upstream files exercise the same native
+                        # corroboration/Undo boundaries without fetching the 77
+                        # blobs in cli-exercise on every repeated plan. Retain
+                        # every installed resource and its mode, never run it.
+                        assert payload.joinpath('scripts/inspect.sh').is_file()
+                        assert not list(payload.rglob('SKILL.md')), 'Nested skill is not a corroboration fixture'
                     damaged = native(payload)
                     (case_root / 'damaged-native.json').write_text(json.dumps(damaged, indent=2))
 
@@ -258,7 +255,7 @@ def main():
                         # use a separate live copy for mismatch admission.
                         raw_undo = case_root / 'exact-undo-original-before-negative'
                         payload.rename(raw_undo); shutil.copytree(raw_undo, payload)
-                        with payload.joinpath('.gitignore').open('ab') as stream: stream.write(b'\nDeliberate corroboration mismatch\n')
+                        with payload.joinpath('scripts/inspect.sh').open('ab') as stream: stream.write(b'\nDeliberate corroboration mismatch\n')
                         mismatch = run('registry-restore-plan', '--path', payload, ok=False)
                         assert 'corroborat' in json.dumps(mismatch), mismatch
                         case['negatives']['corroborationMismatch'] = mismatch
