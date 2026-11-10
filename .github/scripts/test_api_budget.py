@@ -388,9 +388,10 @@ class ProofAndWorkflowGuards(unittest.TestCase):
             'node --test .github/scripts/ci-change-scope.test.js',
             'python3 -m unittest discover -s .github/scripts -p test_native_proof_inputs.py',
             'python3 -m unittest discover -s .github/scripts -p test_api_budget.py',
+            'python3 -m unittest discover -s .github/scripts -p test_proof_ci.py',
         ])
 
-    def test_original_ci_matrix_permissions_proof_bodies_argv_env_and_deadlines_are_byte_exact(self):
+    def test_ci_additions_keep_original_proof_contracts_byte_exact(self):
         text = (ROOT / '.github/workflows/ci.yml').read_text()
         blocks = re.split(r'(?=^      - )', text, flags=re.M)
         observed = [b for b in blocks if b.startswith('      - name: Observe API budget ')]
@@ -401,10 +402,35 @@ class ProofAndWorkflowGuards(unittest.TestCase):
         restored = restored.replace('            dist/api-budget/api-budget-*.json\n', '')
         self.assertEqual(restored.count('          python3 -m unittest discover -s .github/scripts -p test_api_budget.py\n'), 1)
         restored = restored.replace('          python3 -m unittest discover -s .github/scripts -p test_api_budget.py\n', '')
+        additions = [
+            '          python3 -m unittest discover -s .github/scripts -p test_proof_ci.py\n',
+            '    concurrency:\n      group: skillview-native-proof-api\n      queue: max\n      cancel-in-progress: false\n',
+            "      - name: Verify privileged registry execution image before live API proofs\n        id: container_prerequisite\n        if: matrix.shard == 'sources' && matrix.rid == 'linux-x64'\n        shell: bash\n        run: python .github/scripts/proof_ci.py preflight\n",
+            '      - name: Summarize native CI failure evidence\n        if: always()\n        continue-on-error: true\n        shell: bash\n        env:\n          NATIVE_STEPS_JSON: ${{ toJSON(steps) }}\n        run: python .github/scripts/proof_ci.py summary\n',
+            '            dist/native-ci-summary.json\n',
+            '            dist/native-prerequisite.json\n',
+        ]
+        for addition in additions:
+            self.assertEqual(restored.count(addition), 1)
+            restored = restored.replace(addition, '')
+        for index in range(1, 13):
+            label = f'        id: native_check_{index:02}\n'
+            self.assertEqual(restored.count(label), 1)
+            restored = restored.replace(label, '')
+        tool = "      - name: Prepare exact registry-restore gh compatibility target\n        if: matrix.shard == 'sources'\n        shell: bash\n        run: python tests/native/prepare-gh-proof-tool.py --version 2.103.2 --rid '${{ matrix.rid }}' --output '.ci-native/gh-registry-current'\n"
+        early_tool = tool.replace('        if:', '        id: registry_tool\n        if:')
+        self.assertEqual(restored.count(early_tool), 1)
+        restored = restored.replace(early_tool, '')
+        anchor = '      - name: Prove bounded registry-recorded restore and raw damaged Undo on both hosts\n'
+        self.assertEqual(restored.count(anchor), 1)
+        restored = restored.replace(anchor, tool + anchor)
+        scheduling = '      # Pace live API work across isolated proofs; retain every RID and shard.\n      max-parallel: 1\n'
+        self.assertEqual(restored.count(scheduling), 1)
+        restored = restored.replace(scheduling, '      # Keep the original four-runner/API ceiling; schedule expensive Windows families first.\n      max-parallel: 4\n')
         self.assertEqual(hashlib.sha256(restored.encode()).hexdigest(), BASE_HASHES['.github/workflows/ci.yml'])
         native = text.split('  aot-proof:\n', 1)[1].split('  aot-smoke:\n', 1)[0]
         self.assertEqual(native.count('          - rid: '), 12)
-        self.assertIn('      max-parallel: 4\n', text)
+        self.assertIn('      max-parallel: 1\n', native)
 
     def test_every_gh_step_has_separate_best_effort_observers_and_failure_after_guard(self):
         text = (ROOT / '.github/workflows/ci.yml').read_text()

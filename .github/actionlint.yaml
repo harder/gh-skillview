@@ -5,3 +5,9 @@ paths:
   .github/workflows/critical-dependencies.yml:
     ignore:
       - '^unknown permission scope "copilot-requests"\.'
+  # GitHub supports queue:max; v1.7.12 does not yet parse this field.
+  # test_proof_ci.py validates the exact queue/group/cancellation policy and
+  # rejects additional queue keys. Retain all other syntax checks.
+  .github/workflows/ci.yml:
+    ignore:
+      - '^unexpected key "queue" for "concurrency" section\. expected one of "cancel-in-progress", "group"$'

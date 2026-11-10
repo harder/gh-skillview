@@ -56,6 +56,7 @@ jobs:
           node --test .github/scripts/ci-change-scope.test.js
           python3 -m unittest discover -s .github/scripts -p test_native_proof_inputs.py
           python3 -m unittest discover -s .github/scripts -p test_api_budget.py
+          python3 -m unittest discover -s .github/scripts -p test_proof_ci.py
       - name: Test native proof fixture contracts
         run: python3 -m unittest discover -s tests/native -p 'test_*.py'
 
@@ -337,10 +338,14 @@ jobs:
     name: Native proof (${{ matrix.rid }}, ${{ matrix.shard }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
+    concurrency:
+      group: skillview-native-proof-api
+      queue: max
+      cancel-in-progress: false
     strategy:
       fail-fast: false
-      # Keep the original four-runner/API ceiling; schedule expensive Windows families first.
-      max-parallel: 4
+      # Pace live API work across isolated proofs; retain every RID and shard.
+      max-parallel: 1
       matrix:
         include:
           - rid: win-x64
@@ -413,13 +418,25 @@ jobs:
           set -euo pipefail
           python .github/scripts/native_proof_inputs.py unpack --rid '${{ matrix.rid }}'
           python .github/scripts/native_proof_inputs.py stage --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}'
+      - name: Prepare exact registry-restore gh compatibility target
+        id: registry_tool
+        if: matrix.shard == 'sources'
+        shell: bash
+        run: python tests/native/prepare-gh-proof-tool.py --version 2.103.2 --rid '${{ matrix.rid }}' --output '.ci-native/gh-registry-current'
+      - name: Verify privileged registry execution image before live API proofs
+        id: container_prerequisite
+        if: matrix.shard == 'sources' && matrix.rid == 'linux-x64'
+        shell: bash
+        run: python .github/scripts/proof_ci.py preflight
       - name: Prove explicit static package checks preserve payloads without running scripts
+        id: native_check_01
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python tests/native/prove-static-package-check.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/package-check-app-proof.json
           python tests/native/prove-static-package-check.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/package-check-extension-proof.json
       - name: Prove explicit retained retirement and process-death protection
+        id: native_check_02
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
@@ -483,6 +500,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python .github/scripts/api_budget.py --stage after-02 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_02.outcome }}'
       - name: Prove native backup evidence and unchanged installed copies
+        id: native_check_03
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
@@ -504,30 +522,35 @@ jobs:
           python tests/native/prove-native-object-evidence.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/object-app-proof.json
           python tests/native/prove-native-object-evidence.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/object-extension-proof.json
       - name: Prove shared inventory scope and agent filters without network access
+        id: native_check_04
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python tests/native/prove-inventory-filter.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-filter-app-proof.json
           python tests/native/prove-inventory-filter.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-filter-extension-proof.json
       - name: Prove denied scan roots stay diagnostic and cannot authorize cleanup
+        id: native_check_05
         if: matrix.shard == 'inspection-unpin' && (runner.os != 'Windows')
         shell: bash
         run: |
           python tests/native/prove-inventory-denied-root.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/inventory-denied-app-proof.json
           python tests/native/prove-inventory-denied-root.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/inventory-denied-extension-proof.json
       - name: Prove managed and built-in discovery preserves read-only resources
+        id: native_check_06
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python tests/native/prove-managed-discovery.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/managed-discovery-app-proof.json
           python tests/native/prove-managed-discovery.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/managed-discovery-extension-proof.json
       - name: Prove physical installation identities and frozen operation subjects
+        id: native_check_07
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
           python tests/native/prove-installation-identities.py --app 'dist/app/skillview${{ matrix.ext }}' --output dist/identities-app-proof.json
           python tests/native/prove-installation-identities.py --app 'dist/ext/gh-skillview${{ matrix.ext }}' --output dist/identities-extension-proof.json
       - name: Prove standalone quarantine and undo using native hosts
+        id: native_check_08
         if: matrix.shard == 'inspection-unpin'
         shell: bash
         run: |
@@ -708,6 +731,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python .github/scripts/api_budget.py --stage after-09 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_09.outcome }}'
       - name: Prove captured local reimport and restart recovery on both native hosts
+        id: native_check_09
         if: matrix.shard == 'sources'
         shell: bash
         run: |
@@ -733,6 +757,7 @@ jobs:
           prove_old_unpin --old-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-unpin-app-proof.json
           prove_old_unpin --old-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary install-moved --output dist/old-native-unpin-extension-proof.json
       - name: Prove privileged Linux local reimport on private tmpfs
+        id: native_check_10
         if: matrix.shard == 'sources' && (matrix.rid == 'linux-x64')
         shell: bash
         run: |
@@ -747,10 +772,6 @@ jobs:
               --legacy-app "$SKILLVIEW_UNPIN_CHECKOUT/dist/app/skillview" --legacy-checkout "$SKILLVIEW_UNPIN_CHECKOUT" --legacy-kill-boundary "$proof_boundary" \
               --output "dist/local-reimport-privileged-$proof_name-proof" --platform linux/amd64
           done
-      - name: Prepare exact registry-restore gh compatibility target
-        if: matrix.shard == 'sources'
-        shell: bash
-        run: python tests/native/prepare-gh-proof-tool.py --version 2.103.2 --rid '${{ matrix.rid }}' --output '.ci-native/gh-registry-current'
       - name: Observe API budget before 10
         if: matrix.shard == 'sources'
         continue-on-error: true
@@ -876,6 +897,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python .github/scripts/api_budget.py --stage after-13 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_13.outcome }}'
       - name: Prove local source switching and actual schema5/6 recovery on both native hosts
+        id: native_check_11
         if: matrix.shard == 'sources'
         shell: bash
         run: |
@@ -914,6 +936,7 @@ jobs:
           prove_legacy --legacy-schema 6 --old-app "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT" --app 'dist/app/skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary retain-moved --output dist/old-native-source-switch-app-proof.json
           prove_legacy --legacy-schema 6 --old-app "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT/dist/app/skillview${{ matrix.ext }}" --old-checkout "$SKILLVIEW_SOURCE_SWITCH_CHECKOUT" --app 'dist/ext/gh-skillview${{ matrix.ext }}' --proof-host 'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof${{ matrix.ext }}' --gh "$proof_gh_current" --kill-boundary install-moved --output dist/old-native-source-switch-extension-proof.json
       - name: Prove privileged Linux source switching on the private container root
+        id: native_check_12
         if: matrix.shard == 'sources' && (matrix.rid == 'linux-x64')
         shell: bash
         run: |
@@ -1090,6 +1113,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python .github/scripts/api_budget.py --stage after-18 --rid '${{ matrix.rid }}' --shard '${{ matrix.shard }}' --result '${{ steps.api_primary_18.outcome }}'
+      - name: Summarize native CI failure evidence
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          NATIVE_STEPS_JSON: ${{ toJSON(steps) }}
+        run: python .github/scripts/proof_ci.py summary
       - name: Retain native verification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -1100,6 +1130,8 @@ jobs:
             dist/*-proof.json
             dist/gh-api-access.txt
             dist/api-budget/api-budget-*.json
+            dist/native-ci-summary.json
+            dist/native-prerequisite.json
             dist/disk-full-proof/**
             dist/unpin-privileged-*-proof/**
             dist/local-reimport-privileged-*-proof/**

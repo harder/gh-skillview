@@ -37,7 +37,20 @@ before their verified binaries are staged; Git worktree metadata is never
 transferred. Preserve every original proof invocation, host pairing, version,
 kill boundary and platform condition when moving steps between shards.
 
-The proof matrix keeps `max-parallel: 4`. Evidence is retained per shard and
+The proof matrix uses `max-parallel: 1` to pace live API work. Retained CI budget
+observations showed concurrent owner/source proofs exhausting the available
+installation budget, leaving later jobs with no requests at startup. Serialization
+is also enforced across PR and main runs by the fixed `skillview-native-proof-api`
+job concurrency group, with `queue: max` and `cancel-in-progress: false`. Pending
+proofs queue instead of replacing each other (GitHub bounds this queue at 100).
+This does not reserve quota or exclude other workflows/consumers. Preserve reset
+evidence and use bounded, diagnosed retries when needed.
+The pinned actionlint predates `queue`. Its narrowly anchored CI-file compatibility
+exception is paired with offline positive/negative validation of the exact group,
+`queue: max`, non-cancellation policy and absence of any extra queue keys. Remove
+the exception when the pinned linter understands GitHub's field.
+All twelve RID/shard jobs and their proof invocations remain required.
+Evidence is retained per shard and
 combined under the original per-RID artifact names. A completion receipt is
 written/uploaded only after a whole shard succeeds. The existing per-RID AOT
 check names now aggregate successful native builds, successful proof jobs and
@@ -46,6 +59,16 @@ work cannot pass that gate. Receipts require the same run, commit, RID and shard
 an earlier successful attempt within that run is accepted for rerun-failed-jobs,
 while future/invalid attempts are refused. Current job results remain required
 even when earlier receipts exist.
+
+Sources jobs prepare the same checksum-verified registry gh version before any
+proof, and Linux pulls the exact registry execution image before spending API
+requests on fixtures. Prerequisite failures remain failures; there is no alternate
+tool/image or success fallback. `.github/scripts/proof_ci.py` retains an always-run,
+bounded summary of failed step phases and existing HTTP/budget evidence. Explicit
+rate-limit responses, generic HTTP refusals and prerequisite failures stay distinct.
+A failed native step with no causal evidence remains unclassified; exhausted budget
+alone does not prove why that step failed. This summary cannot create completion
+receipts, turn a failure green, or replace the aggregate gate.
 
 Focused offline checks:
 
