@@ -9,6 +9,7 @@ or release verdict.
 ## Current guides
 
 - [Running tests](running-tests.md) and [terminal testing](tui-pty-testing.md).
+- [CI scope, native proof inputs and failure diagnosis](ci-runtime-optimization.md).
 - [Saved updates](../docs/saved-updates.md), [replacement plans](maintenance-update-plans.md),
   [local dispositions](maintenance-local-dispositions.md), and
   [standalone unpin](maintenance-standalone-unpin.md).
