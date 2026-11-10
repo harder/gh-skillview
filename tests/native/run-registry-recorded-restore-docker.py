@@ -94,7 +94,7 @@ def _describe(record, args, command):
         roles.append(dict(role='gh-' + str(index), destination='/proof-gh-' + str(index), readOnly=True))
     if args.gh_config_dir: roles.append(dict(role='gh-config', destination='/proof-gh-config', readOnly=False))
     if args.dotnet_root: roles.append(dict(role='dotnet', destination='/proof-dotnet', readOnly=True))
-    default_image = 'mcr.microsoft.com/dotnet/sdk:10.0.113'
+    default_image = 'mcr.microsoft.com/dotnet/sdk:10.0.403'
     record.update(bindings=bindings, argvSha256=hashlib.sha256(json.dumps(command).encode()).hexdigest(),
                   argvSafe=dict(redacted=True, executable='docker', action='run', containerName=command[3], privileged=True, network='host',
                                 mounts=roles, forwardedEnvironmentNames=['GH_TOKEN', 'GITHUB_TOKEN'],
@@ -201,7 +201,7 @@ def main():
     parser.add_argument('--old-app', type=Path)
     parser.add_argument('--proof-host', type=Path)
     parser.add_argument('--retirement', action='store_true', help='Run the dedicated F1/H2 interoperability proof instead')
-    parser.add_argument('--image', default='mcr.microsoft.com/dotnet/sdk:10.0.113')
+    parser.add_argument('--image', default='mcr.microsoft.com/dotnet/sdk:10.0.403')
     args = parser.parse_args()
     app = args.app.resolve()
     output = args.output.resolve(); output.mkdir(parents=True, exist_ok=False)

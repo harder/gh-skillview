@@ -77,3 +77,8 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   accepting/building historical tools. No other suppression or source rewrite is
   authorized. Current/release packages remain fully audited at14+; see the CI
   runtime guide for exact guards and current-run evidence boundaries.
+
+- The privileged registry restore/retirement launcher executes already-built
+  binaries in the current SDK `10.0.403` container. Its execution image is separate
+  from frozen producer SDK selection and must not rewrite historical globals or
+  locks. Microsoft does not publish the former `10.0.113` container tag.
