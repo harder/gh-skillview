@@ -45,6 +45,13 @@ job concurrency group, with `queue: max` and `cancel-in-progress: false`. Pendin
 proofs queue instead of replacing each other (GitHub bounds this queue at 100).
 This does not reserve quota or exclude other workflows/consumers. Preserve reset
 evidence and use bounded, diagnosed retries when needed.
+
+A single source job can also exhaust the budget left by an earlier job even
+without overlap. Serial execution is pacing, not a quota reservation or an
+automatic wait for a reset. Hosted runner acquisition can fail independently
+of this queue; a cancellation with no assigned runner or steps proves nothing
+about the product.
+
 The pinned actionlint predates `queue`. Its narrowly anchored CI-file compatibility
 exception is paired with offline positive/negative validation of the exact group,
 `queue: max`, non-cancellation policy and absence of any extra queue keys. Remove
@@ -75,8 +82,50 @@ Focused offline checks:
 ```sh
 node --test .github/scripts/ci-change-scope.test.js
 python3 -m unittest discover -s .github/scripts -p test_native_proof_inputs.py
+python3 -m unittest discover -s .github/scripts -p test_api_budget.py
+python3 -m unittest discover -s .github/scripts -p test_proof_ci.py
 ```
 
+## Diagnose and retry a native proof
+
+Retain the exact commit, run, attempt and job IDs, original outcome, failed step,
+bounded log excerpt and relevant artifact IDs. Check job annotations when a
+cancelled job has no steps: hosted-runner acquisition can fail without producing
+a log artifact. Do not relabel that cancellation as a passed proof or an API
+failure.
+
+Use the recorded failure to choose the next action:
+
+| Evidence | Interpretation and next action |
+| --- | --- |
+| No assigned runner/steps; capacity or acquisition annotation | Infrastructure cancellation. Allow a reasonable backoff before retrying that job. |
+| gh preparation or Docker preflight failed | Resolve the concrete prerequisite failure before repeating API-heavy fixtures. Preserve the original exit. |
+| TCP connection refused, timeout or HTTP 5xx | Transport/service failure; retain the exact error and use bounded backoff. It is not evidence of exhausted quota. |
+| Explicit HTTP 403/429 rate-limit response | Provider limit. Retain existing response/budget reset evidence and wait past that reset with a cooldown. Serialize affected source RIDs. |
+| Generic HTTP 403 or incomplete HTTP evidence | Cause unknown until stronger evidence is retained. Do not infer invalid credentials or a quota failure from the status alone. |
+| Failed proof assertion without a provider/prerequisite cause | Diagnose the assertion and its retained inputs before choosing a fix or retry. Keep native checks and expected outcomes intact. |
+
+`native-ci-summary.json`, the existing `api-budget/*.json` observations and
+launcher `launch.json`/bounded stderr can help locate the cause. A summary may
+honestly say `unknown` even when a later inspection of a launcher artifact finds
+an explicit provider error. Budget counts describe those observations; they do
+not identify every consumer or guarantee the budget available to a later job.
+Use retained observations rather than adding authentication or quota probes.
+
+When a retry is justified, wait for the active attempt to settle and retry only
+the affected job, one at a time. Let its dependent aggregate checks rerun and
+inspect their actual results. Do not dispatch a fresh full run or restart an
+active job to work around the queue. Repeated identical failures need further
+diagnosis or a longer backoff, not an immediate rerun loop.
+
+Keep original failed attempts and the successful retry's provenance. The final
+verdict requires every expected native shard and its matching completion receipt,
+plus successful aggregate gates on the intended commit. PR successes do not
+replace main proofs; a successful App case does not establish extension or
+whole-shard success. A documentation-only skip likewise makes no new native
+validation claim.
+
+## Frozen historical producer inputs
 
 The current native-input helper uses schema 3 (`native-producers-v3`): the current
 SDK is selected by the current checkout, while each frozen source must resolve its

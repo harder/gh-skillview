@@ -1,5 +1,11 @@
 # SkillView product simplification and release plan
 
+This is historical planning context for the revision named below, not a current
+implementation backlog or authorization to resume deferred work. For current
+behavior, use the [usage guide](../docs/usage.md) and
+[supported actions](../docs/supported-actions.md); current scope decisions live
+in [deferred maintenance work](deferred-maintenance-work.md).
+
 Research date: October 24, 2026, America/Chicago. Baseline: released `v1.0.1`, PR 41, commit `d6a578535e912876cd6f57158a6396fc94c0f4d7`. Current revision: PR 92 merged, `27efe94ddbde31ef3c8e6e7dbbee41c00c8b7177`.
 
 **Approved direction: retain the reliable inventory and saved-operation foundations, remove peripheral features, and organize the product around Discover, Installed, and Issues.** The largest remaining gap is converting observations into a small, accurate set of problems with understandable repairs. Another broad maintenance framework would make that gap worse.
@@ -82,7 +88,7 @@ In the isolated seven-installation fixture, Changes displayed 12 rows: seven gen
 
 ### The repair offering is much narrower than the detection offering
 
-Current cleanup can remove eligible broken links and genuinely empty ordinary directories. Malformed skills, name collisions, untracked copies, and metadata conflicts are generally review-only. Copies provides comparison and handoffs, but no consolidation. Static package findings do not feed the maintenance queue. Most “fix” routes therefore become inspection or a different workflow. [Classifier](../src/SkillView.Core/Inventory/CleanupClassifier.cs), [Copies](../src/SkillView.Core/Ui/CopiesScreen.cs), [package checker](../src/SkillView.Core/PackageChecking/StaticPackageChecker.cs).
+Current cleanup can remove eligible broken links and genuinely empty ordinary directories. Malformed skills, name collisions, untracked copies, and metadata conflicts are generally review-only. Copies provides comparison and handoffs, but no consolidation. Static package findings do not feed the maintenance queue. Most “fix” routes therefore become inspection or a different workflow. [Classifier](../src/SkillView.Core/Inventory/CleanupClassifier.cs), [historical Copies](https://github.com/harder/gh-skillview/blob/27efe94ddbde31ef3c8e6e7dbbee41c00c8b7177/src/SkillView.Core/Ui/CopiesScreen.cs), [package checker](../src/SkillView.Core/PackageChecking/StaticPackageChecker.cs).
 
 **Change:** publish and implement a bounded repair matrix. For every issue, return a concrete supported action, a user decision that unlocks one, or a clear owner/tool limitation. Automated repair means SkillView executes the reviewed steps and verifies their result; it does not mean silently choosing a survivor, discarding edits, or assuming every same-name skill is interchangeable.
 
@@ -128,7 +134,7 @@ Source review also found a failure-path risk: install result objects lack explic
 
 ### Much of the new product surface has low relevance to the stated goals
 
-Authoring validation wraps `gh skill publish --dry-run`. Docker evaluation adds explicit environments, prompts and isolation machinery. Effective loading models provider configuration merging, permissions, trust and version-specific rules while still declining to claim actual running-session state. These are substantial maintenance commitments for adjacent problems. [Authoring](../src/SkillView.Core/Authoring/AuthoringValidationService.cs), [evaluation](../src/SkillView.Core/Evaluation/IsolatedEvaluationRunner.cs), [loading](../src/SkillView.Core/Loading/EffectiveSkillLoader.cs).
+Authoring validation wraps `gh skill publish --dry-run`. Docker evaluation adds explicit environments, prompts and isolation machinery. Effective loading models provider configuration merging, permissions, trust and version-specific rules while still declining to claim actual running-session state. These are substantial maintenance commitments for adjacent problems. Historical source: [authoring](https://github.com/harder/gh-skillview/blob/27efe94ddbde31ef3c8e6e7dbbee41c00c8b7177/src/SkillView.Core/Authoring/AuthoringValidationService.cs), [evaluation](https://github.com/harder/gh-skillview/blob/27efe94ddbde31ef3c8e6e7dbbee41c00c8b7177/src/SkillView.Core/Evaluation/IsolatedEvaluationRunner.cs), [loading](https://github.com/harder/gh-skillview/blob/27efe94ddbde31ef3c8e6e7dbbee41c00c8b7177/src/SkillView.Core/Loading/EffectiveSkillLoader.cs).
 
 **Change:** remove the authoring and evaluation product features. Replace detailed loading-policy simulation with observed locations, ownership, and concise reload guidance. Preserve discovery of managed/plugin skills and the protections against mutating them. Keep static package integrity checks that detect missing files or invalid metadata.
 

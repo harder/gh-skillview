@@ -27,18 +27,24 @@ workflow visibly. Manually dispatch with `issue_number` to assess an existing
 `critical-dependency` issue. Reruns never create duplicate assessment comments.
 
 CI's `.github/scripts/ci-change-scope.js` permits skipping managed/native proofs
-only for its explicit user-documentation, screenshot/animation and static-site
-allowlist. Workflow lint and site checks still run. All `agent_docs/` changes,
-proof fixtures/scripts, dependencies, workflows and unknown paths require full
-verification. The classifier compares exact local base/head commits, inspects
-both rename paths and file modes, and defaults to full verification on missing,
+only for its explicit documentation, screenshot/animation and static-site
+allowlist. Regular Markdown under `docs/` and `agent_docs/`, root `AGENTS.md`,
+`README.md` and `CONTRIBUTING.md` qualify. Executable modes, links, nested
+`AGENTS.md`/`SKILL.md`, hidden paths (including this workflow README), proof
+fixtures/scripts, dependencies, workflows and unknown paths require full
+verification. Workflow lint and site checks still run. The classifier compares
+exact local base/head commits, inspects both rename paths and file modes, and
+defaults to full verification on missing,
 empty, malformed or bounded diff evidence. Keep the allowlist narrow and run
 `node --test .github/scripts/ci-change-scope.test.js` when changing it.
 
-Native builds feed three independent proof groups per platform and reuse verified
-historical producer binaries. The existing AOT check names still require every
-group to pass. See [CI scope and native proof inputs](../../agent_docs/ci-runtime-optimization.md)
-for cache, artifact and rerun contracts.
+Native builds feed three proof groups per platform and reuse verified historical
+producer binaries. All twelve proof jobs share a fixed concurrency queue across
+PR and main runs; no active proof is cancelled to make room for another. The
+existing AOT check names still require every group to pass. See
+[CI scope and native proof inputs](../../agent_docs/ci-runtime-optimization.md)
+for cache, artifact, queue and targeted retry contracts. Serialization limits
+overlap; it does not reserve API budget or guarantee hosted-runner capacity.
 
 ## Release pipeline
 

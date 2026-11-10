@@ -75,6 +75,8 @@ Use `gh skillview` in place of `skillview` when installed as an extension. Run `
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture, tests, and contribution guidance.
+For native CI coverage, queued proof jobs and failure diagnosis, see the
+[CI guide](agent_docs/ci-runtime-optimization.md).
 
 ## Built with
 

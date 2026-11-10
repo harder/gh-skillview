@@ -92,6 +92,31 @@ absolute-only paths and exit 0; confirm selection using reports or diagnostics.
 Always run the full solution formatting check above before finishing. See
 [scoped formatting](agent_docs/running-tests.md#scoped-formatting) for details.
 
+### Native proofs and CI diagnostics
+
+CI builds four native targets and runs three proof groups for each: `owners`,
+`sources`, and `inspection-unpin`. The twelve proof jobs share one queue across
+PR and main runs; ordinary tests and builds can still run in parallel. A pending
+proof may be waiting for another run, while a queued job may be waiting for a
+hosted runner. Builds alone do not establish native proof success.
+
+Run the focused CI helper checks locally before changing proof orchestration:
+
+```bash
+node --test .github/scripts/ci-change-scope.test.js
+python3 -m unittest discover -s .github/scripts -p test_native_proof_inputs.py
+python3 -m unittest discover -s .github/scripts -p test_api_budget.py
+python3 -m unittest discover -s .github/scripts -p test_proof_ci.py
+```
+
+For a failed job, retain its run, attempt, commit, failed step and bounded logs
+or artifacts before retrying. `native-ci-summary.json` is diagnostic context;
+the original step outcomes and completion gates determine success. Distinguish
+runner-capacity cancellations, tool/container prerequisites, transport errors,
+explicit rate limits and proof assertion failures. See the
+[CI guide](agent_docs/ci-runtime-optimization.md#diagnose-and-retry-a-native-proof)
+for evidence and targeted retry guidance.
+
 ### Offline inventory measurements
 
 Use Python 3 and a built current host; the PTY observer supports Linux/macOS.
