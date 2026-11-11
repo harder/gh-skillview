@@ -58,6 +58,12 @@ Local browsing does not require a remote authentication check. **F5 / Locations*
 
 Read the [usage guide](docs/usage.md) for keyboard controls and configuration, the [supported actions matrix](docs/supported-actions.md) for what each selection can do, [saved updates](docs/saved-updates.md) for review/apply/Undo, and [quarantine and undo](docs/quarantine-and-undo.md) for standalone relocation. Unmatched gh registry records provide inspection guidance; they are not automatic cleanup targets.
 
+For the full range of discovery and repair options, see [Find, diagnose and fix skills](docs/find-diagnose-fix.md): add workspaces and profiles, inspect coverage and owner conflicts, check package references, compare copies, review updates or recorded restoration, and use purpose-specific local-source, unpin, removal and Move aside workflows. Guided review handles eligible items one at a time; retained-operation History supports fresh Undo/recovery and explicit retirement.
+
+![Current Installed view with physical copies, filters and coverage](assets/screenshots/05-installed.png)
+
+*Current development app with an isolated sample inventory; no remote authentication or repair is implied.*
+
 The CLI offers the same core workflows:
 
 ```bash

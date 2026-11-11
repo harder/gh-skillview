@@ -1,0 +1,251 @@
+{
+  "source": "c2dbc5279755d1e71219155a7d36f94684ae8f4c",
+  "builtHostSHA256": "0ffb5db2896419321ff79be40eb6ae2f159d0b64b33df12025415ac9d1ef26ec",
+  "assemblies": {
+    "SkillView.Core.dll": "153af041294bd61210d5c5c3dae385c1d09c8023015848bc421dff58483669b5"
+  },
+  "terminal": {
+    "columns": 120,
+    "rows": 36,
+    "pixels": [
+      1320,
+      864
+    ]
+  },
+  "fixture": "private tools/inventory_fixture.py messy story; credential-free sample search/preview adapter; no writes applied",
+  "fixtureInputsUnchanged": true,
+  "rawANSI": {
+    "sha256": "1ec3d0ee9715abf86bb7c860ffd3be1cf9919ff4b524a454574b43c51a69ca8d",
+    "bytes": 899757
+  },
+  "inputTraceSHA256": "1037eda6b22a8768a05a0a323d62410eeb8a653fb07d88b40dc57ebca1e27cf6",
+  "renderer": "Captured VT cells and ANSI colors, DejaVu Sans Mono18, bold where recorded; no cursor or complete style reconstruction; no terminal text edits",
+  "animation": "Ordered settled captures with edited1.8s holds; review/inspection only, not continuous playback or latency evidence",
+  "limitations": [
+    "Offline sample adapter does not establish real GitHub/auth compatibility or mutation success.",
+    "Capture driver did not decode a private keyboard-protocol restore sequence at shutdown; frame capture completed, exit is not attested.",
+    "First control-navigation timeout/refused slash query and intermediate modal navigation frames retained locally; only inspected settled frames published."
+  ],
+  "assets": {
+    "assets/screenshots/01-discover.png": {
+      "frame": "discover-results",
+      "name": "discover-results",
+      "rawOffset": 370849,
+      "textSHA256": "55d5e6a8d5f820002070dcd95fe1234189f3ab3973107450b6d19e5b956b46e9",
+      "pngSHA256": "0eebbce48a30d10840dfee9ef8f48873b9b4dc05cc7fd31bfe8f27bf069bf68a",
+      "traceLength": 19,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/02-preview.png": {
+      "frame": "preview-loaded",
+      "name": "preview-loaded",
+      "rawOffset": 425322,
+      "textSHA256": "674771d4f01bf3db11b2dc4040d61aa3777b5c678e1dbefe567a75d1850035bb",
+      "pngSHA256": "94e2baddf68c4462289d95cbdac64b962b28a74a9a85d66404735c93c812f73a",
+      "traceLength": 23,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/03-install-dialog.png": {
+      "frame": "install-dialog",
+      "name": "install-dialog",
+      "rawOffset": 403039,
+      "textSHA256": "20eca9021c7609e6101f127935d4e622d9a7829c0647712ae42b313811074b4a",
+      "pngSHA256": "8ebd322da29050abd93c64499b0697a8183201aece9e1a75014076cff50adb10",
+      "traceLength": 21,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/04-discover-filters.png": {
+      "frame": "discover-filters",
+      "name": "discover-filters",
+      "rawOffset": 434884,
+      "textSHA256": "2b7a17440093b9ff07622f2f4315791fbef647ad89b03b3901d650f979a1d16a",
+      "pngSHA256": "5b0c7ab2763c08d173fab3f22df5bbbe9c98cfb9ce3d6239a78d18e54a7ce862",
+      "traceLength": 24,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/05-installed.png": {
+      "frame": "installed-now",
+      "name": "installed-now",
+      "rawOffset": 502492,
+      "textSHA256": "d7e3abef85fd2b8a1f946f6e1ed3541a915d2d031ee1b20108404b9a66828478",
+      "pngSHA256": "eeac78c654ba0179ac9c2c0f895b3bb13e98d33eb2cfcd34d471ca6a905de8e9",
+      "traceLength": 39,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/06-remove-confirm.png": {
+      "frame": "remove-confirm",
+      "name": "remove-confirm",
+      "rawOffset": 681042,
+      "textSHA256": "34386ef052c466347c551af4467cb72e19227f3c1b0ae75ba35d3d313d716d51",
+      "pngSHA256": "9bae293d7dd5add41528ec64544e4e1389858351b96c5e54d65f4c16d84b9014",
+      "traceLength": 50,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/07-issues.png": {
+      "frame": "issues",
+      "name": "issues",
+      "rawOffset": 65014,
+      "textSHA256": "97ee9d794ed53119324e19b89e9550c15a087168db5a2e0312d1a45d1dce44b9",
+      "pngSHA256": "2b03e1282d59f5c70256d403d318c2750251d8791059b0c9e0b920dc56d5af2d",
+      "traceLength": 1,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/08-cleanup.png": {
+      "frame": "cleanup-review",
+      "name": "cleanup-review",
+      "rawOffset": 87053,
+      "textSHA256": "df1e2a3950402e9739cb7bd91cced5f231328463ad6b7fedfd2a7262171956e7",
+      "pngSHA256": "e2972771cc33f1ca790d73744fce7a024573fe6cac592e952a633a3b6941b356",
+      "traceLength": 2,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/09-doctor.png": {
+      "frame": "doctor",
+      "name": "doctor",
+      "rawOffset": 241679,
+      "textSHA256": "8537cfed58ebceb888b8ff13c0e26ddfde9e6999e929f2372dc8adc9f0d84563",
+      "pngSHA256": "ad9a761230517ec08b4281cd787f736efd5e61bc8eea5d0d9a21a718af5daaa0",
+      "traceLength": 12,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/10-help.png": {
+      "frame": "help",
+      "name": "help",
+      "rawOffset": 576199,
+      "textSHA256": "b3731030fbd0f1436c3faf2a865323838f684e2b47280bbdd3e184d854834867",
+      "pngSHA256": "146e0d57c86e94bbebd4cee70d7c5527e8372b363604a0d2d1b1276ea3bfe3bb",
+      "traceLength": 45,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/11-locations.png": {
+      "frame": "locations",
+      "name": "locations",
+      "rawOffset": 182624,
+      "textSHA256": "ec3aa6f963750eba2fd9bc7dc1bd6ea988643bb158f7bd3a3cbf3a421cf6098a",
+      "pngSHA256": "3d613c207558da8f12f2286e1776b690c465d631d1f1e837914be49bc39f03a0",
+      "traceLength": 8,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/12-package-check.png": {
+      "frame": "package-report-final",
+      "name": "package-report-final",
+      "rawOffset": 555082,
+      "textSHA256": "a84f72c04e3e8e110e45101d63c6916f9be57df59a45a309b1908aab65a9d2d8",
+      "pngSHA256": "f794deeef38625a6e6534718cf7b5ac109cf8ea1afc1f10890814358ad7e4ecd",
+      "traceLength": 43,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/13-compare.png": {
+      "frame": "comparison-result-final",
+      "name": "comparison-result-final",
+      "rawOffset": 892385,
+      "textSHA256": "783ce590009863d72fbe757b18bc04fc821177b47d229750a38c06c0f22ff3dc",
+      "pngSHA256": "8230219f32f63bed29727c7803e8185d00c08045fcdf8dde9ffef869c824fef4",
+      "traceLength": 68,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/screenshots/14-history.png": {
+      "frame": "history",
+      "name": "history",
+      "rawOffset": 208767,
+      "textSHA256": "b752661e9328442a8163b351263ef98090a141fde7c21cb4a0300fce318bd7ad",
+      "pngSHA256": "cf7c23623ad5b3378acabea77da73188caf584ac055c3702f3f81d78480e8115",
+      "traceLength": 10,
+      "size": [
+        1320,
+        864
+      ]
+    },
+    "assets/animations/g1-discover.gif": {
+      "frames": [
+        "discover-results",
+        "install-dialog",
+        "preview-loaded"
+      ],
+      "sha256": "e953496e63fef3931bd8138414683d8c11e35914dd700d7757f62e3b8b30af55",
+      "frameCount": 3,
+      "holdsMs": 1800
+    },
+    "assets/animations/g2-installed.gif": {
+      "frames": [
+        "installed-now",
+        "resource-selected",
+        "package-report-final",
+        "help"
+      ],
+      "sha256": "4e1aacb5ce008aad34e43c3f542ea02e5c818efdc20ce58d825e23ef1e8bd01d",
+      "frameCount": 4,
+      "holdsMs": 1800
+    },
+    "assets/animations/g3-changes-cleanup.gif": {
+      "frames": [
+        "issues",
+        "cleanup-review",
+        "remove-confirm",
+        "issues-final-base"
+      ],
+      "sha256": "d8e807e4155997a7684d17de295611486f66e76445e3a4bfb1eb1bada7761f98",
+      "frameCount": 4,
+      "holdsMs": 1800
+    },
+    "assets/animations/g4-doctor-help.gif": {
+      "frames": [
+        "doctor",
+        "doctor-return",
+        "help"
+      ],
+      "sha256": "463b3b055dfcea86ab7d6b8968bb25c56ec2c9a06d977771ca3e8e31df582136",
+      "frameCount": 3,
+      "holdsMs": 1800
+    },
+    "assets/animations/g6-remove.gif": {
+      "frames": [
+        "cleanup-new",
+        "remove-confirm",
+        "issues-final-base"
+      ],
+      "sha256": "60e1da43a4c5f5d7a6c0a445c73008bd499ea31cf80c1f72922e96efe30fd4ce",
+      "frameCount": 3,
+      "holdsMs": 1800
+    }
+  }
+}

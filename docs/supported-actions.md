@@ -5,6 +5,8 @@ installed release. Use that binary's `--help` for its command surface. A visible
 button or captured finding is an invitation to review; fresh admission can still
 refuse it. All actions retain their own cancellation, identity and context checks.
 
+Choose a route by symptom in [Find, diagnose and fix skills](find-diagnose-fix.md).
+
 ## Browse, inspect and choose
 
 | Selection / surface | Action | Result and limits |

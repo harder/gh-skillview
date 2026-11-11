@@ -37,7 +37,7 @@
           <h1 id="hero-title">Your skills.<br><em>In focus.</em></h1>
           <p class="hero-description">Find the right agent skill, read it before you install it, and keep your collection in shape. All without leaving the terminal.</p>
           <div class="hero-install" aria-label="Install SkillView in one command">
-            <div class="hero-install-heading"><span>ONE LINE TO INSTALL</span><span>GH CLI 2.97+</span></div>
+            <div class="hero-install-heading"><span>ONE LINE TO INSTALL</span><span>GH CLI 2.102.0+</span></div>
             <div class="hero-install-line"><span class="command-prompt" aria-hidden="true">$</span><code>gh extension install harder/gh-skillview</code><button type="button" class="copy-button" data-copy="gh extension install harder/gh-skillview" aria-label="Copy extension install command">Copy</button></div>
           </div>
           <div class="hero-actions">
@@ -48,7 +48,7 @@
         <div class="hero-visual">
           <div class="terminal-window hero-terminal">
             <div class="terminal-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="terminal-title">gh skillview <span class="terminal-path">/ discover</span></span><span class="terminal-key">↵</span></div>
-            <img src="media/02-preview.png" width="1280" height="775" alt="SkillView showing Terraform search results and a selected skill preview" fetchpriority="high">
+            <img src="media/02-preview.png" width="1320" height="864" alt="SkillView showing sample Terraform search results and a selected skill preview" fetchpriority="high">
           </div>
           <span class="hero-note"><span aria-hidden="true">↳</span> DISCOVER · INSPECT · INSTALL</span>
         </div>
@@ -65,7 +65,7 @@
         <div class="feature-grid">
           <article class="feature-card"><span class="feature-icon" aria-hidden="true">⌕</span><span class="feature-index">01 — FIND</span><h3>Explore with context</h3><p>Search public skills, narrow results by owner or agent, and inspect a skill’s content before making a choice.</p></article>
           <article class="feature-card"><span class="feature-icon" aria-hidden="true">◇</span><span class="feature-index">02 — ACT</span><h3>Install with intent</h3><p>Choose where a skill goes and which agents use it. Review the plan before SkillView hands it to <code>gh skill</code>.</p></article>
-          <article class="feature-card"><span class="feature-icon" aria-hidden="true">↺</span><span class="feature-index">03 — MAINTAIN</span><h3>Keep things tidy</h3><p>See what’s installed, check for updates, review cleanup candidates, and inspect your environment with Doctor.</p></article>
+          <article class="feature-card"><span class="feature-icon" aria-hidden="true">↺</span><span class="feature-index">03 — MAINTAIN</span><h3>Keep things tidy</h3><p>Find physical copies across workspaces and profiles. Diagnose Problems in Issues, check package references, compare copies, and review exact updates, restoration or removal.</p></article>
         </div>
       </section>
 
@@ -74,14 +74,24 @@
           <div class="section-label"><span class="label-number">02 / INSIDE THE TERMINAL</span><span class="label-rule"></span><span>A quick look around.</span></div>
           <div class="tour-heading"><h2 id="tour-title">Built for the way<br><span class="serif-accent">you actually work.</span></h2><p>One place to move from “what is this?” to “yes, I want it”—and keep tabs on it later.</p></div>
           <div class="showcase">
-            <div class="showcase-media terminal-window"><div class="terminal-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="terminal-title" id="showcase-window-title">gh skillview / discover</span><span class="terminal-key">⌘</span></div><img id="showcase-image" src="media/g1-discover.gif" width="1200" height="675" alt="Animated SkillView Discover screen showing a search and preview" loading="lazy"></div>
+            <div class="showcase-media terminal-window"><div class="terminal-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="terminal-title" id="showcase-window-title">gh skillview / discover</span><span class="terminal-key">⌘</span></div><img id="showcase-image" src="media/01-discover.png" width="1320" height="864" alt="Current Discover view with declared sample search results" loading="lazy"></div>
             <div class="showcase-controls" role="group" aria-label="SkillView tour">
-              <button class="showcase-tab is-active" type="button" data-image="media/g1-discover.gif" data-alt="Animated SkillView Discover screen showing a search and preview" data-title="gh skillview / discover" aria-pressed="true"><span class="tab-count">01</span><span><strong>Discover &amp; preview</strong><small>Look inside before installing.</small></span><span aria-hidden="true">↗</span></button>
+              <button class="showcase-tab is-active" type="button" data-image="media/01-discover.png" data-alt="Current Discover view with declared sample search results" data-title="gh skillview / discover" aria-pressed="true"><span class="tab-count">01</span><span><strong>Discover &amp; preview</strong><small>Look inside before installing.</small></span><span aria-hidden="true">↗</span></button>
               <button class="showcase-tab" type="button" data-image="media/03-install-dialog.png" data-alt="SkillView install dialog with scope and agent choices" data-title="gh skillview / install" aria-pressed="false"><span class="tab-count">02</span><span><strong>Choose the destination</strong><small>Scope, agents, and install options.</small></span><span aria-hidden="true">↗</span></button>
               <button class="showcase-tab" type="button" data-image="media/05-installed.png" data-alt="SkillView Installed view listing local skills and details" data-title="gh skillview / installed" aria-pressed="false"><span class="tab-count">03</span><span><strong>Know what’s installed</strong><small>Browse and inspect local skills.</small></span><span aria-hidden="true">↗</span></button>
-              <button class="showcase-tab" type="button" data-image="media/08-cleanup.png" data-alt="SkillView Cleanup view showing candidates for review" data-title="gh skillview / cleanup" aria-pressed="false"><span class="tab-count">04</span><span><strong>Clean up confidently</strong><small>Review candidates before removal.</small></span><span aria-hidden="true">↗</span></button>
+              <button class="showcase-tab" type="button" data-image="media/07-issues.png" data-alt="Current Issues view showing Problems, Review and incomplete coverage" data-title="gh skillview / issues" aria-pressed="false"><span class="tab-count">04</span><span><strong>Diagnose &amp; review fixes</strong><small>Problems, comparison and exact repair reviews.</small></span><span aria-hidden="true">↗</span></button>
             </div>
           </div>
+          <p>Fresh development-version captures use an isolated sample inventory and sample search adapter. <a href="docs.html#find">Explore discovery, diagnosis and every supported repair route</a>. Screens show review paths; installed releases may differ.</p>
+        </div>
+      </section>
+
+      <section class="section-wrap section-space" aria-labelledby="care-title">
+        <h2 id="care-title">Find the copy. Understand the problem. Review the fix.</h2>
+        <div class="feature-grid">
+          <article class="feature-card"><h3>Look across locations</h3><p>Browse agent homes, shared copies and projects. Add workspaces, exact folders or named profiles in Locations, then filter physical copies without losing their recorded consumers.</p><a href="docs.html#find">Find skills →</a></article>
+          <article class="feature-card"><h3>Inspect the evidence</h3><p>Issues separates Problems from Review. Check missing resources and metadata, compare copies, inspect coverage and owner conflicts, or run Doctor for environment diagnostics.</p><a href="docs.html#diagnose">Diagnose a finding →</a></article>
+          <article class="feature-card"><h3>Choose an exact repair</h3><p>Review updates, recorded restoration, local reimport/source switch or unpin. Remove eligible residue, move an independent copy aside, or inspect retained originals for fresh Undo and recovery.</p><a href="docs.html#fix">See all supported repair paths →</a></article>
         </div>
       </section>
 

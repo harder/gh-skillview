@@ -4,6 +4,10 @@ This guide describes the development checkout. Installed releases may have an ea
 
 For installation and a quick start, see the [README](../README.md).
 
+For a task-oriented map of every supported discovery, diagnostic and repair route,
+start with [Find, diagnose and fix skills](find-diagnose-fix.md). The
+[supported actions matrix](supported-actions.md) gives exact selection and approval boundaries.
+
 ## TUI
 
 ### TUI layout
