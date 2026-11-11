@@ -23,6 +23,17 @@ Planning writes private state and downloads source; it leaves the installation
 untouched. It never executes skill code. Staging failure retains private evidence
 and reports its location.
 
+Read the frozen source review and its omissions, then acknowledge that exact review
+separately from permission to retain the original:
+
+```sh
+skillview --scan-root /path/to/skills restore-ack-source --id PLAN_ID \
+  --expect PLAN_FINGERPRINT --review SOURCE_REVIEW_FINGERPRINT --yes --json
+```
+
+Use the saved plan and source-review fingerprints reported by planning/inspection.
+Viewing a diff is not acknowledgement or a claim of authenticity. Then approve retention:
+
 ```sh
 skillview --scan-root /path/to/skills restore-apply --id PLAN_ID \
   --yes --disposition retain-original --expect PLAN_FINGERPRINT --json

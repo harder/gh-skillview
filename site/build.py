@@ -10,13 +10,20 @@ OUTPUT = ROOT / "dist" / "skillview-site"
 
 PAGES = ("index.html", "docs.html", "styles.css", "app.js", "favicon.svg", "robots.txt", "sitemap.xml")
 MEDIA = {
-    "g1-discover.gif": ROOT / "assets" / "animations" / "g1-discover.gif",
-    "g2-installed.gif": ROOT / "assets" / "animations" / "g2-installed.gif",
-    "01-discover.png": ROOT / "assets" / "screenshots" / "01-discover.png",
-    "02-preview.png": ROOT / "assets" / "screenshots" / "02-preview.png",
-    "03-install-dialog.png": ROOT / "assets" / "screenshots" / "03-install-dialog.png",
-    "05-installed.png": ROOT / "assets" / "screenshots" / "05-installed.png",
-    "08-cleanup.png": ROOT / "assets" / "screenshots" / "08-cleanup.png",
+    '01-discover.png': ROOT / "assets" / "screenshots" / '01-discover.png',
+    '02-preview.png': ROOT / "assets" / "screenshots" / '02-preview.png',
+    '03-install-dialog.png': ROOT / "assets" / "screenshots" / '03-install-dialog.png',
+    '04-discover-filters.png': ROOT / "assets" / "screenshots" / '04-discover-filters.png',
+    '05-installed.png': ROOT / "assets" / "screenshots" / '05-installed.png',
+    '06-remove-confirm.png': ROOT / "assets" / "screenshots" / '06-remove-confirm.png',
+    '07-issues.png': ROOT / "assets" / "screenshots" / '07-issues.png',
+    '08-cleanup.png': ROOT / "assets" / "screenshots" / '08-cleanup.png',
+    '09-doctor.png': ROOT / "assets" / "screenshots" / '09-doctor.png',
+    '10-help.png': ROOT / "assets" / "screenshots" / '10-help.png',
+    '11-locations.png': ROOT / "assets" / "screenshots" / '11-locations.png',
+    '12-package-check.png': ROOT / "assets" / "screenshots" / '12-package-check.png',
+    '13-compare.png': ROOT / "assets" / "screenshots" / '13-compare.png',
+    '14-history.png': ROOT / "assets" / "screenshots" / '14-history.png',
 }
 
 if OUTPUT.exists():
