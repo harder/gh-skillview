@@ -31,6 +31,11 @@ LINK_PROOFS = {'static-package-check', 'gitfile-protection', 'inventory-filter',
 RELEASE_RIDS = {'win-x64', 'win-arm64', 'linux-x64', 'osx-arm64'}
 
 
+def gh_version_supported(output):
+    version = re.match(r'gh version (\d+)\.(\d+)\.(\d+)(?:\s|$)', output)
+    return version is not None and tuple(map(int, version.groups())) >= (2, 102, 0)
+
+
 def make_output(requested):
     base = Path('/var/tmp') if sys.platform.startswith('linux') else Path(tempfile.gettempdir())
     candidate = requested.expanduser().resolve() if requested else base.resolve()
@@ -207,9 +212,8 @@ def main(argv=None):
         gh = shutil.which('gh')
         if not gh or not run('gh-version', [gh, '--version'], 30) or not run('gh-skill-help', [gh, 'skill', '--help'], 30):
             raise RuntimeError('gh with the required skill surface is unavailable')
-        version = re.search(r'gh version (\d+)\.(\d+)\.(\d+)', (output / 'gh-version.log').read_text())
-        if version is None or tuple(map(int, version.groups())) < (2, 97, 0):
-            raise RuntimeError('gh 2.97.0 or newer is required')
+        if not gh_version_supported((output / 'gh-version.log').read_text()):
+            raise RuntimeError('Stable gh 2.102.0 or newer is required')
         run('changes-since-release', ['git', 'log', '--oneline', 'v1.0.1..HEAD'], 30)
         ready = {}
         for name in ('unit', 'integration'):

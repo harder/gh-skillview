@@ -28,7 +28,9 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   permissions; retain response headers to distinguish access from quota errors.
 - `release.yml` uses locked restore, tests, AOT publishes, version and checksum
   checks, provenance attestations, a complete-asset check, and a draft release
-  before publication. Published tag reruns are refused. Stable releases also
+  before publication. Curated `docs/releases/<version>.md` notes, when present,
+  precede the shared download/install instructions and generated commit notes.
+  Published tag reruns are refused. Stable releases also
   generate a verified Homebrew formula artifact; the tap polls releases and
   validates formula PRs on macOS and Linux before merging. WinGet generation
   remains opt-in.

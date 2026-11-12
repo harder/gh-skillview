@@ -5,6 +5,7 @@ using SkillView.Threading;
 using SkillView.Ui.Theming;
 using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
+using Terminal.Gui.Editor;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -77,7 +78,7 @@ internal sealed class RemoveConfirmModal
         _ => OperationOwnership.AwaitingUiCompletion,
     };
 
-    internal Result Show()
+    internal Result Show(Action<Dialog>? readyForTests = null)
     {
         using var lifetime = new CancellationSource(
             CancellationCallbackReporter.For(_logger, "remove dialog", "remove.ui"));
@@ -91,70 +92,60 @@ internal sealed class RemoveConfirmModal
         using var dialog = new Dialog
         {
             Title = " Remove skill ",
-            Width = Dim.Percent(50),
-            Height = 12,
+            Width = Dim.Percent(90),
+            Height = Dim.Percent(85),
         };
         dialog.SchemeName = SchemeNames.Dialog;
 
-        var prompt = new Label
-        {
-            X = 1,
-            Y = 0,
-            Width = Dim.Fill(2),
-            Text = $"Remove {_skill.Name}?",
-        };
-        var path = new Label
-        {
-            X = 1,
-            Y = 1,
-            Width = Dim.Fill(2),
-            Text = $"  {TuiHelpers.ShortenPath(_skill.ResolvedPath, segments: 4)}",
-        };
         var warningsText = _evaluation.Warnings.Length > 0
             ? "  ⚠ " + string.Join("; ", _evaluation.Warnings.Select(w => w.Detail))
             : string.Empty;
         if (validation.Impact is { } impact)
             warningsText += $"  {impact.AffectedExposures.Length} known exposure(s); "
                 + string.Join("; ", impact.AffectedExposures.Select(OperationImpactFormatter.Exposure));
-        var warnings = new Label
+        var review = new Editor
         {
-            X = 1,
-            Y = 3,
-            Width = Dim.Fill(2),
-            Text = TerminalEscapeSanitizer.Sanitize(warningsText) ?? "",
-            Visible = warningsText.Length > 0,
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(3),
+            ReadOnly = true,
+            WordWrap = true,
+            Text = TerminalEscapeSanitizer.Sanitize(
+                $"Remove {_skill.Name}?\n\nLocation: {_skill.ResolvedPath}\n\n{warningsText}") ?? "",
         };
 
         var status = new Label
         {
             X = 3,
-            Y = Pos.AnchorEnd(3),
+            Y = Pos.AnchorEnd(2),
             Width = Dim.Fill(4),
+            Height = 1,
             Text = " [y] yes   [n] no   [a] advanced…",
         };
         var spinner = new SpinnerView
         {
             X = 1,
-            Y = Pos.AnchorEnd(3),
+            Y = Pos.AnchorEnd(2),
             Visible = false,
             AutoSpin = false,
         };
 
-        var yesButton = new Button
+        var yesButton = new SingleRowButton
         {
             X = Pos.Center() - 16,
             Y = Pos.AnchorEnd(1),
             Text = "Yes",
             IsDefault = false,
         };
-        var noButton = new Button
+        var noButton = new SingleRowButton
         {
             X = Pos.Center() - 6,
             Y = Pos.AnchorEnd(1),
             Text = "No",
             IsDefault = true,
         };
-        var advancedButton = new Button
+        var advancedButton = new SingleRowButton
         {
             X = Pos.Center() + 4,
             Y = Pos.AnchorEnd(1),
@@ -341,13 +332,16 @@ internal sealed class RemoveConfirmModal
             }
         };
 
-        dialog.Add(prompt, path, warnings, spinner, status, yesButton, noButton, advancedButton);
+        dialog.Add(review, spinner, status, yesButton, noButton, advancedButton);
+        TuiHelpers.ConfigureReadOnlyPane(review, SchemeNames.Dialog);
+        noButton.SetFocus();
         TuiHelpers.ApplyScheme(SkillViewStyling.DialogSchemeName,
-            dialog, prompt, path, warnings, spinner, status,
+            dialog, review, spinner, status,
             yesButton, noButton, advancedButton);
 
         try
         {
+            readyForTests?.Invoke(dialog);
             _app.Run(dialog);
         }
         finally

@@ -213,7 +213,14 @@ jobs:
           RELEASE_REF: ${{ github.ref_name }}
           RELEASE_REPO: ${{ github.repository }}
         run: |
-          cat > release-notes.md <<EOF
+          set -euo pipefail
+          notes_path="docs/releases/${RELEASE_REF#v}.md"
+          : > release-notes.md
+          if [ -f "$notes_path" ]; then
+            cat "$notes_path" >> release-notes.md
+            printf '\n\n' >> release-notes.md
+          fi
+          cat >> release-notes.md <<EOF
           > SkillView is a Native AOT standalone build. Download the binary for your machine, mark it executable on macOS/Linux, and run \`skillview\`.
           >
           > Asset names use Go's OS/arch vocabulary (\`windows\`/\`linux\`/\`darwin\`, \`amd64\`/\`arm64\`) for both the standalone binary and the \`gh\` extension binary, matching the naming \`gh extension install\` requires.

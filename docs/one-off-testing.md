@@ -114,7 +114,11 @@ including missing security-metadata privileges; the kit does not waive them.
 
 Results default to a unique temp directory outside the checkout (`/var/tmp` on
 Linux). `--output PATH` chooses a new directory instead. The runner prints its
-location and writes `REPORT.md`, `report.json`, command logs and proof JSON.
+location. On Linux, keep both the checkout and results on a filesystem reachable
+from `/` without crossing a separate mount; `/tmp` can be separately mounted.
+Native placement tests deliberately refuse mount crossings, so prefer `/var/tmp`
+for a dedicated checkout and results on such hosts. The runner writes
+`REPORT.md`, `report.json`, command logs and proof JSON.
 Exit status 0 means requested commands passed, 1 means a command failed, and 2
 means blocked or partial coverage. Test skips still need to be read in the logs.
 Each command has a timeout; after a timeout the run stops for cleanup inspection.

@@ -8,7 +8,7 @@
 [![Release](https://github.com/harder/gh-skillview/actions/workflows/release.yml/badge.svg)](https://github.com/harder/gh-skillview/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
 
-This checkout documents the development version. Some workflows below may be ahead of your installed release; check `skillview --version` and `skillview --help`.
+SkillView **1.1.0** adds clearer discovery, diagnosis and reviewed maintenance workflows. See the [release notes](docs/releases/1.1.0.md) for highlights and upgrade instructions. Check `skillview --version` and `skillview --help` for your installed version.
 
 ## Install
 
@@ -62,7 +62,7 @@ For the full range of discovery and repair options, see [Find, diagnose and fix 
 
 ![Current Installed view with physical copies, filters and coverage](assets/screenshots/05-installed.png)
 
-*Current development app with an isolated sample inventory; no remote authentication or repair is implied.*
+*The 1.1 feature set with an isolated sample inventory, captured before the version bump; see [media provenance](docs/media.md). No remote authentication or repair is implied.*
 
 The CLI offers the same core workflows:
 

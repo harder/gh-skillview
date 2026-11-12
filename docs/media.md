@@ -1,10 +1,10 @@
 # Current terminal screenshots
 
 The current PNGs and GIFs in `assets/screenshots/` and `assets/animations/` were
-regenerated from the development app at `c2dbc5279755d1e71219155a7d36f94684ae8f4c`.
+captured from the pre-release 1.1 app at `c2dbc5279755d1e71219155a7d36f94684ae8f4c`.
 They show actual Terminal.Gui output from a 120-column × 36-row PTY with a
-credential-free, disposable sample inventory. The source revision is the parent
-of this documentation/media update, so no product change is implied.
+credential-free, disposable sample inventory. The source revision predates the 1.1.0 version bump. These captures document
+the 1.1 feature set, rather than a new run of the tagged release binary.
 
 The fixture contains independent same-name copies, an intentional project
 variation, a shared payload, a broken link, an empty directory, malformed metadata,

@@ -1,7 +1,7 @@
 # Supported actions and their boundaries
 
-This matrix describes the development checkout, which may be ahead of an
-installed release. Use that binary's `--help` for its command surface. A visible
+This matrix describes SkillView **1.1.0**. Use your installed binary's
+`--help` for its command surface; see the [release notes](releases/1.1.0.md) to upgrade. A visible
 button or captured finding is an invitation to review; fresh admission can still
 refuse it. All actions retain their own cancellation, identity and context checks.
 

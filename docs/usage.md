@@ -1,6 +1,6 @@
 # Using SkillView
 
-This guide describes the development checkout. Installed releases may have an earlier command or UI surface; check `skillview --version` and `skillview --help`. The [supported actions matrix](supported-actions.md) summarizes selection and approval boundaries.
+This guide describes SkillView **1.1.0**. Older releases may have an earlier command or UI surface; check `skillview --version` and `skillview --help`. See the [1.1 release notes](releases/1.1.0.md) for upgrade instructions. The [supported actions matrix](supported-actions.md) summarizes selection and approval boundaries.
 
 For installation and a quick start, see the [README](../README.md).
 
@@ -516,7 +516,7 @@ resumes a saved transaction; it does not mean repairing an arbitrary broken skil
 Quarantine `undo --id` continues to use its own review contract.
 
 The generic `plan`, `apply`, `repair`, `verify` and `undo --plan-file` wrappers
-were introduced after the last public release (1.0.1) and have been retired.
+were introduced during development after 1.0.1 and retired before 1.1.0.
 New operation output no longer exports `planReference` or its duplicate comparison;
 complete before/after payload evidence remains in the saved native manifest,
 with changed paths and status in specialist output. Persisted plans, hashes,
