@@ -1,7 +1,7 @@
 # Find, diagnose and fix skills
 
-This guide describes the development version; check your installed binary’s `--help`
-for available commands.
+This guide describes SkillView **1.1.0**; check your installed binary’s `--help`
+for available commands. See the [release notes](releases/1.1.0.md) to upgrade.
 
 Start with the symptom below. SkillView observes files and recorded ownership;
 it does not know whether a running agent has loaded a skill. A scan, suggestion,

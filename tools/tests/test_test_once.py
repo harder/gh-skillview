@@ -20,6 +20,15 @@ TEMP_BASE = '/var/tmp' if sys.platform.startswith('linux') else None
 
 
 class TestOnceTests(unittest.TestCase):
+    def test_gh_minimum_rejects_old_and_prerelease_versions(self):
+        for output in ('gh version 2.101.9', 'gh version 2.97.0',
+                       'gh version 2.102.0-rc1', 'gh version 2.103.0-pre', 'unavailable'):
+            with self.subTest(output=output):
+                self.assertFalse(runner.gh_version_supported(output))
+        for output in ('gh version 2.102.0 (2026-10-21)\n', 'gh version 2.103.3', 'gh version 3.0.0'):
+            with self.subTest(output=output):
+                self.assertTrue(runner.gh_version_supported(output))
+
     def test_environment_is_private_and_parent_is_unchanged(self):
         original = dict(os.environ, GH_TOKEN='secret', GIT_DIR='foreign', CODEX_HOME='foreign',
                         SKILLVIEW_CONTRACT_TESTS='true', CLAUDE_CODE_PLUGIN_DIRS='foreign')
