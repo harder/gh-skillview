@@ -3,12 +3,74 @@ using System.IO;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Ui;
+using SkillView.Logging;
+using Terminal.Gui.App;
+using Terminal.Gui.Drawing;
+using Terminal.Gui.Drivers;
+using Terminal.Gui.Editor;
+using Terminal.Gui.Input;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 using Xunit;
 
 namespace SkillView.Tests.Ui;
 
+[Collection(TestCollections.TerminalGuiStaticState)]
 public sealed class RemoveConfirmModalTests
 {
+    [Theory]
+    [InlineData(80, 24)]
+    [InlineData(120, 36)]
+    public void LongReviewKeepsAllEvidenceAboveControlsAndEnterCancels(int width, int height)
+    {
+        var root = NewTempRoot();
+        try
+        {
+            var skill = MakeSkill(root, withGit: false) with { Name = new string('n', 180) };
+            var original = File.ReadAllBytes(Path.Combine(skill.ResolvedPath, "SKILL.md"));
+            var target = new RemoveTarget(RemoveTargetKind.CurrentInstall, "Remove", "—", [skill]);
+            var evaluation = RemoveTargetResolver.Evaluate(target, Snapshot(root, skill));
+            using var app = Application.Create().Init("ansi");
+            app.Driver!.SetScreenSize(width, height);
+            Dialog? modal = null;
+            var inspected = false;
+            var timedOut = false;
+            app.AddTimeout(TimeSpan.FromSeconds(6), () => { timedOut = true; app.RequestStop(); return false; });
+            app.AddTimeout(TimeSpan.FromMilliseconds(10), () =>
+            {
+                if (modal is null) return true;
+                modal.Layout(); modal.Draw(new DrawContext());
+                var review = Assert.Single(modal.SubViews.OfType<Editor>());
+                var status = Assert.Single(modal.SubViews.OfType<Label>());
+                var buttons = modal.SubViews.OfType<Button>().ToArray();
+                var cancel = Assert.Single(buttons, button => button.Text == "No");
+                Assert.Contains(skill.Name, review.Text);
+                Assert.Contains(skill.ResolvedPath, review.Text);
+                Assert.Contains("known exposure(s)", review.Text);
+                Assert.True(review.ReadOnly);
+                Assert.True(review.Frame.Height > 3);
+                Assert.True(review.Frame.Bottom <= status.Frame.Y);
+                Assert.All(buttons, button =>
+                {
+                    Assert.Equal(1, button.Frame.Height);
+                    Assert.True(status.Frame.Bottom <= button.Frame.Y);
+                    Assert.True(button.Frame.X >= 0 && button.Frame.Right <= modal.Viewport.Width);
+                });
+                Assert.True(cancel.IsDefault);
+                cancel.SetFocus(); inspected = true;
+                app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Enter));
+                return false;
+            });
+            var logger = new Logger();
+            var result = new RemoveConfirmModal(app, new RemoveService(logger), logger, skill, evaluation)
+                .Show(dialog => modal = dialog);
+            Assert.True(inspected); Assert.False(timedOut);
+            Assert.Equal(RemoveConfirmModal.Outcome.Cancelled, result.Outcome);
+            Assert.Equal(original, File.ReadAllBytes(Path.Combine(skill.ResolvedPath, "SKILL.md")));
+        }
+        finally { TryDelete(root); }
+    }
+
     [Fact]
     public void ClassifyOperation_TreatsCompletedWorkerAsOwnedUntilUiCompletion()
     {
