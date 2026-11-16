@@ -196,9 +196,9 @@ public sealed class CapturedFindingTests
         foreach (var technical in new[] { false, true })
         {
             var text = ChangesQueueBuilder.Render(row, Token, technical, null);
-            Assert.DoesNotContain('\u001b', text); Assert.Contains("whole evidence fields omitted", text);
+            Assert.DoesNotContain('\u001b', text); if (technical) Assert.Contains("whole evidence fields omitted", text);
             Assert.InRange(text.Length, 1, technical ? MaintenanceQueueFormatter.MaxDetailCharacters : MaintenanceQueueFormatter.MaxSummaryCharacters);
-            Assert.Contains(MarkdownTableFormatter.FormatCodeSpan(malicious.Selector!), text);
+            Assert.Contains(technical ? MarkdownTableFormatter.FormatCodeSpan(malicious.Selector!) : MarkdownTableFormatter.FormatProse(malicious.Selector!), text);
         }
         var copies = Enumerable.Range(0, 300).Select(i => Copy("/fixtures/" + i + new string('x', 2000) + "/demo", i % 2 == 0 ? "v1" : "v2")).ToArray();
         var familyRow = Assert.Single(ChangesQueueBuilder.Build(MaintenanceQueueBuilder.Build(Snapshot(copies), Token), Token).Rows);

@@ -200,7 +200,7 @@ internal static class ChangesQueueBuilder
                 + MarkdownTableFormatter.FormatCodeSpan(availableEntry.Subject.Path)
                 + "\n\n**Enter / u:** prepare the saved update review for this exact copy.\n"
                 + (showDetails ? "\n````\n" + (TerminalEscapeSanitizer.Sanitize(observation.Diagnostic) ?? "").Replace("`", "'") + "\n````\n" : "");
-        if (row.ExactEntry is { } exact) return MaintenanceQueueFormatter.Render(exact, token, showDetails, homeDirectory);
+        if (row.ExactEntry is { } exact) return MaintenanceQueueFormatter.Render(exact, token, showDetails, homeDirectory, compact: !showDetails);
         if (!row.IsFamily) return "## Inspect finding\n\nNo eligible exact operation target. Refresh or select an exact captured copy deliberately.";
         var rendered = MaintenanceQueueFormatter.RenderFields(FamilyFields(row, token, showDetails), token,
             (showDetails ? MaintenanceQueueFormatter.MaxDetailCharacters : MaintenanceQueueFormatter.MaxSummaryCharacters) - 768);

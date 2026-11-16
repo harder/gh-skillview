@@ -330,7 +330,7 @@ public sealed partial class SkillViewApp
         void InvalidateUpdateObservations() => _workflows.InvalidateAvailability(RefreshUpdateAvailability);
         _services.ListAdapter.Invalidated += InvalidateUpdateObservations;
         window.Disposing += (_, _) => _services.ListAdapter.Invalidated -= InvalidateUpdateObservations;
-        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = ActionLabels.History.ButtonText, Width = Dim.Func(_ => window.Viewport.Width >= 110 ? 30 : 16) };
+        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = ActionLabels.History.ButtonText, Width = 16 };
         _historyButton.Accepting += (_, args) => { args.Handled = true; OpenHistory(); };
         _locationsButton = new SingleRowButton { X = Pos.Right(_historyButton), Y = 0, Text = "Locations F5", Width = 17 };
         window.FrameChanged += (_, _) => RefreshHistoryButton();
@@ -419,7 +419,7 @@ public sealed partial class SkillViewApp
 
         // Installed owns its filter/coverage chrome and needs the row budget
         // for its full-width list at 80x24.
-        if (_activeTab == SkillViewTab.Installed && _installedTab is not null)
+        if ((_activeTab == SkillViewTab.Installed && _installedTab is not null) || (_activeTab == SkillViewTab.Changes && _changesTab is not null))
         {
             ApplyContextBarVisibility(false);
             return;

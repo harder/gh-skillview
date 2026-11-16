@@ -359,7 +359,7 @@ public sealed partial class SkillViewApp
         var showSummary = summary.Length > 0;
         _discoverTab.FilterSummaryLabel.Text = summary;
         _discoverTab.FilterSummaryLabel.Visible = showSummary;
-        _discoverTab.ResultsTable.Y = showSummary ? 4 : 3;
+        _discoverTab.ResultsTable.Y = showSummary ? 3 : 2;
     }
 
     private string DescribeDiscoverFilters(bool includePrefix)

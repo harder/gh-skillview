@@ -28,6 +28,8 @@ internal sealed class ChangesTabView : FrameView
     private readonly InlineCopiesView _copies;
     private readonly Button _back;
     private readonly Button _cleanupFilter;
+    private readonly Button _moreActions;
+    private PopoverMenu? _actionsMenu;
     private bool _cleanupOnly;
     private OperationSubject? _cleanupTarget;
     private bool _detailOpen;
@@ -129,7 +131,7 @@ internal sealed class ChangesTabView : FrameView
             BackToList, lifetimeToken, onCancellationCallbackException);
         _back = new SingleRowButton { X = Pos.AnchorEnd(14), Y = Pos.AnchorEnd(1), Text = "Back (Esc)", Visible = false };
         _back.Accepting += (_, e) => { e.Handled = true; BackToList(); };
-        _cleanupFilter = new SingleRowButton { X = 0, Y = 0, Text = "c" };
+        _cleanupFilter = new SingleRowButton { X = 0, Y = 0, Text = "Cleanup (c)" };
         _cleanupFilter.Accepting += (_, e) => { e.Handled = true; CleanupSelected(); };
         _packageCheck = packageCheck ?? (() => null);
         _onPackageCheck = onPackageCheck;
@@ -162,6 +164,8 @@ internal sealed class ChangesTabView : FrameView
         _checkUpdates.Accepting += (_, e) => { e.Handled = true; ClearPreferenceFeedback(); _onCheckUpdates?.Invoke(); };
         _reviewFinding.Accepting += (_, e) => { e.Handled = true; if (!_loading.Visible) ReviewSelected(); };
 
+        _moreActions = new SingleRowButton { X = Pos.Right(_reviewFinding) + 1, Y = 0, Text = "More actions" };
+        _moreActions.Accepting += (_, e) => { e.Handled = true; ShowMoreActions(); };
         _guide.X = Pos.Right(_resetChoices) + 1;
         _cleanupFilter.X = Pos.Right(_guide) + 1;
 
@@ -227,9 +231,9 @@ internal sealed class ChangesTabView : FrameView
             _status.Text = BuildStatusText();
         };
 
-        Add(_table, _detail, _spinner, _status, _loading, _checkUpdates, _reviewFinding, _keepBoth, _resetChoices, _updateStatus, _back, _cleanupFilter, _copies, _guide, _next, _skip, _stop);
+        Add(_table, _detail, _spinner, _status, _loading, _checkUpdates, _reviewFinding, _keepBoth, _resetChoices, _updateStatus, _back, _cleanupFilter, _copies, _guide, _next, _skip, _stop, _moreActions);
         FrameChanged += (_, _) => ApplyLayout();
-        Disposing += (_, _) => { _disposed = true; CancelPendingLoad(); _guidedRequests.Dispose(); };
+        Disposing += (_, _) => { _actionsMenu?.Dispose(); _disposed = true; CancelPendingLoad(); _guidedRequests.Dispose(); };
     }
 
     /// Load the maintenance queue from the inventory snapshot.
@@ -445,11 +449,34 @@ internal sealed class ChangesTabView : FrameView
 
     private void ApplyToolbarLayout()
     {
-        var narrow = Frame.Width < 100;
-        _guide.X = narrow ? 0 : Pos.Right(_resetChoices) + 1;
-        _guide.Y = narrow ? Pos.AnchorEnd(1) : 0;
-        _cleanupFilter.X = narrow ? Pos.Right(_resetChoices) + 1 : Pos.Right(_guide) + 1;
-        _next.X = narrow && _guide.Visible ? Pos.Right(_guide) + 1 : 0;
+        // Secondary repair tools belong in the selected item's menu.
+        _keepBoth.Visible = _resetChoices.Visible = _guide.Visible = _cleanupFilter.Visible = false;
+        _moreActions.Enabled = !_loading.Visible && !_preferenceBusy && SelectionCurrent;
+        _updateStatus.Visible = _availability?.Running == true || _guided is { HasSequence: true };
+        var contentY = _updateStatus.Visible ? 2 : 1;
+        _table.Y = _detail.Y = _copies.Y = contentY;
+        _next.X = 0;
+    }
+
+    private void ShowMoreActions()
+    {
+        if (App is null || !SelectionCurrent || _preferenceBusy) return;
+        var actions = new List<(string Label, Action Run)>();
+        if (_keepBoth.Enabled && _setIntentional is not null) actions.Add((_keepBoth.Text.ToString(), SetIntentional));
+        if (_resetChoices.Enabled && _resetIntentional is not null) actions.Add(("Manage saved choices (K)", ResetIntentional));
+        if (CanStartGuided) actions.Add(("Guided repairs (g)", StartGuided));
+        if (_cleanupFilter.Enabled) actions.Add(("Cleanup findings (c)", CleanupSelected));
+        actions.Add(("Technical details (F2)", () => { _showDetails = !_showDetails; UpdateDetail(); }));
+        var key = _rows.ElementAtOrDefault(_table.GetSelectedRow())?.Key;
+        var generation = _catalogGeneration();
+        var snapshot = _snapshot;
+        _actionsMenu?.Dispose();
+        _actionsMenu = AnchoredActions.Show(_moreActions, actions.Select(action => (action.Label, (Action)(() =>
+        {
+            if (!_disposed && Visible && !_lifetimeToken.IsCancellationRequested && ReferenceEquals(snapshot, _snapshot)
+                && generation == _catalogGeneration() && key == _rows.ElementAtOrDefault(_table.GetSelectedRow())?.Key)
+                action.Run();
+        }))));
     }
 
     private void CleanupSelected()
@@ -464,7 +491,7 @@ internal sealed class ChangesTabView : FrameView
         if (RefuseDuringGuidedReview() || _preferenceBusy || !SelectionCurrent) return;
         _copies.Retire(); CancelSelectedRequest();
         _cleanupOnly = !_cleanupOnly || selected is not null;
-        _cleanupFilter.Text = "c";
+        _cleanupFilter.Text = "Cleanup (c)";
         _cleanupTarget = selected;
         if (selected is null && _table.GetSelectedRow() is var index && index >= 0 && index < _rows.Count)
             _returnSelectionId = _rows[index].Key;
@@ -509,7 +536,7 @@ internal sealed class ChangesTabView : FrameView
         {
             var wide = Frame.Width >= 110;
             var showList = (wide || !_detailOpen) && _rows.Count > 0;
-            _table.Width = wide ? Dim.Percent(55) : Dim.Fill();
+            _table.Width = wide ? Dim.Percent(60) : Dim.Fill();
             _detail.X = wide && _rows.Count > 0 ? Pos.Right(_table) + 1 : 0;
             _detail.Width = Dim.Fill();
             _table.Visible = showList;
@@ -655,7 +682,7 @@ internal sealed class ChangesTabView : FrameView
                 : "## Issues\n\n" + (_partial
                     ? "No local problems found in checked locations. Discovery is incomplete.\n"
                     : $"No local problems found. {ChangesQueueProjection.UpdatesNotChecked}.\n");
-            if (_rows.Count > 0 || _partial) detail += $"\n{ChangesQueueProjection.UpdatesNotChecked}.\n";
+            if (_showDetails && (_rows.Count > 0 || _partial)) detail += $"\n{ChangesQueueProjection.UpdatesNotChecked}.\n";
             if (_availability is not null)
                 detail = detail.Replace(ChangesQueueProjection.UpdatesNotChecked, _availability.Summary, StringComparison.Ordinal);
             if (_preferenceNotice is not null && selectedFinding?.Id == _preferenceNoticeFamily)
@@ -664,10 +691,10 @@ internal sealed class ChangesTabView : FrameView
                 detail = (notice.OmittedFields == 0 ? notice.Text
                     : "Preference operation details exceed the 256 KiB display bound. Use **Choices (K)** to inspect the exact preference store and supported recovery route. Raw state remains preserved.") + "\n\n" + detail;
             }
-            detail += "\nPackage Problems come only from the last explicit check of one exact copy. Other copies remain package not checked for this inventory capture; Reviews stay in Installed/full report. Queue JSON contains captured scan findings only.\n";
-            detail += "\n**C:** Check updates / cancel. **Enter / u:** review an exact finding; Enter expands a family or opens child details. **r:** refresh local inventory. Routine inspection is in **Installed (2)**.\n";
+            if (_showDetails) detail += "\nPackage Problems come only from the last explicit check of one exact copy. Other copies remain package not checked for this inventory capture; Reviews stay in Installed/full report. Queue JSON contains captured scan findings only.\n";
+            if (_showDetails) detail += "\n**C:** Check updates / cancel. **Enter / u:** review an exact finding; Enter expands a family or opens child details. **r:** refresh local inventory. Routine inspection is in **Installed (2)**.\n";
             if (_showDetails) detail += _coverageDetail;
-            else if (_coverageDetail.Length > 0) detail += "\nDiscovery/checks incomplete. Press **F2** for coverage details.\n";
+            else if (_coverageDetail.Length > 0) detail += "\nPartial scan — F2 shows coverage details.\n";
             if (OmittedRows > 0) detail += $"\n{OmittedRows} additional findings omitted by the row limit. Counts include these findings; Installed retains per-copy update results; queue --json makes a fresh local capture.\n";
             token.ThrowIfCancellationRequested();
             if (SequenceActive)
@@ -724,6 +751,7 @@ internal sealed class ChangesTabView : FrameView
             _onCheckUpdates();
             return;
         }
+        if (key.KeyCode == KeyCode.Enter && !_table.HasFocus && !_detail.HasFocus) return;
         if (key.KeyCode == KeyCode.Enter || key.AsRune.Value is 'u' or 'U')
         {
             key.Handled = true;
@@ -817,8 +845,16 @@ internal sealed class ChangesTabView : FrameView
     }
 
     private static ChangesQueueRow ChildRow(ChangesQueueRow parent, MaintenanceQueueEntry entry, int index) =>
-        new("Copy", "  " + parent.LocationLabels.ElementAtOrDefault(index), [entry])
+        new("Copy", "  " + CopyLocationLabel(entry.Subject), [entry])
         { Finding = parent.Finding, IsExactChild = true, ParentKey = parent.Key };
+
+    private static string CopyLocationLabel(OperationSubject subject)
+    {
+        var consumers = subject.Exposures.Select(e => e.Membership).Select(a =>
+            (a.Scope ?? subject.Scope).ToString() + " · " + a.AgentId).Distinct().ToArray();
+        return InstalledOverview.Text((consumers.Length == 0 ? subject.Scope.ToString() : string.Join(", ", consumers))
+            + " · " + DisplayPath.Abbreviate(subject.Path), 180);
+    }
 
     internal void RefreshAvailability()
     {

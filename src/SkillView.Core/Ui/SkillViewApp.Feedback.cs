@@ -95,7 +95,10 @@ public sealed partial class SkillViewApp
         if (_statusStrip is null) return;
 
         var hints = GetCurrentHints();
-        if (_activeTab == SkillViewTab.Installed && !_inDoctor && _updatesTab?.Visible != true && text == _defaultStatus)
+        var routineStatus = text == "ready — press / to search or F1 for help"
+            || text.StartsWith("gh ", StringComparison.Ordinal)
+                && text.EndsWith("— press '/' to search, 'd' for Doctor", StringComparison.Ordinal);
+        if (!_inDoctor && _updatesTab?.Visible != true && text == _defaultStatus && routineStatus)
             text = "";
         _statusStrip.Update(text, hints);
     }

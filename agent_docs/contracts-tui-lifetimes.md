@@ -286,6 +286,16 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   full inventory browser, marks/All, UI sibling queue and dry-run action must
   not be reintroduced as test helpers. Main-view availability remains separate.
 
+- Ordinary browsing follows the simpler 1.0.1 / WinGet Scout list-and-detail
+  hierarchy. Single, unambiguous copies occupy one exact row; multiple-copy
+  groups can expand. A browse-only install handoff may retain a singleton group
+  until the user explicitly chooses its copy. Keep concise default details and
+  compact toolbars. Issues secondary actions live in More actions; guided review
+  controls and retained outcomes remain visible while relevant. Detailed repair
+  dialogs/wizards are appropriate. F2 retains technical evidence; hiding it never
+  changes frozen routing identities, stale-selection guards or operation approval.
+  Verify real rendered grids with long skill names and managed inventories,
+  including every visible toolbar control at 80x24, 120x36 and a wider size.
 - Installed builds one transient source/copy projection off the UI thread per new
   snapshot. SourceIdentity.Key plus case-insensitive name groups known sources;
   null/conflicting keys stay singleton groups; duplicate IDs are inspect-only.
@@ -311,8 +321,9 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   and exact-copy actions disabled. Filtered no matches and missing/ambiguous
   selections remain distinct; never clear retained filters or choices implicitly.
 
-- Installed's four visible selectors use stable captured keys, never shortened
-  display labels. Tab reaches each direct choice popup; Esc cancels it. Keep
+- Installed's four selectors live behind Filters (f); active selectors mark the
+  button with an asterisk. Use stable captured keys, never shortened display
+  labels. Tab reaches each expanded choice popup; Esc cancels it. Keep
   missing choices visibly unavailable with zero matches until explicit clearing.
   Preserve exact selection, expansion, top-row anchor, sort and detail focus;
   local filters/coverage must not capture, classify, hash or launch gh children.

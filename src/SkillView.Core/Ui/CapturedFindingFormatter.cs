@@ -9,6 +9,27 @@ internal static class CapturedFindingFormatter
         var registry = finding.Subject is FindingRegistry;
         var heading = registry ? "gh registry observation" : finding.Kind switch
         { "recorded-revisions" => "Recorded revisions differ", "installation-methods" => "Installation methods differ", "same-source-copies" => "Same source, separate copies", _ => "Same name, separate sources" };
+        if (!technical)
+        {
+            var fields = new List<(string, string?)> { ("Skill", finding.Title), ("Why", finding.Explanation) };
+            if (finding.Subject is FindingCopies members)
+            {
+                foreach (var copy in members.Copies)
+                {
+                    token.ThrowIfCancellationRequested();
+                    var contexts = copy.Exposures.Select(e => e.Membership).Select(a => (a.Scope ?? copy.Scope) + " · " + a.AgentId).Distinct();
+                    fields.Add(("Copy", string.Join(", ", contexts) + " · " + DisplayPath.Abbreviate(copy.Path)));
+                }
+            }
+            var summary = MaintenanceQueueFormatter.RenderFields(fields, token, MaintenanceQueueFormatter.MaxSummaryCharacters - 768, prose: true);
+            return "## " + heading + "\n\n" + summary.Text
+                + (summary.OmittedFields > 0 ? $"\n{summary.OmittedFields} whole evidence fields omitted; F2 shows technical details.\n" : "")
+                + (registry ? "\nF2 inspects the captured record. Locations (F5) can include another known folder.\n"
+                    : "\nEnter expands copies. Select one for Compare files or an update review."
+                        + (finding.Intentional ? "\n\nKept as an intentional difference. More actions: Restore suggestions."
+                            : finding.Difference is not null ? "\n\nMore actions: Keep both." : "\n\nF2 shows the captured source and ownership evidence."));
+        }
+
         var actions = registry
             ? "Inspect this captured record below. To include a known location, restart with **--scan-root ROOT** (before the subcommand), or configure an existing workspace/profile. **1 Discover** offers normal install review. gh has no supported exact-record remove/uninstall; registry cleanup and editing are unavailable.\n\n"
             : "**Enter / Right:** expand the exact captured members here. Select a child for inline **Compare files**, or use **u** for its exact saved update review. Each copy is reviewed separately.\n\n"

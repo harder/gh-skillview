@@ -21,14 +21,18 @@ internal static class MaintenanceQueueFormatter
             + $"\nCoverage fields omitted: {rendered.OmittedFields}. Full captured diagnostics are emitted by queue --json; running it makes a fresh capture.\n";
     }
 
-    internal static string Render(MaintenanceQueueEntry entry, CancellationToken token, bool showDetails = false, string? homeDirectory = null)
+    internal static string Render(MaintenanceQueueEntry entry, CancellationToken token, bool showDetails = false, string? homeDirectory = null, bool compact = false)
     {
         if (showDetails) return RenderEvidence(entry, token);
-        var fields = RenderFields(SummaryFields(entry, token, homeDirectory), token, MaxSummaryCharacters - 512);
+        var summary = SummaryFields(entry, token, homeDirectory);
+        if (compact) summary = summary.Where(field => field.Item1 is "Skill" or "Why" or "Next" or "Agent" or "Location"
+            || field.Item1 == "Pin policy" && PinPolicy(entry) is { State: PinDisplayState.Pinned or PinDisplayState.Conflicting });
+        var fields = RenderFields(summary, token, MaxSummaryCharacters - 512, prose: compact);
         var text = new StringBuilder($"## {DescribeIssue(entry)}\n\n").Append(fields.Text);
         if (fields.OmittedFields > 0)
             text.AppendLine("\nSome values are too long for this summary; open details to inspect them.");
-        text.AppendLine("\nOpening review changes nothing.");
+        if (!compact) text.AppendLine("\nOpening review changes nothing.");
+        if (entry.Cleanup is { ReviewOnly: false }) text.AppendLine("\nReview the affected files before confirming removal.");
         token.ThrowIfCancellationRequested();
         return text.ToString();
     }
@@ -37,6 +41,7 @@ internal static class MaintenanceQueueFormatter
     {
         "installation-review" => "Check this installation",
         "EmptyDirectory" => "Empty directory",
+        "Malformed" when entry.Cleanup?.Skill?.Validity == ValidityState.NameMismatch => "Skill name differs from folder",
         "Malformed" => "Missing or invalid skill file",
         "BrokenSymlink" => "Broken link",
         "BrokenSharedMapping" => "Shared link needs attention",
@@ -139,7 +144,7 @@ internal static class MaintenanceQueueFormatter
     // Bounds allocation before escaping, then checks the escaped length. Whole
     // fields are skipped, preserving exact identity semantics and omission counts.
     internal static RenderedFields RenderFields(IEnumerable<(string Label, string? Value)> fields,
-        CancellationToken token, int budget)
+        CancellationToken token, int budget, bool prose = false)
     {
         var text = new StringBuilder();
         var omitted = 0;
@@ -153,7 +158,8 @@ internal static class MaintenanceQueueFormatter
                 omitted++;
                 continue;
             }
-            var formatted = $"**{MarkdownTableFormatter.FormatCodeSpan(label)}:** {MarkdownTableFormatter.FormatCodeSpan(value)}\n\n";
+            var formatted = prose ? $"**{MarkdownTableFormatter.FormatProse(label)}:** {MarkdownTableFormatter.FormatProse(value)}\n\n"
+                : $"**{MarkdownTableFormatter.FormatCodeSpan(label)}:** {MarkdownTableFormatter.FormatCodeSpan(value)}\n\n";
             token.ThrowIfCancellationRequested();
             if (formatted.Length > remaining) omitted++;
             else text.Append(formatted);

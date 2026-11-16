@@ -59,7 +59,7 @@ public static class InstalledScreen
         return default;
     }
 
-    internal static string RenderDetail(InstalledSkill s, bool showDetails = false, string? homeDirectory = null, bool showShortcuts = true, int? descriptionWidth = null, int? recordedPlacementCount = null)
+    internal static string RenderDetail(InstalledSkill s, bool showDetails = false, string? homeDirectory = null, bool showShortcuts = true, int? descriptionWidth = null, int? recordedPlacementCount = null, bool compact = false)
     {
         if (!showDetails && homeDirectory is null && s.OwnershipRunner is { } runner)
             homeDirectory = DisplayPath.CaptureHome(runner);
@@ -69,7 +69,7 @@ public static class InstalledScreen
         sb.AppendLine();
         if (s.FrontMatter.Description is { Length: > 0 } description)
         {
-            sb.AppendLine("Description · from skill metadata (untrusted):");
+            sb.AppendLine(compact ? "### Description" : "Description · from skill metadata (untrusted):");
             sb.AppendLine();
             var length = Math.Min(description.Length, 2048);
             if (length < description.Length && char.IsHighSurrogate(description[length - 1]) && char.IsLowSurrogate(description[length]))
@@ -95,6 +95,24 @@ public static class InstalledScreen
             sb.AppendLine(fence);
             sb.AppendLine();
             if (length < description.Length) sb.AppendLine("[truncated]\n");
+        }
+
+        if (compact && !showDetails)
+        {
+            sb.AppendLine("1 physical copy · " + PlacementCount(recordedPlacementCount ?? s.Agents.Distinct().Count()) + "\n");
+            var compactSource = s.ObservedSubject?.Source ?? s.SourceIdentity;
+            sb.AppendLine("**Source:** " + Literal(compactSource.Key is null ? compactSource.Conflicted ? "Conflicting source" : "Unknown source" : InstalledOverview.SourceLabel(compactSource)));
+            sb.AppendLine("\n**Version:** " + Literal(s.Revision.RepositoryRef ?? s.Revision.AuthoredVersion ?? s.Revision.DistributorVersion ?? "Not recorded"));
+            var location = PathLabel(s.ResolvedPath);
+            var locationLines = descriptionWidth is > 0
+                ? TextFormatter.WordWrapText(location, descriptionWidth.Value, tabWidth: 4) : [location];
+            sb.AppendLine("\n**Location:**\n\n" + string.Join("  \n", locationLines.Select(MarkdownTableFormatter.FormatProse)));
+            sb.AppendLine("\n**Used by:** " + Literal(string.Join(", ", s.Agents.Select(a => a.AgentId + " (" + (a.Scope ?? s.Scope) + ")").Distinct())));
+            if (s.AllOwnershipClaims.Any(o => o.ReadOnly || o.InstallationMode == "managed-read-only"))
+                sb.AppendLine("\nRead-only — maintained by its owning package or agent.");
+            if (s.Validity != ValidityState.Valid) sb.AppendLine("\nMetadata needs review. Open Issues or F2 for the finding.");
+            if (!s.MetadataConflicts.IsEmpty || !s.OwnershipDiagnostics.IsEmpty) sb.AppendLine("\nOwnership information needs review. See F2.");
+            return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? "";
         }
 
         if (!showDetails)

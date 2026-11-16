@@ -509,7 +509,7 @@ public sealed class InstalledRepositoryBrowseRenderingTests
             Assert.Equal(selected, view.SelectedKeyForTests);
             Assert.Same(one, view.GetSelectedSkill());
             Assert.Equal("demo-a", view.GetFilterText());
-            Assert.Contains("Agent: `universal`", view.DetailTextForTests);
+            Assert.Contains(view.SubViews.OfType<Button>(), button => button.Text.ToString().StartsWith("Filters*", StringComparison.Ordinal));
             shell.SetStatusForTests("Unrelated workflow notice", TuiHelpers.NotificationLevel.Info);
             view.RefreshAvailability(); Draw(); AssertRestriction();
 
@@ -532,11 +532,11 @@ public sealed class InstalledRepositoryBrowseRenderingTests
             // Existing keyboard Clear resets independent facets/search/scope
             // and the repository restriction in the same visible transition.
             view.FocusFilterForTests();
-            for (var i = 0; i < 5; i++) Assert.True(view.HandleLocalNavigation(Key.Tab));
+            for (var i = 0; i < 2; i++) Assert.True(view.HandleLocalNavigation(Key.Tab));
             Assert.True(clear.HasFocus);
             app.Keyboard.RaiseKeyDownEvent(Key.Enter); Draw();
             Assert.False(indicator.Visible); Assert.Empty(indicator.Text);
-            Assert.Equal(3, table.Frame.Y); Assert.Equal(3, detail.Frame.Y);
+            Assert.Equal(2, table.Frame.Y); Assert.Equal(2, detail.Frame.Y);
             Assert.Empty(view.GetFilterText());
             Assert.DoesNotContain("Repository:", view.DetailTextForTests);
             Assert.Contains(view.RowsForTests, row => row.Group?.Name == "demo-b");
@@ -552,7 +552,7 @@ public sealed class InstalledRepositoryBrowseRenderingTests
                 Assert.True(clear.Visible); Assert.True(clear.Enabled);
                 Assert.True(view.ViewportToScreen().Contains(indicator.FrameToScreen()));
                 Assert.True(view.ViewportToScreen().Contains(clear.FrameToScreen()));
-                Assert.Equal(4, table.Frame.Y); Assert.Equal(4, detail.Frame.Y);
+                Assert.Equal(3, table.Frame.Y); Assert.Equal(3, detail.Frame.Y);
                 Assert.True(indicator.Frame.Bottom <= table.Frame.Top);
                 Assert.InRange(indicator.Frame.Right, 1, view.Viewport.Width);
                 Assert.Equal(1, indicator.Frame.Height);

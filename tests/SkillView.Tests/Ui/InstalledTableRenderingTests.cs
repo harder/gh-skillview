@@ -37,7 +37,7 @@ public sealed class InstalledTableRenderingTests
         try
         {
             window.Layout(); window.Draw(new DrawContext());
-            view.SetSelectedRowForTests(1);
+            view.SetSelectedRowForTests(view.RowsForTests.ToList().FindIndex(row => row.Copy?.Target?.ResolvedPath == snapshot.Skills[0].ResolvedPath));
             var review = view.SubViews.OfType<Button>().Single(b => b.Text.ToString().StartsWith("Review update", StringComparison.Ordinal));
             review.SetFocus(); Assert.True(review.HasFocus);
             var refresh = view.LoadAsync();
@@ -78,16 +78,16 @@ public sealed class InstalledTableRenderingTests
             view.SetFilterTextForTests("skill"); view.FocusList();
             window.Layout(); window.Draw(new DrawContext());
             var table = view.SubViews.OfType<TableView>().Single();
-            view.SetSelectedRowForTests(61); // exact skill-30, after its heading
-            table.RowOffset = 50;
+            view.SetSelectedRowForTests(30); // a single copy has one row
+            table.RowOffset = 25;
             window.Draw(new DrawContext());
             var topKey = view.RowsForTests[table.RowOffset].Key;
             var selectedKey = view.SelectedKeyForTests;
-            table.RowOffset = 61;
-            view.NewKeyDownEvent(new Key(KeyCode.CursorLeft)); Assert.Null(view.GetSelectedSkill());
+            table.RowOffset = 30;
+            view.NewKeyDownEvent(new Key(KeyCode.CursorLeft)); Assert.Equal(skills[30].ResolvedPath, view.GetSelectedSkill()!.ResolvedPath);
             view.NewKeyDownEvent(new Key(KeyCode.CursorRight));
             Assert.Equal(selectedKey, view.RowsForTests[table.RowOffset].Key);
-            table.RowOffset = 50;
+            table.RowOffset = 25;
             view.NewKeyDownEvent(Key.Enter);
             Assert.True(view.DetailOpenForTests);
             Assert.Equal(skills[30].ResolvedPath, view.GetSelectedSkill()!.ResolvedPath);
@@ -100,7 +100,7 @@ public sealed class InstalledTableRenderingTests
             Assert.Equal(selectedKey, view.SelectedKeyForTests);
             Assert.Equal(detailOffset, detail.Viewport.Y);
             Assert.Equal("skill", view.GetFilterText());
-            Assert.Contains("Available", view.RowsForTests[61].Summary);
+            Assert.Contains("Available", view.RowsForTests[30].Summary);
             view.LoadSeeded(snapshot with { Skills = [.. skills.Reverse()] });
             Assert.Equal(selectedKey, view.SelectedKeyForTests);
             Assert.Equal(topKey, view.RowsForTests[table.RowOffset].Key);
@@ -140,11 +140,12 @@ public sealed class InstalledTableRenderingTests
         try
         {
             window.Layout(); window.Draw(new DrawContext()); view.FocusList();
+            view.SetSelectedRowForTests(view.RowsForTests.ToList().FindIndex(row => row.Copy is null && row.Group?.Copies.Count > 1));
             Assert.Null(view.GetSelectedSkill());
             Type('u'); Assert.Null(reviewed);
             var groupKey = view.SelectedKeyForTests;
-            Press(KeyCode.CursorLeft); Assert.Equal(groupKey, view.SelectedKeyForTests); Assert.Equal(8, view.RowsForTests.Count);
-            Press(KeyCode.CursorRight); Assert.Equal(9, view.RowsForTests.Count);
+            Press(KeyCode.CursorLeft); Assert.Equal(groupKey, view.SelectedKeyForTests); Assert.Equal(4, view.RowsForTests.Count);
+            Press(KeyCode.CursorRight); Assert.Equal(6, view.RowsForTests.Count);
             var exact = view.RowsForTests.ToList().FindIndex(r => r.Copy?.Target?.ResolvedPath == snapshot.Skills[0].ResolvedPath);
             view.SetSelectedRowForTests(exact); var copyKey = view.SelectedKeyForTests;
             Press(KeyCode.CursorLeft); Assert.Null(view.GetSelectedSkill()); Assert.Equal(copyKey, view.SelectedKeyForTests);

@@ -179,9 +179,9 @@ public sealed class InstalledDescriptionRenderingTests
             Assert.True(view.RowsForTests[1].Copy!.Ambiguous);
             var records = view.DetailTextForTests.Split("\n\n---\n\n", StringSplitOptions.None);
             Assert.Equal(2, records.Length);
-            Assert.Contains("**Location:** `/skills/Demo`", records[0]);
+            Assert.Contains("**Location:**\n\n/skills/Demo", records[0]);
             Assert.Contains("1 physical copy · 1 recorded placement" + System.Environment.NewLine, records[0]);
-            Assert.Contains("**Location:** `" + secondPath + "`", records[1]);
+            Assert.Contains("**Location:**\n\n" + secondPath, records[1]);
             Assert.Contains("1 physical copy · 2 recorded placements" + System.Environment.NewLine, records[1]);
             Assert.DoesNotContain("1 physical copy · 3 recorded placements", view.DetailTextForTests);
             Assert.Contains("1 observed copy · 3 recorded placements · 1 ambiguous", view.FooterTextForTests);

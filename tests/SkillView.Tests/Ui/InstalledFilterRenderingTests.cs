@@ -6,6 +6,7 @@ using SkillView.Ui;
 using SkillView.Ui.Tabs;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Drivers;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -51,6 +52,7 @@ public sealed class InstalledFilterRenderingTests
             Assert.DoesNotContain("No matching installed", view.DetailTextForTests);
             var detail = view.SubViews.OfType<Markdown>().Single();
             Assert.Equal(0, detail.Frame.X); Assert.True(detail.Frame.Width >= width - 4);
+            view.ToggleFilters(); Draw();
             var buttons = view.SubViews.OfType<Button>().ToArray();
             var search = buttons.Single(b => b.Text == "Search skills (1)");
             var coverage = buttons.Single(b => b.Text == "Coverage");
@@ -92,7 +94,7 @@ public sealed class InstalledFilterRenderingTests
         var session = app.Begin(window);
         try
         {
-            Draw(); view.SetSelectedRowForTests(1);
+            Draw(); view.SetSelectedRowForTests(0);
             var key = view.SelectedKeyForTests;
             view.SelectFilter(0, Assert.Single(view.FilterChoices(0)).Key);
             view.SetFilterTextForTests("no-matches"); Draw();
@@ -142,6 +144,7 @@ public sealed class InstalledFilterRenderingTests
         try
         {
             Draw();
+            view.ToggleFilters(); Draw();
             var buttons = view.SubViews.OfType<Button>().ToArray();
             var facets = new[] { "Agent:", "Project/location:", "Source/owner:", "Issue:" }.Select(title => buttons.Single(b => b.Text.ToString().StartsWith(title, StringComparison.Ordinal))).ToArray();
             for (var i = 0; i < 4; i++)
@@ -151,14 +154,14 @@ public sealed class InstalledFilterRenderingTests
                 if (i > 0) Assert.True(facets[i - 1].Frame.Right <= facets[i].Frame.X);
             }
             var table = view.SubViews.OfType<TableView>().Single();
-            Assert.True(table.Frame.Height >= height - 8); // three header rows, two footer rows, window borders
-            view.FocusFilterForTests();
+            Assert.True(table.Frame.Height >= height - 9); // three header rows, two footer rows, window borders
+            view.SubViews.OfType<Button>().Single(button => button.Text.ToString().StartsWith("Filters", StringComparison.Ordinal)).SetFocus();
             foreach (var facet in facets)
             { Assert.True(view.HandleLocalNavigation(Key.Tab)); Assert.True(facet.HasFocus); }
             var agent = view.FilterChoices(0).Single(c => c.Label == "claude");
             view.SelectFilter(0, agent.Key);
             view.SelectFilter(1, view.FilterChoices(1).Single(c => c.Label.Contains("Alpha", StringComparison.Ordinal)).Key);
-            view.FocusList(); view.SetSelectedRowForTests(41); table.RowOffset = 30; Draw();
+            view.FocusList(); view.SetSelectedRowForTests(20); table.RowOffset = 10; Draw();
             var key = view.SelectedKeyForTests;
             var top = view.RowsForTests[table.RowOffset].Key;
             view.NewKeyDownEvent(Key.Enter); Draw();
@@ -335,7 +338,7 @@ public sealed class InstalledFilterRenderingTests
         installed.LoadSeeded(snapshot);
         installed.SelectFilter(3, "any-finding");
         Assert.Single(installed.RowsForTests, r => r.Copy is not null);
-        installed.SetSelectedRowForTests(1); installed.NewKeyDownEvent(Key.Enter);
+        installed.SetSelectedRowForTests(0); installed.NewKeyDownEvent(Key.Enter); installed.NewKeyDownEvent(new(KeyCode.F2));
         Assert.Contains("line 56", installed.DetailTextForTests);
         Assert.Contains("references/maintenance.md", installed.DetailTextForTests);
         Assert.Contains("1 Review", installed.DetailTextForTests);
@@ -396,7 +399,7 @@ public sealed class InstalledFilterRenderingTests
                 try
                 {
                     installed.LoadSeeded(snapshot);
-                    installed.SetSelectedRowForTests(1);
+                    installed.SetSelectedRowForTests(0);
                     installed.FocusList();
                     Assert.True(installed.TableHasFocusForTests);
                     Assert.Same(target, installed.GetSelectedSkill());
@@ -427,7 +430,7 @@ public sealed class InstalledFilterRenderingTests
                     Assert.Same(fact, lastFact); // Retained memory was not rebound to S2.
                     installed.LoadAsync().GetAwaiter().GetResult();
                     Assert.Same(replacement, installed.CurrentSnapshot);
-                    installed.SetSelectedRowForTests(1); installed.NewKeyDownEvent(Key.Enter);
+                    installed.SetSelectedRowForTests(0); installed.NewKeyDownEvent(Key.Enter); installed.NewKeyDownEvent(new(KeyCode.F2));
                     Assert.Contains("Package not checked for this inventory capture.", installed.DetailTextForTests);
                     Assert.Contains(PackageCheckFact.InventoryLifetimeNotice, installed.DetailTextForTests);
                     Assert.Equal(1, displayCaptures);
@@ -533,12 +536,13 @@ public sealed class InstalledFilterRenderingTests
         using var view = new InstalledTabView(a => { a(); return Task.CompletedTask; }, (_, _) => { }, _ => throw new InvalidOperationException(),
             (_, _, _) => Task.CompletedTask, () => { });
         view.LoadSeeded(InventorySnapshot.Empty with { Skills = [skill] });
+        view.ToggleFilters();
         view.SelectFilter(0, InstalledFilters.Key("agent", skill.Agents[0].AgentId));
         Assert.Contains("claude #", view.DetailTextForTests);
         view.LoadSeeded(InventorySnapshot.Empty with { Skills = [skill with { Agents = [skill.Agents[0]] }] });
         Assert.Contains("Agent: `claude`", view.DetailTextForTests);
         Assert.DoesNotContain("claude #", view.DetailTextForTests);
-        Assert.Equal(2, view.RowsForTests.Count);
+        Assert.Single(view.RowsForTests);
     }
 
 }

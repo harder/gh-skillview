@@ -31,8 +31,7 @@ public sealed partial class SkillViewApp
     private void RefreshHistoryButton()
     {
         if (_historyButton is null) return;
-        var text = (_mainWindow?.Viewport.Width ?? 0) >= 110 ? _historyHint
-            : _historyHint == "History (F4)" ? "History F4" : "History ! F4";
+        var text = _historyHint == "History (F4)" ? "History F4" : "History ! F4";
         if (_historyButton.Text != text) _historyButton.Text = text;
     }
 
