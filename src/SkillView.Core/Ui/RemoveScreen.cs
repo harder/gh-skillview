@@ -89,7 +89,7 @@ public sealed class RemoveScreen
         RemoveTargetEvaluation? currentEvaluation = null;
         RemoveService.RemoveProgress? lastProgress = null;
 
-        using var wizard = new Wizard
+        using var wizard = new RemovalWizard
         {
             Title = $"Remove — {_target.Name}",
             // Wizard inherits Dialog's Dim.Auto sizing, which collapses to each
@@ -577,6 +577,19 @@ public sealed class RemoveScreen
             StartEvaluation(selectedIndex, findFirstExecutable: false);
         };
         _app.Run(wizard);
+    }
+
+    internal sealed class RemovalWizard : Wizard
+    {
+        protected override bool OnAccepting(CommandEventArgs args)
+        {
+            // Dialog's final-step acceptance requests stop before raising the
+            // Accepting event. Removal owns its asynchronous completion and must
+            // keep the wizard alive until validation/execution settles.
+            return CurrentStep is not null && CurrentStep == GetLastStep()
+                ? false
+                : base.OnAccepting(args);
+        }
     }
 
     internal string BuildSummary()

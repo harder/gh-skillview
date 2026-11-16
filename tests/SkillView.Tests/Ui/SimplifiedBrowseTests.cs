@@ -82,6 +82,22 @@ public sealed class SimplifiedBrowseTests
     }
 
     [Fact]
+    public void LongLiveStyleDescriptionsKeepIdentityVisibleAndFullTextAvailableInDetails()
+    {
+        var skill = InstalledOverviewTests.Copy("/home/alex/.agents/skills/demo", "demo");
+        var description = string.Join(" ", Enumerable.Repeat("Describe the selected skill and when it is useful.", 20)) + " Final description marker.";
+        skill = skill with { FrontMatter = skill.FrontMatter with { Description = description } };
+        var summary = InstalledScreen.RenderDetail(skill, descriptionWidth: 42, compact: true);
+        var preview = Assert.Single(Markdig.Markdown.Parse(summary).Descendants<Markdig.Syntax.FencedCodeBlock>());
+        Assert.Equal(4, preview.Lines.ToString().Split('\n').Length);
+        Assert.True(summary.IndexOf("**Location:**", StringComparison.Ordinal) < summary.IndexOf("### Description", StringComparison.Ordinal));
+        Assert.DoesNotContain("Final description marker", summary);
+        Assert.Contains("F2 Details", summary);
+        var details = InstalledScreen.RenderDetail(skill, showDetails: true, descriptionWidth: 42);
+        Assert.Contains("Final description marker.", details);
+    }
+
+    [Fact]
     public void LiteralSummaryProseCannotCreateLinksOrFormattingFromMetadata()
     {
         var text = MarkdownTableFormatter.FormatProse("[Open](https://bad.example) **bold** <img> `code`\nnext\u001b[31m");

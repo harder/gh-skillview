@@ -83,8 +83,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   owners; retain workflow notifications and progress. Status timers must reject
   callbacks superseded by a newer status or workspace transition.
 
-- Keep advanced-remove policy evaluation off the Terminal.Gui thread. Cache
-  per-target evaluations only for wizard display and always validate again in
+- Keep advanced-remove policy evaluation off the Terminal.Gui thread. Final wizard
+  acceptance must retain the modal until its owned operation settles; bypass
+  Dialog's automatic stop on that final step while retaining wizard navigation.
+  Cache per-target evaluations only for wizard display and always validate again in
   the owned background operation immediately before execution; if blocking or
   warning content changed, return to Review instead of deleting. Agent-link
   removal is available only through `ValidateSymlink` plus `RemoveAsync`; do
@@ -290,7 +292,8 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   hierarchy. Single, unambiguous copies occupy one exact row; multiple-copy
   groups can expand. A browse-only install handoff may retain a singleton group
   until the user explicitly chooses its copy. Keep concise default details and
-  compact toolbars. Issues secondary actions live in More actions; guided review
+  compact toolbars. Basic identity precedes a four-line description preview; F2
+  retains the full bounded inert description. Issues secondary actions live in More actions; guided review
   controls and retained outcomes remain visible while relevant. Detailed repair
   dialogs/wizards are appropriate. F2 retains technical evidence; hiding it never
   changes frozen routing identities, stale-selection guards or operation approval.

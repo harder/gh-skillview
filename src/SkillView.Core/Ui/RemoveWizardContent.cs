@@ -28,30 +28,23 @@ internal static class RemoveWizardContent
         sb.AppendLine();
         sb.AppendLine("### Selection");
         sb.AppendLine();
-        sb.AppendLine("| Field | Value |");
-        sb.AppendLine("| --- | --- |");
-        sb.AppendLine($"| Action | {MarkdownTableFormatter.FormatTableCell(evaluation.Target.Title)} |");
-        sb.AppendLine($"| Summary | {MarkdownTableFormatter.FormatTableCell(evaluation.Target.Description)} |");
-        if (evaluation.Target.Skills.Length == 1)
-        {
-            sb.AppendLine($"| Path | {MarkdownTableFormatter.FormatCodeSpan(evaluation.Target.Skills[0].ResolvedPath)} |");
-        }
-
-        if (evaluation.Target.Kind == RemoveTargetKind.AgentSymlink && evaluation.Target.AgentMembership is { } agent)
-        {
-            sb.AppendLine($"| Link path | {MarkdownTableFormatter.FormatCodeSpan(agent.Path)} |");
-        }
-
-        sb.AppendLine($"| Skills affected | {MarkdownTableFormatter.FormatTableCell(evaluation.Target.Skills.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))} |");
-
+        sb.AppendLine("**Action:** " + MarkdownTableFormatter.FormatProse(evaluation.Target.Title));
         sb.AppendLine();
-        sb.AppendLine("### Skills");
+        sb.AppendLine(MarkdownTableFormatter.FormatProse(evaluation.Target.Description));
         sb.AppendLine();
-        sb.AppendLine("| Skill | Path |");
-        sb.AppendLine("| --- | --- |");
+        sb.AppendLine($"**Skills affected:** {evaluation.Target.Skills.Length}");
+        sb.AppendLine();
         foreach (var skill in evaluation.Target.Skills)
         {
-            sb.AppendLine($"| {MarkdownTableFormatter.FormatTableCell(skill.Name)} | {MarkdownTableFormatter.FormatCodeSpan(skill.ResolvedPath)} |");
+            sb.AppendLine("**Skill:** " + MarkdownTableFormatter.FormatProse(skill.Name));
+            sb.AppendLine();
+            sb.AppendLine("**Location:** " + MarkdownTableFormatter.FormatProse(skill.ResolvedPath));
+            sb.AppendLine();
+        }
+        if (evaluation.Target.Kind == RemoveTargetKind.AgentSymlink && evaluation.Target.AgentMembership is { } agent)
+        {
+            sb.AppendLine("**Link path:** " + MarkdownTableFormatter.FormatProse(agent.Path));
+            sb.AppendLine();
         }
 
         foreach (var item in evaluation.Items)
@@ -88,11 +81,10 @@ internal static class RemoveWizardContent
             sb.AppendLine();
             sb.AppendLine("### Related links");
             sb.AppendLine();
-            sb.AppendLine("| Incoming symlink |");
-            sb.AppendLine("| --- |");
+
             foreach (var incoming in incomingLinks)
             {
-                sb.AppendLine($"| {MarkdownTableFormatter.FormatCodeSpan(incoming)} |");
+                sb.AppendLine("- " + MarkdownTableFormatter.FormatProse(incoming));
             }
         }
 

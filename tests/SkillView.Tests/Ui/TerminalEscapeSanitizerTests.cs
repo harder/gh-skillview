@@ -153,9 +153,9 @@ public sealed class TerminalEscapeSanitizerTests
         Assert.DoesNotContain('\x07', summary);
         Assert.Contains("## Blocked", summary);
         Assert.Contains("### Selection", summary);
-        Assert.Contains("| Field | Value |", summary);
-        Assert.Contains("### Skills", summary);
-        Assert.Contains("| Skill | Path |", summary);
+        Assert.Contains("**Action:**", summary);
+        Assert.Contains("**Skills affected:**", summary);
+        Assert.Contains("**Location:**", summary);
         Assert.Contains("### Why SkillView is blocking this", summary);
         Assert.Contains("### Warnings", summary);
         Assert.Contains("### Related links", summary);
@@ -193,7 +193,7 @@ public sealed class TerminalEscapeSanitizerTests
     }
 
     [Fact]
-    public void BuildRemoveSummary_UsesLongerCodeSpanDelimiterForBackticks()
+    public void BuildRemoveSummary_EscapesBackticksInReadableLiteralPaths()
     {
         var validation = new RemoveValidator.RemoveValidation(
             Errors: ImmutableArray.Create(
@@ -222,9 +222,9 @@ public sealed class TerminalEscapeSanitizerTests
 
         var summary = screen.BuildSummary();
 
-        Assert.Contains("| Path | `` /skills/demo`copy `` |", summary);
-        Assert.Contains("| demo`copy | `` /skills/demo`copy `` |", summary);
-        Assert.Contains("| `` /agents/demo`copy `` |", summary);
+        Assert.Contains("**Location:** /skills/demo\\`copy", summary);
+        Assert.Contains("**Skill:** demo\\`copy", summary);
+        Assert.Contains("- /agents/demo\\`copy", summary);
     }
 
     private static InstalledSkill CreateSkill() => new()

@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using System.IO;
+using Markdig;
+using Markdig.Syntax;
 using SkillView.Inventory;
 using SkillView.Inventory.Models;
 using SkillView.Ui;
@@ -35,6 +37,19 @@ public sealed class RemoveWizardContentTests
         {
             try { Directory.Delete(root, recursive: true); } catch { }
         }
+    }
+
+    [Fact]
+    public void RemovalReviewUsesReadableFieldsInsteadOfNarrowPropertyTables()
+    {
+        var skill = InstalledOverviewTests.Copy("/home/alex/.agents/skills/disposable-live-check", "disposable-live-check");
+        var target = new RemoveTarget(RemoveTargetKind.CurrentInstall, "Remove this skill", "Delete only the selected copy.", [skill]);
+        var validation = new RemoveValidator.RemoveValidation([], [], skill.ResolvedPath, []);
+        var markdown = RemoveWizardContent.BuildReviewMarkdown(new(target, [new(skill, validation)]));
+        var document = Markdig.Markdown.Parse(markdown, new MarkdownPipelineBuilder().UsePipeTables().Build());
+        Assert.Empty(document.Descendants<Markdig.Extensions.Tables.Table>());
+        Assert.Contains("**Skill:** disposable-live-check", markdown);
+        Assert.Contains("**Location:** " + skill.ResolvedPath, markdown);
     }
 
     [Fact]

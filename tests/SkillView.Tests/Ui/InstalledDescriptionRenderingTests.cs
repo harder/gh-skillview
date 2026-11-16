@@ -113,7 +113,9 @@ public sealed class InstalledDescriptionRenderingTests
                 Assert.True(pane.HasFocus);
                 Assert.InRange(pane.Viewport.Y, 0, Math.Max(0, pane.GetContentSize().Height - pane.Viewport.Height));
                 var literal = Assert.Single(Markdig.Markdown.Parse(pane.Text).Descendants<FencedCodeBlock>()).Lines.ToString();
-                Assert.Equal(InstalledDetailReadabilityTests.OrdinaryDescription, string.Join(" ", literal.Split('\n')));
+                var preview = string.Join(" ", literal.Split('\n'));
+                Assert.StartsWith(preview, InstalledDetailReadabilityTests.OrdinaryDescription);
+                if (preview.Length < InstalledDetailReadabilityTests.OrdinaryDescription.Length) Assert.Contains("F2 Details", pane.Text);
                 Assert.All(literal.Split('\n'), line => Assert.True(line.GetColumns() <= pane.Viewport.Width - 2, line));
                 if (descriptions.TryGetValue(size.Item1, out var prior)) Assert.Equal(prior, literal);
                 descriptions[size.Item1] = literal;

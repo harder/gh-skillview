@@ -67,10 +67,12 @@ public static class InstalledScreen
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"## {MarkdownTableFormatter.FormatTableCell(InstalledOverview.Text(s.Name, 128))}");
         sb.AppendLine();
+        var descriptionPreview = new System.Text.StringBuilder();
+        var descriptionOutput = compact && !showDetails ? descriptionPreview : sb;
         if (s.FrontMatter.Description is { Length: > 0 } description)
         {
-            sb.AppendLine(compact ? "### Description" : "Description · from skill metadata (untrusted):");
-            sb.AppendLine();
+            descriptionOutput.AppendLine(compact ? "### Description" : "Description · from skill metadata (untrusted):");
+            descriptionOutput.AppendLine();
             var length = Math.Min(description.Length, 2048);
             if (length < description.Length && char.IsHighSurrogate(description[length - 1]) && char.IsLowSurrogate(description[length]))
                 length--;
@@ -81,6 +83,12 @@ public static class InstalledScreen
             if (descriptionWidth is > 0)
                 text = string.Join("\n", text.Split('\n').SelectMany(line => line.Length == 0
                     ? [""] : TextFormatter.WordWrapText(line, descriptionWidth.Value, tabWidth: 4)));
+            var previewOmitted = false;
+            if (compact && !showDetails && text.Split('\n').Length > 4)
+            {
+                text = string.Join("\n", text.Split('\n').Take(4));
+                previewOmitted = true;
+            }
             var longestRun = 0;
             var run = 0;
             foreach (var c in text)
@@ -90,11 +98,12 @@ public static class InstalledScreen
             }
             // Compute after final wrapping, which can create standalone fence lines.
             var fence = new string('`', Math.Max(3, longestRun + 1));
-            sb.AppendLine(fence);
-            sb.AppendLine(text);
-            sb.AppendLine(fence);
-            sb.AppendLine();
-            if (length < description.Length) sb.AppendLine("[truncated]\n");
+            descriptionOutput.AppendLine(fence);
+            descriptionOutput.AppendLine(text);
+            descriptionOutput.AppendLine(fence);
+            descriptionOutput.AppendLine();
+            if (previewOmitted) descriptionOutput.AppendLine("More description: F2 Details.\n");
+            if (length < description.Length) descriptionOutput.AppendLine("[truncated]\n");
         }
 
         if (compact && !showDetails)
@@ -112,6 +121,7 @@ public static class InstalledScreen
                 sb.AppendLine("\nRead-only — maintained by its owning package or agent.");
             if (s.Validity != ValidityState.Valid) sb.AppendLine("\nMetadata needs review. Open Issues or F2 for the finding.");
             if (!s.MetadataConflicts.IsEmpty || !s.OwnershipDiagnostics.IsEmpty) sb.AppendLine("\nOwnership information needs review. See F2.");
+            sb.Append(descriptionPreview);
             return TerminalEscapeSanitizer.Sanitize(sb.ToString()) ?? "";
         }
 
