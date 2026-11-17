@@ -41,7 +41,7 @@ internal static class WingetTuiTheme
             Normal = normal,
             HotNormal = hot,
             Focus = focus,
-            HotFocus = new Attribute(Accent, Accent, TextStyle.Bold), // matches selected bg
+            HotFocus = focus,
             Active = active,
             HotActive = hot,
             Highlight = focus,

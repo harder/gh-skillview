@@ -324,8 +324,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   and exact-copy actions disabled. Filtered no matches and missing/ambiguous
   selections remain distinct; never clear retained filters or choices implicitly.
 
-- Installed's four selectors live behind Filters (f); active selectors mark the
-  button with an asterisk. Use stable captured keys, never shortened display
+- Installed's four selectors live behind Filters (f); active selectors, pin and
+  scope filters mark the button with an asterisk. Non-default pin, scope and sort
+  choices remain visible when collapsed. Tab reaches visible detail and inline
+  comparison controls as well as the main toolbar. Use stable captured keys, never shortened display
   labels. Tab reaches each expanded choice popup; Esc cancels it. Keep
   missing choices visibly unavailable with zero matches until explicit clearing.
   Preserve exact selection, expansion, top-row anchor, sort and detail focus;
@@ -551,5 +553,14 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   restart guidance uses quarantine-history/undo, never replacement-only F4 History.
 - More-actions and reference popups anchor to their actual control for keyboard
   and mouse acceptance, use a bounded screen rectangle and opaque framed content.
+  Keep action labels short; explain comparison scope inside its review.
+
+- Discover preview aliases are consumed by the focused results table before
+  shell arrow navigation; each invokes one preview and preserves the active tab.
+  Compact and advanced install shortcuts require the visible Discover workspace,
+  never a cached selection hidden behind Installed, Issues, Doctor or a review.
+  Read-only logs retain l/L and Esc to return to preview; read-only raw preview
+  retains e/E to return to rendered text. These keys must not depend on bubbling
+  past Editor, and must preserve control-key selection/copy behavior.
 
 - The B9/Inline UI adapter retains typed finding keys and parent-qualified exact children. ExactEntry admits only verified expanded membership, non-finding singleton rows, or the strict existing typed singleton leaf shape with exact ordinal IDs/path and consistent single ReviewCleanup/ReviewUpdate navigation. Registry, family, intent and coverage observations supply no execution subject. Finding comparison revalidates Id/Difference and all captured members under the owned selection lease; Allowed membership restricts browsing only. Guided requests own a separate selection gate; s is Skip and k/K remain preferences. Source/retention approvals and specialist fresh admission remain independent.

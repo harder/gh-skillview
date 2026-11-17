@@ -43,7 +43,7 @@ internal static class ActionLabels
     internal static readonly ActionLabel Previous = new("", "Previous", "use the button to load the previous submitted search page");
     internal static readonly ActionLabel Next = new("", "Next", "use the button to load the next page when offered; paging uses the submitted query and filters");
     internal static readonly ActionLabel Logs = new("l", "Logs", "show the Discover log pane", "L");
-    internal static readonly ActionLabel ReturnPreview = Logs with { Label = "Preview", Explanation = "return from logs to the Discover preview when focus is outside the read-only log editor" };
+    internal static readonly ActionLabel ReturnPreview = Logs with { Label = "Preview", Explanation = "return from logs to the Discover preview; Esc also returns from the log pane" };
     internal static readonly ActionLabel PreviewMode = new("e", "Raw/rendered", "toggle raw / rendered Discover preview while logs are hidden", "E");
     internal static readonly ActionLabel Sort = new("s", "Sort", "cycle sort order", "S");
     internal static readonly ActionLabel Browse = new("Enter", "Details/Expand", "expand a source group or browse the selected exact copy");
@@ -58,7 +58,7 @@ internal static class ActionLabels
     internal static readonly ActionLabel KeepBoth = new("k", "Keep both", "mark the selected observed copy difference intentional; an intentional difference offers Restore suggestions instead");
     internal static readonly ActionLabel RestoreSuggestions = KeepBoth with { Label = "Restore" };
     internal static readonly ActionLabel Choices = new("K", "Choices", "review saved intentional differences; resetting them requires separate confirmation");
-    internal static readonly ActionLabel MoreActions = new("", "More actions", "open, remove, package check and contextual local-source reviews; unavailable actions explain their limits");
+    internal static readonly ActionLabel MoreActions = new("", "More actions", "compare copies, open location, remove, package check and contextual local-source reviews; unavailable actions explain their limits");
     internal static readonly ActionLabel Remove = new("x", "Remove", "review removal of the selected installed copy", "X");
     internal static readonly ActionLabel PackageCheck = new("K", "Package check", "check the selected copy without launching a client");
     internal static readonly ActionLabel Reimport = new("R", "Reimport local", "review a local reimport when applicable");

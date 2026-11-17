@@ -115,7 +115,7 @@ internal static class CleanupReviewFormatter
         });
         yield return ("Next", candidate.ReviewOnly
             ? "Inspect the details and compare or repair this copy."
-            : "Space selects; Enter reviews removal.");
+            : "Choose Review removal to inspect and confirm this item.");
         yield return ("Changes", Effect(candidate));
         yield return ("Undo", candidate.ReviewOnly ? "Inspection changes nothing." : "Deletion has no automatic undo.");
         foreach (var field in AgentFields(candidate)) yield return field;

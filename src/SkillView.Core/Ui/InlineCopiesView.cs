@@ -69,7 +69,7 @@ internal sealed class InlineCopiesView : View
         Retire();
         _request = InlineCopyRequest.Capture(snapshot, _generation(), _context(), ++_epoch, target, returnState, binding);
         if (_request is null) return false;
-        _notice = "Choose a reference explicitly, then Compare. Reference is for comparison only; it is never a survivor.";
+        _notice = "Choose a reference, then Compare. This only reads files; it does not choose a copy to keep.";
         Visible = true;
         Render();
         _choose.SetFocus();
@@ -163,7 +163,7 @@ internal sealed class InlineCopiesView : View
         // Preserve the pure formatter's bounded literal fields while allowing
         // long exact locations to wrap at the current Markdown viewport width.
         _detail.Text = "## Selected copy comparison\n\n"
-            + (request.Finding is null ? "Compare copies (broad: same name or recorded source; not the finding's family)\n\n" : "Exact captured finding members only.\n\n") + MarkdownTableFormatter.FormatCodeSpan(_notice)
+            + (request.Finding is null ? "Copies with the same name or recorded source. These may include copies outside the selected finding.\n\n" : "Only the copies in this captured finding.\n\n") + MarkdownTableFormatter.FormatCodeSpan(_notice)
             + "\n\n" + string.Join("\n\n", text.Split('\n').Where(line => line.Length > 0).Select(MarkdownTableFormatter.FormatCodeSpan))
             + "\n\nLocal capture success does not establish complete inventory or all consumers. Full ACL/xattr/ADS equivalence and running sessions remain unknown. Comparison grants no mutation authority. Tracked copies cannot use standalone Move aside.\n";
     }

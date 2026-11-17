@@ -473,6 +473,7 @@ public sealed partial class SkillViewApp
     /// in `OpenInstallDialog`.
     private void StageInstall(bool forceAdvanced = false)
     {
+        if (_activeTab != SkillViewTab.Discover || _inDoctor || _updatesTab?.Visible == true) return;
         if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {

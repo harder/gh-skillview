@@ -260,7 +260,7 @@ Discover tab:
 | `I` | Advanced install wizard for the selected result |
 | `o` | Open the repo in a browser |
 | `e` | Toggle raw / rendered preview |
-| `l` | Toggle the right pane between preview and logs |
+| `l` / `L` | Toggle preview and logs, including while logs have focus; Esc also leaves logs |
 
 Installed tab:
 
@@ -272,7 +272,7 @@ Installed tab:
 | `C` (Shift+c) | Check updates for the whole catalog, or cancel the check |
 | `u` | Hand the selected exact copy to saved update review |
 | `c` | Show Cleanup findings in Issues |
-| `Tab` / `Shift+Tab` | Reach Filters, Clear, Coverage and copy controls; expand Filters to reach the four selectors; Enter opens a selector, arrows/Enter choose, Esc cancels |
+| `Tab` / `Shift+Tab` | Reach Filters, Clear, Coverage, scrollable details and comparison controls; expand Filters to reach the four selectors; Enter opens a selector, arrows/Enter choose, Esc cancels |
 | `G` | Cycle scope (all / user / project / custom), keeping all consumers |
 | `/` | Search Installed by name, path, agent or recorded source |
 | `f` / `F` | Expand or collapse agent, location, source and issue filters |
@@ -283,7 +283,9 @@ Installed tab:
 | `x` | Remove the selected skill (compact confirm; wizard if the plan needs second-confirm) |
 | `o` | Open the skill folder |
 
-Press **F2** in Installed to show or hide technical evidence (installation IDs, captured identities, exposure paths, and reload references). Ordinary detail starts with a bounded, literal-text description attributed to skill metadata (Markdown and links remain inert), followed by recorded source, exact location, version/ref evidence, pins and every recorded consumer. **More actions** exposes open, remove, package check and contextual local-source reviews. Source groups cannot run copy operations; ambiguous IDs remain inspect-only.
+Pin and scope filters mark **Filters*** while active, even when the selectors are collapsed. The coverage line also shows non-default pin, scope and sort choices.
+
+Press **F2** in Installed to show or hide technical evidence (installation IDs, captured identities, exposure paths, and reload references). Ordinary detail shows recorded source, version, exact location and consumers before a four-line literal description preview; F2 retains the full bounded description (Markdown and links remain inert). **More actions** exposes comparison, open, remove, package check and contextual local-source reviews. Source groups cannot run copy operations; ambiguous IDs remain inspect-only.
 
 TUI pin displays include contextual lockfile records as well as skill metadata. The
 **pinned only** filter includes copies with any recorded pin, including conflicting

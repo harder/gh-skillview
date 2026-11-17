@@ -1,6 +1,8 @@
 using SkillView.Inventory.Models;
 using SkillView.Bootstrapping;
 using SkillView.Threading;
+using Terminal.Gui.Drivers;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -76,6 +78,29 @@ public sealed partial class SkillViewApp
         _previewPane = _discoverTab.DetailPane.PreviewPane;
         _previewRawPane = _discoverTab.DetailPane.PreviewRawPane;
         _logPane = _discoverTab.DetailPane.LogPane;
+        _logPane.KeyDown += (_, key) =>
+        {
+            if (key.Handled || key.IsCtrl || key.IsAlt) return;
+            if (key.KeyCode != KeyCode.Esc && key.AsRune.Value is not ('l' or 'L')) return;
+            key.Handled = true;
+            ShowPreviewPane();
+            _resultsTable?.SetFocus();
+        };
+        _previewRawPane.KeyDown += (_, key) =>
+        {
+            if (key.Handled || key.IsCtrl || key.IsAlt) return;
+            if (key.AsRune.Value is 'e' or 'E')
+            {
+                key.Handled = true;
+                TogglePreviewMode();
+                _previewPane?.SetFocus();
+            }
+            else if (key.KeyCode == KeyCode.Esc)
+            {
+                key.Handled = true;
+                _resultsTable?.SetFocus();
+            }
+        };
 
         _discoverTab.PageRequested += ChangeSearchPage;
         void RefreshInstallMarkers() => Invoke(() => { RefreshResultsTable(); UpdateMetadataPane(); });
@@ -90,6 +115,15 @@ public sealed partial class SkillViewApp
         // Wire event handlers that require SkillViewApp state.
         _resultsTable.KeyDown += (sender, key) =>
         {
+            if (!key.Handled && _results.Count > 0 && (TuiHelpers.IsPreviewKey(key)
+                || key.KeyCode == KeyCode.CursorRight || key.KeyCode == (KeyCode.J | KeyCode.CtrlMask)))
+            {
+                // Handle view-local activation before the shell sees arrows
+                // as tab navigation. Command bindings run after KeyDown bubbles.
+                key.Handled = true;
+                _resultsTable.InvokeCommand(Command.Accept);
+                return;
+            }
             // Terminal.Gui consumes printable keys on an empty table before
             // they reach the window. Keep retry, help and tab shortcuts usable.
             if (_results.Count == 0) OnWindowKeyDown(sender, key);

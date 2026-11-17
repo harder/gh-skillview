@@ -372,11 +372,6 @@ internal sealed class InstalledTabView : FrameView
         _detail.ViewportChanged += (_, _) => ReflowDetail();
 
         KeyDown += OnKeyDown;
-        _detail.KeyDown += (_, key) =>
-        {
-            if (key.KeyCode == KeyCode.Tab) { key.Handled = true; _detailsButton.SetFocus(); }
-            else if (key.KeyCode == (KeyCode.Tab | KeyCode.ShiftMask)) { key.Handled = true; FocusList(); }
-        };
         _detail.KeyDown += OnKeyDown;
         _table.KeyDown += OnKeyDown;
         _filterField.KeyDown += OnKeyDown;
@@ -895,7 +890,8 @@ internal sealed class InstalledTabView : FrameView
 
     private void RefreshFilterButtons()
     {
-        var active = Enumerable.Range(0, 4).Count(i => FilterKey(i) is not null);
+        var active = Enumerable.Range(0, 4).Count(i => FilterKey(i) is not null)
+            + (_pinFilter == PinFilter.All ? 0 : 1) + (_scopeFilter == ScopeFilter.All ? 0 : 1);
         _filtersButton.Text = active == 0 ? "Filters (f)" : "Filters* (f)";
         for (var i = 0; i < 4; i++)
         {
@@ -1024,7 +1020,9 @@ internal sealed class InstalledTabView : FrameView
     {
         if ((key.KeyCode & ~KeyCode.ShiftMask) == KeyCode.Tab)
         {
-            var order = new View[] { _filterField, _filtersButton, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills }
+            IEnumerable<View> content = _copies.Open ? _copies.SubViews : new View[] { _detail };
+            var order = new View[] { _filterField, _filtersButton, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table }
+                .Concat(content).Concat([_detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills])
                 .Where(v => v.Visible && v.Enabled && v.CanFocus).ToArray();
             if (order.Length == 0) return false;
             var index = Array.FindIndex(order, v => v.HasFocus);
@@ -1053,6 +1051,9 @@ internal sealed class InstalledTabView : FrameView
         var partial = _snapshot is not null && (_snapshot.IsPartial || !_snapshot.ConfiguredRootsComplete);
         _coverage.Text = blocked + (partial ? "Partial scan" : "Captured inventory")
             + (_snapshot is null ? "" : $" · {_snapshot.ScannedRoots.Length}/{_snapshot.ConfiguredRoots.Length} locations")
+            + (_pinFilter == PinFilter.All ? "" : " · Pins: " + DescribePin(_pinFilter))
+            + (_scopeFilter == ScopeFilter.All ? "" : " · Scope: " + DescribeScope(_scopeFilter))
+            + (_sort == SortMode.Name ? "" : " · Sort: " + _sort.ToString().ToLowerInvariant())
             + (_filtersExpanded ? " · " + _overview.Coverage : "");
     }
 
@@ -1230,12 +1231,14 @@ internal sealed class InstalledTabView : FrameView
         if (_snapshotGeneration != _catalogGeneration()) return;
         if (GetSelectedSkill() is not { } skill || !CanActOnSelection) return;
         _copies.Retire();
-        var actions = new List<(string Label, Action Run)> { ("Open exact location", () => _openPath(skill.ResolvedPath)), ("Remove exact copy", () => TryStartSelectedRemove()) };
-        actions.Insert(0, ("Compare copies (broad: same name or recorded source; not the finding's family)", OpenCopies));
-        if (_onMoveAside is not null) actions.Add(("Review standalone Move aside...", () => _onMoveAside(skill)));
-        if (_onPackageCheck is not null) actions.Add(("Check package", () => CheckPackage(skill)));
+        var actions = new List<(string Label, Action Run)> { ("Open location (o)", () => _openPath(skill.ResolvedPath)), ("Remove copy (x)...", () => TryStartSelectedRemove()) };
+        if (_snapshot is not null && CopiesPresentation.Build(_snapshot, skill, CancellationToken.None).Copies
+            .Any(copy => !ReferenceEquals(copy, skill)))
+            actions.Insert(0, ("Compare copies...", OpenCopies));
+        if (_onMoveAside is not null) actions.Add(("Move aside...", () => _onMoveAside(skill)));
+        if (_onPackageCheck is not null) actions.Add(("Check package (K)", () => CheckPackage(skill)));
         if (_onResourceReplacement is not null && CurrentResourceReplacement(skill) is { } replacement)
-            actions.Add(("Review replacement for " + InstalledOverview.Text(replacement.Target, 240), () =>
+            actions.Add(("Repair missing resource...", () =>
             {
                 // Re-read the coordinator's current fact at the click boundary.
                 if (CurrentResourceReplacement(skill) is { } current && ReferenceEquals(current.Fact, replacement.Fact)
@@ -1246,8 +1249,8 @@ internal sealed class InstalledTabView : FrameView
             actions.Add(("Review registry-recorded replacement", () => _onRegistryRestore(skill)));
         if (skill.FrontMatter.LocalPath is not null)
         {
-            if (_onLocalReimport is not null) actions.Add(("Review local reimport", () => _onLocalReimport(skill)));
-            if (_onLocalSourceSwitch is not null) actions.Add(("Review different local source", () => _onLocalSourceSwitch(skill)));
+            if (_onLocalReimport is not null) actions.Add(("Reimport local (R)...", () => _onLocalReimport(skill)));
+            if (_onLocalSourceSwitch is not null) actions.Add(("Change local source (T)...", () => _onLocalSourceSwitch(skill)));
         }
         _actionsMenu?.Dispose();
         var key = _selectedKey;
