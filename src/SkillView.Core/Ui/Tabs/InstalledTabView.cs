@@ -296,8 +296,6 @@ internal sealed class InstalledTabView : FrameView
         TuiHelpers.ConfigureTableNavigation(_table);
         TuiHelpers.ConfigureTableChrome(_table);
         _table.Style.ShowVerticalCellLineForLastColumn = true;
-        _table.Style.ShowHorizontalHeaderOverline = false;
-        _table.Style.ShowHorizontalHeaderUnderline = false;
         _table.Style.AlwaysUseNormalColorForVerticalCellLines = true;
         _table.Style.AlwaysShowHeaders = true;
         _table.MaxCellWidth = int.MaxValue;
@@ -636,7 +634,7 @@ internal sealed class InstalledTabView : FrameView
     {
         var width = _table.Viewport.Width > 0 ? _table.Viewport.Width : Math.Max(30, _lastWidth);
         _lastWidth = width;
-        var available = Math.Max(2, width - 2);
+        var available = Math.Max(2, width - 3);
         var first = Math.Max(1, available * 68 / 100);
         for (var i = 0; i < 2; i++)
         {

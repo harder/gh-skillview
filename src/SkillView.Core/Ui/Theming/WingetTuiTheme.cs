@@ -119,7 +119,9 @@ internal static class WingetTuiTheme
     /// against panel fills, accent on focus.
     internal static Scheme CreateEditableInputScheme()
     {
-        var normal = new Attribute(TextPrimary, Surface);
+        // Surface and Background both quantize to black in 16-color terminals.
+        // Keep empty editable fields visible in that supported fallback too.
+        var normal = new Attribute(new Color(StandardColor.White), DarkGray);
         var focus = new Attribute(Black, Accent);
         var disabled = new Attribute(TextSecondary, Background);
 
@@ -138,6 +140,9 @@ internal static class WingetTuiTheme
             Code = normal,
         };
     }
+
+    /// Persistent headings differ from both ordinary text and row selection.
+    internal static Scheme CreateHeadingScheme() => AllSame(new Attribute(new Color(StandardColor.White), DarkGray, TextStyle.Bold));
 
     /// TableView scheme — selected row uses Accent bg to match winget-tui
     /// `selected_row()`. Multi-select "marked" rows are colored at the cell

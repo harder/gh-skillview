@@ -177,6 +177,7 @@ public sealed partial class SkillViewApp
             Y = 1,
             Width = Dim.Fill(),
         };
+        _contextBar.SetScheme(TuiHelpers.CreateHeadingScheme());
 
         _statusStrip = new StatusStripView
         {
@@ -425,6 +426,7 @@ public sealed partial class SkillViewApp
         var workspaceName = _activeTab switch
         {
             _ when _inDoctor => "Doctor — Environment diagnostics",
+            _ when _updatesTab?.Visible == true => "Update review",
             SkillViewTab.Discover => "Discover skills",
             SkillViewTab.Installed => "Installed skills",
             SkillViewTab.Changes => "Issues",
@@ -451,16 +453,8 @@ public sealed partial class SkillViewApp
             return;
         }
 
-        // Installed owns its filter/coverage chrome and needs the row budget
-        // for its full-width list at 80x24.
-        if ((_activeTab == SkillViewTab.Installed && _installedTab is not null) || (_activeTab == SkillViewTab.Changes && _changesTab is not null))
-        {
-            ApplyContextBarVisibility(false);
-            return;
-        }
-
         // For Changes tab, show count of pending items.
-        if (_activeTab == SkillViewTab.Changes && _changesTab is not null)
+        if (_activeTab == SkillViewTab.Changes && _updatesTab?.Visible != true && _changesTab is not null)
         {
             var label = _changesTab.GetQueueLabel();
             if (!string.IsNullOrWhiteSpace(label))
