@@ -28,6 +28,7 @@ public sealed class VisualHierarchyTests
         Assert.NotEqual(input.Foreground.GetClosestNamedColor16(), input.Background.GetClosestNamedColor16());
         Assert.NotEqual(header.Foreground.GetClosestNamedColor16(), header.Background.GetClosestNamedColor16());
         Assert.NotEqual(selected.Background.GetClosestNamedColor16(), header.Background.GetClosestNamedColor16());
+        Assert.Equal(body.Background, header.Background);
         Assert.NotEqual(input, header);
     }
 

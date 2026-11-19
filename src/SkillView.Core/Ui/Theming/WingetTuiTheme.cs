@@ -141,8 +141,8 @@ internal static class WingetTuiTheme
         };
     }
 
-    /// Persistent headings differ from both ordinary text and row selection.
-    internal static Scheme CreateHeadingScheme() => AllSame(new Attribute(new Color(StandardColor.White), DarkGray, TextStyle.Bold));
+    /// Gold type and table rules define headings without a filled banner.
+    internal static Scheme CreateHeadingScheme() => AllSame(new Attribute(Accent, Background, TextStyle.Bold));
 
     /// TableView scheme — selected row uses Accent bg to match winget-tui
     /// `selected_row()`. Multi-select "marked" rows are colored at the cell

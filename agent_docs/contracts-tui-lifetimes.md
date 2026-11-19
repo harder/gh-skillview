@@ -300,9 +300,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   Verify real rendered grids with long skill names and managed inventories,
   including every visible toolbar control at 80x24, 120x36 and a wider size.
   Keep the screen heading visible below navigation. Table column headers retain
-  their bold, shaded style and horizontal rules when focus moves to a toolbar
-  or menu; selected rows use a separate accent fill. Reserve enough column width
-  for the outer borders as well as the internal separator.
+  their bold accent text and horizontal rules when focus moves to a toolbar
+  or menu; default headings have no filled banner, and selected rows use a separate
+  accent fill. Reserve enough column width for the outer borders as well as the
+  internal separator.
 - Installed builds one transient source/copy projection off the UI thread per new
   snapshot. SourceIdentity.Key plus case-insensitive name groups known sources;
   null/conflicting keys stay singleton groups; duplicate IDs are inspect-only.
