@@ -83,8 +83,10 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   owners; retain workflow notifications and progress. Status timers must reject
   callbacks superseded by a newer status or workspace transition.
 
-- Keep advanced-remove policy evaluation off the Terminal.Gui thread. Cache
-  per-target evaluations only for wizard display and always validate again in
+- Keep advanced-remove policy evaluation off the Terminal.Gui thread. Final wizard
+  acceptance must retain the modal until its owned operation settles; bypass
+  Dialog's automatic stop on that final step while retaining wizard navigation.
+  Cache per-target evaluations only for wizard display and always validate again in
   the owned background operation immediately before execution; if blocking or
   warning content changed, return to Review instead of deleting. Agent-link
   removal is available only through `ValidateSymlink` plus `RemoveAsync`; do
@@ -286,6 +288,22 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   full inventory browser, marks/All, UI sibling queue and dry-run action must
   not be reintroduced as test helpers. Main-view availability remains separate.
 
+- Ordinary browsing follows the simpler 1.0.1 / WinGet Scout list-and-detail
+  hierarchy. Single, unambiguous copies occupy one exact row; multiple-copy
+  groups can expand. A browse-only install handoff may retain a singleton group
+  until the user explicitly chooses its copy. Keep concise default details and
+  compact toolbars. Basic identity precedes a four-line description preview; F2
+  retains the full bounded inert description. Issues secondary actions live in More actions; guided review
+  controls and retained outcomes remain visible while relevant. Detailed repair
+  dialogs/wizards are appropriate. F2 retains technical evidence; hiding it never
+  changes frozen routing identities, stale-selection guards or operation approval.
+  Verify real rendered grids with long skill names and managed inventories,
+  including every visible toolbar control at 80x24, 120x36 and a wider size.
+  Keep the screen heading visible below navigation. Table column headers retain
+  their bold accent text and horizontal rules when focus moves to a toolbar
+  or menu; default headings have no filled banner, and selected rows use a separate
+  accent fill. Reserve enough column width for the outer borders as well as the
+  internal separator.
 - Installed builds one transient source/copy projection off the UI thread per new
   snapshot. SourceIdentity.Key plus case-insensitive name groups known sources;
   null/conflicting keys stay singleton groups; duplicate IDs are inspect-only.
@@ -311,8 +329,11 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   and exact-copy actions disabled. Filtered no matches and missing/ambiguous
   selections remain distinct; never clear retained filters or choices implicitly.
 
-- Installed's four visible selectors use stable captured keys, never shortened
-  display labels. Tab reaches each direct choice popup; Esc cancels it. Keep
+- Installed's four selectors live behind Filters (f); active selectors, pin and
+  scope filters mark the button with an asterisk. Non-default pin, scope and sort
+  choices remain visible when collapsed. Tab reaches visible detail and inline
+  comparison controls as well as the main toolbar. Use stable captured keys, never shortened display
+  labels. Tab reaches each expanded choice popup; Esc cancels it. Keep
   missing choices visibly unavailable with zero matches until explicit clearing.
   Preserve exact selection, expansion, top-row anchor, sort and detail focus;
   local filters/coverage must not capture, classify, hash or launch gh children.
@@ -537,5 +558,14 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   restart guidance uses quarantine-history/undo, never replacement-only F4 History.
 - More-actions and reference popups anchor to their actual control for keyboard
   and mouse acceptance, use a bounded screen rectangle and opaque framed content.
+  Keep action labels short; explain comparison scope inside its review.
+
+- Discover preview aliases are consumed by the focused results table before
+  shell arrow navigation; each invokes one preview and preserves the active tab.
+  Compact and advanced install shortcuts require the visible Discover workspace,
+  never a cached selection hidden behind Installed, Issues, Doctor or a review.
+  Read-only logs retain l/L and Esc to return to preview; read-only raw preview
+  retains e/E to return to rendered text. These keys must not depend on bubbling
+  past Editor, and must preserve control-key selection/copy behavior.
 
 - The B9/Inline UI adapter retains typed finding keys and parent-qualified exact children. ExactEntry admits only verified expanded membership, non-finding singleton rows, or the strict existing typed singleton leaf shape with exact ordinal IDs/path and consistent single ReviewCleanup/ReviewUpdate navigation. Registry, family, intent and coverage observations supply no execution subject. Finding comparison revalidates Id/Difference and all captured members under the owned selection lease; Allowed membership restricts browsing only. Guided requests own a separate selection gate; s is Skip and k/K remain preferences. Source/retention approvals and specialist fresh admission remain independent.

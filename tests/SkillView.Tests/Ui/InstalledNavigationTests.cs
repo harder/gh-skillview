@@ -99,14 +99,14 @@ public sealed class InstalledNavigationTests
             Press(KeyCode.N | KeyCode.CtrlMask, 10);
             Assert.True(count == 0 ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.CursorUp, count * 2 + 10);
-            Assert.Null(view.GetSelectedSkill()); // first row is a source heading
+            Assert.Equal(count == 0 ? null : "skill-000", view.GetSelectedSkill()?.Name); // singleton rows are exact copies
             Assert.True(count == 0 ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.P | KeyCode.CtrlMask, 10);
             Assert.True(count == 0 ? view.SubViews.OfType<Markdown>().Single().HasFocus : view.TableHasFocusForTests);
             Press(KeyCode.PageDown, 10);
             Assert.Equal(count == 0 ? null : $"skill-{count - 1:D3}", view.GetSelectedSkill()?.Name);
             Press(KeyCode.PageUp, 10);
-            Assert.Null(view.GetSelectedSkill()); // first row is a source heading
+            Assert.Equal(count == 0 ? null : "skill-000", view.GetSelectedSkill()?.Name); // singleton rows are exact copies
             Press(KeyCode.End | KeyCode.CtrlMask);
             app.Driver.SetScreenSize(90, 26);
             window.Layout();

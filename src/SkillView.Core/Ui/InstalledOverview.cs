@@ -97,7 +97,7 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
     }
 
     internal InstalledOverviewRows View(Func<InstalledSkill, bool> matches, string sort, ISet<string> expanded,
-        Func<InstalledSkill, UpdateAvailability>? availability, CancellationToken token)
+        Func<InstalledSkill, UpdateAvailability>? availability, CancellationToken token, bool compactSingletons = false, string? retainGroupKey = null)
     {
         token.ThrowIfCancellationRequested();
         var groups = Groups.Select(g => (Group: g, Copies: g.Copies.Where(c => c.Records.Any(matches)).ToArray()))
@@ -108,6 +108,9 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
             "location" => groups.OrderBy(g => g.Copies[0].Path, StringComparer.Ordinal).ThenBy(g => g.Group.Key, StringComparer.Ordinal),
             _ => groups.OrderBy(g => g.Group.Name, StringComparer.OrdinalIgnoreCase).ThenBy(g => g.Group.Key, StringComparer.Ordinal),
         };
+        var nameMarkers = Groups.GroupBy(g => g.Name, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1)
+            .SelectMany(g => g.OrderBy(source => source.Key, StringComparer.Ordinal).Select((source, index) => (source.Key, Number: index + 1)))
+            .ToDictionary(pair => pair.Key, pair => pair.Number, StringComparer.Ordinal);
         var rows = new List<InstalledOverviewRow>();
         var totalRows = 0;
         var matching = 0;
@@ -129,8 +132,12 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
                 + (group.RefsDiffer ? "; recorded revisions differ" : "") + (group.RefsIncomplete && group.Copies.Count > 1 ? "; revision evidence incomplete" : "")
                 + (localStates.Length == 0 ? "" : "; " + string.Join(", ", localStates))
                 + (updateStates.Length == 0 ? "" : "; Updates: " + string.Join(", ", updateStates));
-            Add(new(group.Key, group, null, (expanded.Contains(group.Key) ? "v " : "> ") + group.Name + " · " + group.Source, summary));
-            if (!expanded.Contains(group.Key)) continue;
+            var hasNamesake = nameMarkers.TryGetValue(group.Key, out var number);
+            var name = group.Name + (hasNamesake ? $" #{number}" : "");
+            var singleRow = compactSingletons && group.Copies.Count == 1 && !copies[0].Ambiguous && group.Key != retainGroupKey;
+            if (!singleRow)
+                Add(new(group.Key, group, null, (expanded.Contains(group.Key) ? "v " : "> ") + name + (hasNamesake ? " · " + group.Source : ""), summary));
+            if (!singleRow && !expanded.Contains(group.Key)) continue;
             foreach (var copy in copies)
             {
                 token.ThrowIfCancellationRequested();
@@ -140,7 +147,7 @@ internal sealed record InstalledOverview(IReadOnlyList<InstalledSourceGroup> Gro
                     : s.Revision.AuthoredVersion is { Length: > 0 } a ? "authored " + a
                     : s.Revision.DistributorVersion is { Length: > 0 } d ? "pack " + d : "ref unknown";
                 var state = copy.Ambiguous ? "Ambiguous; actions disabled" : copy.ReadOnly ? "Read-only" : "Updates: " + (availability?.Invoke(s).TableLabel ?? "Not checked");
-                Add(new(copy.Key, group, copy, "  " + Text(revision, 36) + " · " + copy.Location + (pin.HasPin ? " · pin " + pin.Label : ""),
+                Add(new(copy.Key, group, copy, singleRow ? name + (hasNamesake ? " · " + s.Scope + " · " + copy.Location : "") : "  " + Text(revision, 36) + " · " + copy.Location + (pin.HasPin ? " · pin " + pin.Label : ""),
                     Text(string.Join(" + ", copy.Records.SelectMany(s => s.Agents).Select(a => a.AgentId).Distinct(StringComparer.Ordinal)), 64) + "; " + state));
             }
         }

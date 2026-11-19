@@ -959,6 +959,35 @@ public sealed class SkillViewAppTests
     }
 
     [Fact]
+    public void QuietFooterRetainsDependencyErrorsAndTerminalGuidance()
+    {
+        using var terminal = Application.Create().Init();
+        terminal.Driver!.SetScreenSize(120, 36);
+        var app = CreateApp();
+        using var window = app.BuildUiForTests();
+        var session = terminal.Begin(window);
+        try
+        {
+            foreach (var message in new[] { "gh not found — search and preview disabled; press 'd' for Doctor",
+                "gh 2.0 below minimum 2.102.0 — press 'd' for Doctor", "Warp detected — use Ctrl+J instead of Enter" })
+            {
+                app.SetDefaultStatusForTests(message);
+                Assert.Contains(message[..12], Footer());
+            }
+            app.SetDefaultStatusForTests("gh 2.103.3 — press '/' to search, 'd' for Doctor");
+            Assert.DoesNotContain("gh 2.103.3", Footer());
+        }
+        finally { terminal.End(session!); }
+
+        string Footer()
+        {
+            terminal.LayoutAndDraw(); terminal.LayoutAndDraw();
+            var row = app.StatusStripForTests!.FrameToScreen().Y;
+            return string.Concat(Enumerable.Range(0, 120).Select(column => terminal.Driver.Contents![row, column].Grapheme));
+        }
+    }
+
+    [Fact]
     public void BuildUi_InstalledHints_ShowOnlyPrimaryActions()
     {
         var app = CreateApp();
@@ -971,7 +1000,7 @@ public sealed class SkillViewAppTests
         Assert.Contains(hints, hint => hint.Key == "/" && hint.Label == "Search");
         Assert.Contains(hints, hint => hint.Key == "Enter" && hint.Label == "Details/Expand");
         Assert.Contains(hints, hint => hint.Key == "r" && hint.Label == "Refresh");
-        Assert.Contains(hints, hint => hint.Key == "c" && hint.Label == "Cleanup");
+        Assert.Contains(hints, hint => hint.Key == "f" && hint.Label == "Filters");
         Assert.Contains(hints, hint => hint.Key == "?" && hint.Label == "Help");
         Assert.Contains(hints, hint => hint.Key == "Ctrl+Q" && hint.Label == "Quit");
         Assert.DoesNotContain(hints, hint => hint.Key == "o" && hint.Label == "Open");
@@ -980,7 +1009,8 @@ public sealed class SkillViewAppTests
         Assert.Contains(visible, hint => hint is { Key: "C", Label: "Check updates" });
         Assert.Contains(visible, hint => hint is { Key: "Enter", Label: "Details/Expand" });
         Assert.Contains(visible, hint => hint is { Key: "?", Label: "Help" });
-        Assert.Contains("**/ / f / F**", app.CurrentHelpForTests);
+        Assert.Contains("**/**", app.CurrentHelpForTests);
+        Assert.Contains("**f / F**", app.CurrentHelpForTests);
     }
 
     [Fact]

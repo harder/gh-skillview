@@ -326,7 +326,7 @@ public sealed class TuiHelpersTests
     }
 
     [Fact]
-    public void ConfigureTableChrome_HidesOnlyOuterVerticalChrome()
+    public void ConfigureTableChrome_KeepsASeparatedPersistentHeader()
     {
         var table = new TableView
         {
@@ -342,9 +342,13 @@ public sealed class TuiHelpersTests
         TuiHelpers.ConfigureTableChrome(table);
 
         Assert.True(table.Style.ShowVerticalCellLines);
-        Assert.False(table.Style.ShowVerticalCellLineForFirstColumn);
-        Assert.False(table.Style.ShowVerticalCellLineForLastColumn);
+        Assert.True(table.Style.ShowVerticalCellLineForFirstColumn);
+        Assert.True(table.Style.ShowVerticalCellLineForLastColumn);
         Assert.True(table.Style.ShowVerticalHeaderLines);
+        Assert.True(table.Style.ShowHorizontalHeaderOverline);
+        Assert.True(table.Style.ShowHorizontalHeaderUnderline);
+        Assert.NotNull(table.Style.HeaderScheme);
+        Assert.Equal(table.Style.HeaderScheme.Normal, table.Style.HeaderScheme.Focus);
     }
 
     [Fact]

@@ -1,6 +1,8 @@
 using SkillView.Inventory.Models;
 using SkillView.Bootstrapping;
 using SkillView.Threading;
+using Terminal.Gui.Drivers;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -76,6 +78,29 @@ public sealed partial class SkillViewApp
         _previewPane = _discoverTab.DetailPane.PreviewPane;
         _previewRawPane = _discoverTab.DetailPane.PreviewRawPane;
         _logPane = _discoverTab.DetailPane.LogPane;
+        _logPane.KeyDown += (_, key) =>
+        {
+            if (key.Handled || key.IsCtrl || key.IsAlt) return;
+            if (key.KeyCode != KeyCode.Esc && key.AsRune.Value is not ('l' or 'L')) return;
+            key.Handled = true;
+            ShowPreviewPane();
+            _resultsTable?.SetFocus();
+        };
+        _previewRawPane.KeyDown += (_, key) =>
+        {
+            if (key.Handled || key.IsCtrl || key.IsAlt) return;
+            if (key.AsRune.Value is 'e' or 'E')
+            {
+                key.Handled = true;
+                TogglePreviewMode();
+                _previewPane?.SetFocus();
+            }
+            else if (key.KeyCode == KeyCode.Esc)
+            {
+                key.Handled = true;
+                _resultsTable?.SetFocus();
+            }
+        };
 
         _discoverTab.PageRequested += ChangeSearchPage;
         void RefreshInstallMarkers() => Invoke(() => { RefreshResultsTable(); UpdateMetadataPane(); });
@@ -90,6 +115,15 @@ public sealed partial class SkillViewApp
         // Wire event handlers that require SkillViewApp state.
         _resultsTable.KeyDown += (sender, key) =>
         {
+            if (!key.Handled && _results.Count > 0 && (TuiHelpers.IsPreviewKey(key)
+                || key.KeyCode == KeyCode.CursorRight || key.KeyCode == (KeyCode.J | KeyCode.CtrlMask)))
+            {
+                // Handle view-local activation before the shell sees arrows
+                // as tab navigation. Command bindings run after KeyDown bubbles.
+                key.Handled = true;
+                _resultsTable.InvokeCommand(Command.Accept);
+                return;
+            }
             // Terminal.Gui consumes printable keys on an empty table before
             // they reach the window. Keep retry, help and tab shortcuts usable.
             if (_results.Count == 0) OnWindowKeyDown(sender, key);
@@ -143,6 +177,7 @@ public sealed partial class SkillViewApp
             Y = 1,
             Width = Dim.Fill(),
         };
+        _contextBar.SetScheme(TuiHelpers.CreateHeadingScheme());
 
         _statusStrip = new StatusStripView
         {
@@ -330,7 +365,7 @@ public sealed partial class SkillViewApp
         void InvalidateUpdateObservations() => _workflows.InvalidateAvailability(RefreshUpdateAvailability);
         _services.ListAdapter.Invalidated += InvalidateUpdateObservations;
         window.Disposing += (_, _) => _services.ListAdapter.Invalidated -= InvalidateUpdateObservations;
-        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = ActionLabels.History.ButtonText, Width = Dim.Func(_ => window.Viewport.Width >= 110 ? 30 : 16) };
+        _historyButton = new SingleRowButton { X = 0, Y = 0, Text = ActionLabels.History.ButtonText, Width = 16 };
         _historyButton.Accepting += (_, args) => { args.Handled = true; OpenHistory(); };
         _locationsButton = new SingleRowButton { X = Pos.Right(_historyButton), Y = 0, Text = "Locations F5", Width = 17 };
         window.FrameChanged += (_, _) => RefreshHistoryButton();
@@ -391,6 +426,7 @@ public sealed partial class SkillViewApp
         var workspaceName = _activeTab switch
         {
             _ when _inDoctor => "Doctor — Environment diagnostics",
+            _ when _updatesTab?.Visible == true => "Update review",
             SkillViewTab.Discover => "Discover skills",
             SkillViewTab.Installed => "Installed skills",
             SkillViewTab.Changes => "Issues",
@@ -417,16 +453,8 @@ public sealed partial class SkillViewApp
             return;
         }
 
-        // Installed owns its filter/coverage chrome and needs the row budget
-        // for its full-width list at 80x24.
-        if (_activeTab == SkillViewTab.Installed && _installedTab is not null)
-        {
-            ApplyContextBarVisibility(false);
-            return;
-        }
-
         // For Changes tab, show count of pending items.
-        if (_activeTab == SkillViewTab.Changes && _changesTab is not null)
+        if (_activeTab == SkillViewTab.Changes && _updatesTab?.Visible != true && _changesTab is not null)
         {
             var label = _changesTab.GetQueueLabel();
             if (!string.IsNullOrWhiteSpace(label))

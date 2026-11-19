@@ -113,7 +113,9 @@ public sealed class InstalledDescriptionRenderingTests
                 Assert.True(pane.HasFocus);
                 Assert.InRange(pane.Viewport.Y, 0, Math.Max(0, pane.GetContentSize().Height - pane.Viewport.Height));
                 var literal = Assert.Single(Markdig.Markdown.Parse(pane.Text).Descendants<FencedCodeBlock>()).Lines.ToString();
-                Assert.Equal(InstalledDetailReadabilityTests.OrdinaryDescription, string.Join(" ", literal.Split('\n')));
+                var preview = string.Join(" ", literal.Split('\n'));
+                Assert.StartsWith(preview, InstalledDetailReadabilityTests.OrdinaryDescription);
+                if (preview.Length < InstalledDetailReadabilityTests.OrdinaryDescription.Length) Assert.Contains("F2 Details", pane.Text);
                 Assert.All(literal.Split('\n'), line => Assert.True(line.GetColumns() <= pane.Viewport.Width - 2, line));
                 if (descriptions.TryGetValue(size.Item1, out var prior)) Assert.Equal(prior, literal);
                 descriptions[size.Item1] = literal;
@@ -179,9 +181,9 @@ public sealed class InstalledDescriptionRenderingTests
             Assert.True(view.RowsForTests[1].Copy!.Ambiguous);
             var records = view.DetailTextForTests.Split("\n\n---\n\n", StringSplitOptions.None);
             Assert.Equal(2, records.Length);
-            Assert.Contains("**Location:** `/skills/Demo`", records[0]);
+            Assert.Contains("**Location:**\n\n/skills/Demo", records[0]);
             Assert.Contains("1 physical copy · 1 recorded placement" + System.Environment.NewLine, records[0]);
-            Assert.Contains("**Location:** `" + secondPath + "`", records[1]);
+            Assert.Contains("**Location:**\n\n" + secondPath, records[1]);
             Assert.Contains("1 physical copy · 2 recorded placements" + System.Environment.NewLine, records[1]);
             Assert.DoesNotContain("1 physical copy · 3 recorded placements", view.DetailTextForTests);
             Assert.Contains("1 observed copy · 3 recorded placements · 1 ambiguous", view.FooterTextForTests);

@@ -59,6 +59,8 @@ internal sealed class InstalledTabView : FrameView
     private readonly Action<InstalledSkill>? _onMoveAside;
     private readonly Button[] _facetButtons;
     private readonly Button _coverageButton;
+    private readonly Button _filtersButton;
+    private bool _filtersExpanded;
     private readonly Button _clearFilters;
     private readonly Func<InstalledIssueEvidence?> _capturedIssues;
     private readonly Func<PackageCheckFact?> _packageCheck;
@@ -142,6 +144,7 @@ internal sealed class InstalledTabView : FrameView
         var issues = _issueView;
         var package = _packageView;
         var expanded = _expanded.ToArray();
+        var filtersExpanded = _filtersExpanded;
         var values = Values();
         var labels = _chosenLabels.ToArray();
         var detailValues = DetailValues();
@@ -153,7 +156,7 @@ internal sealed class InstalledTabView : FrameView
             && ReferenceEquals(rows, _rows) && ReferenceEquals(table, _table.Table)
             && tableState == (_table.Frame, _table.Viewport, _table.ColumnOffset, _table.Value?.SelectedCell)
             && ReferenceEquals(issues.Evidence, _issueView.Evidence) && issues.Generation == _issueView.Generation
-            && ReferenceEquals(package, _packageView) && _expanded.SetEquals(expanded) && values == Values()
+            && ReferenceEquals(package, _packageView) && filtersExpanded == _filtersExpanded && _expanded.SetEquals(expanded) && values == Values()
             && availability.All(pair => Equals(pair.Value, _availability!.Get(pair.Key)))
             && (!detail || (detailValues == DetailValues() && labels.SequenceEqual(_chosenLabels)));
 
@@ -238,7 +241,7 @@ internal sealed class InstalledTabView : FrameView
             Visible = false,
             HotKeySpecifier = (System.Text.Rune)0xffff,
         };
-        _controls = new Label { X = 22, Y = 0, Width = Dim.Fill(35), Height = 1 };
+        _controls = new Label { X = 0, Y = 2, Width = Dim.Fill(), Height = 1, Visible = false };
         _clearFilters = new SingleRowButton { X = Pos.AnchorEnd(9), Y = 0, Text = "Clear" };
         _clearFilters.Accepting += (_, e) => { e.Handled = true; ClearFilters(); };
         _coverageButton = new SingleRowButton { X = 0, Y = 2, Text = "Coverage" };
@@ -250,12 +253,14 @@ internal sealed class InstalledTabView : FrameView
             return (Button)button;
         }).ToArray();
 
-        var filterLabel = new Label { Text = "Search:", X = 0, Y = 0 };
+        _filtersButton = new SingleRowButton { X = Pos.AnchorEnd(53), Y = 0, Width = 17, Text = "Filters (f)" };
+        _filtersButton.Accepting += (_, e) => { e.Handled = true; ToggleFilters(); };
+        var filterLabel = new Label { Text = "Filter:", X = 0, Y = 0 };
         _filterField = new TextField
         {
             X = 8,
             Y = 0,
-            Width = 13,
+            Width = Dim.Fill(54),
             Text = string.Empty,
         };
         TuiHelpers.ConfigureTextInput(_filterField, SchemeNames.Base);
@@ -276,11 +281,21 @@ internal sealed class InstalledTabView : FrameView
             FullRowSelect = true,
         };
         TuiHelpers.DisableTypeToSearch(_table);
+        _table.KeyDown += (_, key) =>
+        {
+            // At a one-row endpoint Terminal.Gui need not emit ValueChanged.
+            // An explicit browse key still chooses that visible row after a
+            // previously selected copy was filtered out; review alone cannot.
+            if (!key.Handled && !_restoring && _table.Visible && _rows.Count == 1 && SelectedRow is null
+                && key.KeyCode is KeyCode.CursorUp or KeyCode.CursorDown)
+            {
+                _selectedKey = _rows[0].Key;
+                RefreshSelectedDetail();
+            }
+        };
         TuiHelpers.ConfigureTableNavigation(_table);
         TuiHelpers.ConfigureTableChrome(_table);
         _table.Style.ShowVerticalCellLineForLastColumn = true;
-        _table.Style.ShowHorizontalHeaderOverline = false;
-        _table.Style.ShowHorizontalHeaderUnderline = false;
         _table.Style.AlwaysUseNormalColorForVerticalCellLines = true;
         _table.Style.AlwaysShowHeaders = true;
         _table.MaxCellWidth = int.MaxValue;
@@ -355,11 +370,6 @@ internal sealed class InstalledTabView : FrameView
         _detail.ViewportChanged += (_, _) => ReflowDetail();
 
         KeyDown += OnKeyDown;
-        _detail.KeyDown += (_, key) =>
-        {
-            if (key.KeyCode == KeyCode.Tab) { key.Handled = true; _detailsButton.SetFocus(); }
-            else if (key.KeyCode == (KeyCode.Tab | KeyCode.ShiftMask)) { key.Handled = true; FocusList(); }
-        };
         _detail.KeyDown += OnKeyDown;
         _table.KeyDown += OnKeyDown;
         _filterField.KeyDown += OnKeyDown;
@@ -368,11 +378,11 @@ internal sealed class InstalledTabView : FrameView
             this, filterLabel, _filterField, _table, _detail, _footer, _spinner);
 
         Add(filterLabel, _filterField, _table, _detail, _spinner, _footer,
-            _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills, _coverage, _repositoryFilter, _controls, _coverageButton, _clearFilters);
+            _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills, _coverage, _repositoryFilter, _controls, _coverageButton, _clearFilters, _filtersButton);
         Add(_facetButtons);
         Add(_copies);
         _detail.TabStop = TabBehavior.NoStop;
-        foreach (var control in new View[] { _filterField, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detail, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills })
+        foreach (var control in new View[] { _filterField, _filtersButton, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detail, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills })
             control.HasFocusChanged += (_, _) => { if (control.HasFocus) _rememberedFocus = control; };
         Disposing += (_, _) => { _disposed = true; _actionsMenu?.Dispose(); CancelPendingWork(); };
     }
@@ -531,7 +541,7 @@ internal sealed class InstalledTabView : FrameView
             _topRowKey = _table.RowOffset >= 0 && _table.RowOffset < _rows.Count ? _rows[_table.RowOffset].Key : _topRowKey;
         _viewRows = _overview.View(Matches, _sort.ToString().ToLowerInvariant(), _expanded,
             _availability is null ? null : pass is null ? _availability.Get
-                : skill => ObserveAvailability(skill, pass.FilterAvailability), _lifetimeToken);
+                : skill => ObserveAvailability(skill, pass.FilterAvailability), _lifetimeToken, compactSingletons: true, retainGroupKey: _selectedKey);
         _rows = _viewRows.Rows;
         if (_repositoryBrowse is null) _selectedKey ??= _rows.FirstOrDefault()?.Key;
         BuildTableSource();
@@ -610,8 +620,8 @@ internal sealed class InstalledTabView : FrameView
         {
             _table.Table = new EnumerableTableSource<InstalledOverviewRow>(_rows, new Dictionary<string, Func<InstalledOverviewRow, object>>
             {
-                ["Skill / source / copy"] = r => r.Label,
-                ["Copies / consumers / updates"] = r => r.Summary,
+                ["Skill"] = r => r.Label,
+                ["Status"] = RowStatus,
             });
             _table.Style.ExpandLastColumn = false;
             RecomputeColumnWidths();
@@ -624,8 +634,8 @@ internal sealed class InstalledTabView : FrameView
     {
         var width = _table.Viewport.Width > 0 ? _table.Viewport.Width : Math.Max(30, _lastWidth);
         _lastWidth = width;
-        var available = Math.Max(2, width - 2);
-        var first = Math.Max(1, available * 55 / 100);
+        var available = Math.Max(2, width - 3);
+        var first = Math.Max(1, available * 68 / 100);
         for (var i = 0; i < 2; i++)
         {
             var style = _table.Style.GetOrCreateColumnStyle(i);
@@ -670,11 +680,16 @@ internal sealed class InstalledTabView : FrameView
             var detail = _detailOpen && !_wide;
             var showTable = !detail && _rows.Count > 0;
             var showDetail = _wide || detail || _rows.Count == 0;
-            _table.Width = _wide ? Dim.Percent(55) : Dim.Fill();
+            _table.Width = _wide ? Dim.Percent(60) : Dim.Fill();
             _detail.X = _wide && _rows.Count > 0 ? Pos.Right(_table) + 1 : 0;
             _repositoryFilter.Visible = _repositoryBrowse is not null;
             _repositoryFilter.Text = RepositoryFilterText(_repositoryBrowse, Math.Max(60, Viewport.Width));
-            _table.Y = _detail.Y = _repositoryBrowse is null ? 3 : 4;
+            var contentY = _filtersExpanded ? 4 : 2;
+            _repositoryFilter.Y = contentY;
+            _table.Y = _detail.Y = contentY + (_repositoryBrowse is null ? 0 : 1);
+            _coverage.Y = _coverageButton.Y = _filtersExpanded ? 3 : 1;
+            _controls.Visible = _filtersExpanded;
+            foreach (var facet in _facetButtons) facet.Visible = _filtersExpanded;
             LayoutFilters();
             _detail.Width = Dim.Fill();
             if (showTable) _table.Visible = true;
@@ -840,6 +855,26 @@ internal sealed class InstalledTabView : FrameView
         RefreshAll();
     }
 
+    private object RowStatus(InstalledOverviewRow row)
+    {
+        if (row.Copy is not { } copy) return row.Group is { } group
+            ? $"{group.Copies.Count} copies" + (group.RefsDiffer ? " · Different refs" : "") : row.Summary;
+        var skill = copy.Records[0];
+        var version = skill.Revision.RepositoryRef ?? skill.Revision.AuthoredVersion ?? skill.Revision.DistributorVersion;
+        var agents = string.Join(", ", copy.Records.SelectMany(s => s.Agents).Select(a => a.AgentId).Distinct());
+        var state = copy.Ambiguous ? "Ambiguous" : copy.ReadOnly ? "Read-only"
+            : skill.Validity != ValidityState.Valid ? "Needs review" : _availability?.Get(skill).TableLabel ?? "Not checked";
+        return InstalledOverview.Text(string.Join(" · ", new[] { state, version, agents }.Where(s => !string.IsNullOrEmpty(s))), 160);
+    }
+
+    internal void ToggleFilters()
+    {
+        _filtersExpanded = !_filtersExpanded;
+        ApplyResponsiveLayout();
+        RefreshSelectedDetail();
+        if (_filtersExpanded) _facetButtons[0].SetFocus(); else _filtersButton.SetFocus();
+    }
+
     private void LayoutFilters()
     {
         var width = Math.Max(60, Frame.Width);
@@ -853,6 +888,9 @@ internal sealed class InstalledTabView : FrameView
 
     private void RefreshFilterButtons()
     {
+        var active = Enumerable.Range(0, 4).Count(i => FilterKey(i) is not null)
+            + (_pinFilter == PinFilter.All ? 0 : 1) + (_scopeFilter == ScopeFilter.All ? 0 : 1);
+        _filtersButton.Text = active == 0 ? "Filters (f)" : "Filters* (f)";
         for (var i = 0; i < 4; i++)
         {
             var key = FilterKey(i);
@@ -980,7 +1018,9 @@ internal sealed class InstalledTabView : FrameView
     {
         if ((key.KeyCode & ~KeyCode.ShiftMask) == KeyCode.Tab)
         {
-            var order = new View[] { _filterField, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table, _detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills }
+            IEnumerable<View> content = _copies.Open ? _copies.SubViews : new View[] { _detail };
+            var order = new View[] { _filterField, _filtersButton, _facetButtons[0], _facetButtons[1], _facetButtons[2], _facetButtons[3], _clearFilters, _coverageButton, _table }
+                .Concat(content).Concat([_detailsButton, _reviewUpdate, _moreActions, _checkUpdates, _back, _searchSkills])
                 .Where(v => v.Visible && v.Enabled && v.CanFocus).ToArray();
             if (order.Length == 0) return false;
             var index = Array.FindIndex(order, v => v.HasFocus);
@@ -993,6 +1033,7 @@ internal sealed class InstalledTabView : FrameView
             if (key.KeyCode != KeyCode.Esc) return false;
             FocusList(); return true;
         }
+        if (key.AsRune.Value is 'f' or 'F') { ToggleFilters(); return true; }
         if (key.AsRune.Value == '1' && _searchSkills.Visible) { _onLeaveTab(); return true; }
         if (key.AsRune.Value == '/') { _filterField.SetFocus(); _filterField.SelectAll(); return true; }
         if ((_table.HasFocus || _detail.HasFocus) && key.KeyCode is KeyCode.CursorLeft or KeyCode.CursorRight)
@@ -1005,7 +1046,13 @@ internal sealed class InstalledTabView : FrameView
     {
         var blocked = !NoObservedCopies && SelectedRow is null && _selectedKey is not null ? "Selection missing/hidden/filtered; actions disabled · "
             : SelectedRow?.Copy?.Ambiguous == true ? "Ambiguous installation ID; actions disabled · " : "";
-        _coverage.Text = blocked + (_snapshot is not null && _issueView.Evidence?.IsCurrent(_snapshot, _issueView.Generation) != true ? "Issues not loaded · " : "") + _overview.Coverage + (_availability is null ? "" : " · " + _availability.Summary);
+        var partial = _snapshot is not null && (_snapshot.IsPartial || !_snapshot.ConfiguredRootsComplete);
+        _coverage.Text = blocked + (partial ? "Partial scan" : "Captured inventory")
+            + (_snapshot is null ? "" : $" · {_snapshot.ScannedRoots.Length}/{_snapshot.ConfiguredRoots.Length} locations")
+            + (_pinFilter == PinFilter.All ? "" : " · Pins: " + DescribePin(_pinFilter))
+            + (_scopeFilter == ScopeFilter.All ? "" : " · Scope: " + DescribeScope(_scopeFilter))
+            + (_sort == SortMode.Name ? "" : " · Sort: " + _sort.ToString().ToLowerInvariant())
+            + (_filtersExpanded ? " · " + _overview.Coverage : "");
     }
 
     private void OnKeyDown(object? sender, Key key)
@@ -1026,7 +1073,7 @@ internal sealed class InstalledTabView : FrameView
         }
         if (!_filterField.HasFocus && key.KeyCode == KeyCode.Enter && !_detailsButton.HasFocus && !_reviewUpdate.HasFocus
             && !_moreActions.HasFocus && !_checkUpdates.HasFocus && !_back.HasFocus && !_searchSkills.HasFocus
-            && !_facetButtons.Any(b => b.HasFocus) && !_coverageButton.HasFocus && !_clearFilters.HasFocus)
+            && !_facetButtons.Any(b => b.HasFocus) && !_coverageButton.HasFocus && !_clearFilters.HasFocus && !_filtersButton.HasFocus)
         { key.Handled = true; BrowseSelected(); return; }
         if ((_table.HasFocus || _detail.HasFocus) && key.KeyCode is KeyCode.CursorLeft or KeyCode.CursorRight)
         { key.Handled = true; ExpandSelected(key.KeyCode == KeyCode.CursorRight); return; }
@@ -1122,11 +1169,14 @@ internal sealed class InstalledTabView : FrameView
         var observation = _availability is null ? null : pass is null ? _availability.Get(skill)
             : ObserveAvailability(skill, pass.DetailAvailability);
         var package = _snapshot is not null && _packageView?.Matches(_snapshot, _issueView.Generation, skill) == true ? _packageView : null;
-        return InstalledScreen.RenderDetail(skill, _showDetails, showShortcuts: false, descriptionWidth: _descriptionWidth, recordedPlacementCount: recordedPlacementCount)
-            + "\n\n" + (package?.Detail ?? "Package not checked for this inventory capture. **K:** explicit local package check.\n\n" + PackageCheckFact.InventoryLifetimeNotice)
-            + (observation is null ? "" : "\n" + observation.Detail
-                + (_showDetails && observation.Diagnostic.Length > 0 ? "\n````\n" + (TerminalEscapeSanitizer.Sanitize(observation.Diagnostic) ?? "").Replace("`", "'") + "\n````\n" : ""))
-            + "\n" + _overview.Coverage + "\n\n**F2** Technical details · **u** Review update · **c** Cleanup\n";
+        var detail = InstalledScreen.RenderDetail(skill, _showDetails, showShortcuts: false, descriptionWidth: _descriptionWidth, recordedPlacementCount: recordedPlacementCount, compact: !_showDetails);
+        if (_showDetails)
+            return detail + "\n\n" + (package?.Detail ?? "Package not checked for this inventory capture.\n\n" + PackageCheckFact.InventoryLifetimeNotice)
+                + (observation is null ? "" : "\n" + observation.Detail + "\n" + MarkdownTableFormatter.FormatCodeSpan(observation.Diagnostic))
+                + "\n" + _overview.Coverage;
+        return detail + "\n\nUpdates: " + MarkdownTableFormatter.FormatCodeSpan(observation?.Label ?? "Not checked")
+            + (package is null ? "" : "\n\nPackage check available — K opens the report. " + PackageCheckFact.InventoryLifetimeNotice)
+            + "\n\nF2 Technical details · More actions for checks and repairs.";
     }
 
     private void BrowseSelected()
@@ -1179,12 +1229,14 @@ internal sealed class InstalledTabView : FrameView
         if (_snapshotGeneration != _catalogGeneration()) return;
         if (GetSelectedSkill() is not { } skill || !CanActOnSelection) return;
         _copies.Retire();
-        var actions = new List<(string Label, Action Run)> { ("Open exact location", () => _openPath(skill.ResolvedPath)), ("Remove exact copy", () => TryStartSelectedRemove()) };
-        actions.Insert(0, ("Compare copies (broad: same name or recorded source; not the finding's family)", OpenCopies));
-        if (_onMoveAside is not null) actions.Add(("Review standalone Move aside...", () => _onMoveAside(skill)));
-        if (_onPackageCheck is not null) actions.Add(("Check package", () => CheckPackage(skill)));
+        var actions = new List<(string Label, Action Run)> { ("Open location (o)", () => _openPath(skill.ResolvedPath)), ("Remove copy (x)...", () => TryStartSelectedRemove()) };
+        if (_snapshot is not null && CopiesPresentation.Build(_snapshot, skill, CancellationToken.None).Copies
+            .Any(copy => !ReferenceEquals(copy, skill)))
+            actions.Insert(0, ("Compare copies...", OpenCopies));
+        if (_onMoveAside is not null) actions.Add(("Move aside...", () => _onMoveAside(skill)));
+        if (_onPackageCheck is not null) actions.Add(("Check package (K)", () => CheckPackage(skill)));
         if (_onResourceReplacement is not null && CurrentResourceReplacement(skill) is { } replacement)
-            actions.Add(("Review replacement for " + InstalledOverview.Text(replacement.Target, 240), () =>
+            actions.Add(("Repair missing resource...", () =>
             {
                 // Re-read the coordinator's current fact at the click boundary.
                 if (CurrentResourceReplacement(skill) is { } current && ReferenceEquals(current.Fact, replacement.Fact)
@@ -1195,8 +1247,8 @@ internal sealed class InstalledTabView : FrameView
             actions.Add(("Review registry-recorded replacement", () => _onRegistryRestore(skill)));
         if (skill.FrontMatter.LocalPath is not null)
         {
-            if (_onLocalReimport is not null) actions.Add(("Review local reimport", () => _onLocalReimport(skill)));
-            if (_onLocalSourceSwitch is not null) actions.Add(("Review different local source", () => _onLocalSourceSwitch(skill)));
+            if (_onLocalReimport is not null) actions.Add(("Reimport local (R)...", () => _onLocalReimport(skill)));
+            if (_onLocalSourceSwitch is not null) actions.Add(("Change local source (T)...", () => _onLocalSourceSwitch(skill)));
         }
         _actionsMenu?.Dispose();
         var key = _selectedKey;
@@ -1472,11 +1524,11 @@ internal sealed class InstalledTabView : FrameView
             int? placementCount = copy.Records.All(s => string.Equals(s.ResolvedPath, copy.Path, StringComparison.Ordinal))
                 ? copy.Records.SelectMany(s => s.Agents).Distinct().Count() : null;
             _detail.Text = (copy.Ambiguous ? "## Ambiguous copy\n\n" + _selectionReason + "\n\n" : "")
-                + string.Join("\n\n---\n\n", copy.Records.Select(skill => RenderDetail(skill, placementCount, pass))) + "\n\n" + FilterDescription();
+                + string.Join("\n\n---\n\n", copy.Records.Select(skill => RenderDetail(skill, placementCount, pass))) + (_showDetails || _filtersExpanded ? "\n\n" + FilterDescription() : "");
         }
         else if (row?.Group is { } group)
             _detail.Text = "## " + MarkdownTableFormatter.FormatTableCell(group.Name) + "\n\nSource: " + MarkdownTableFormatter.FormatCodeSpan(group.Source)
-                + "\n\n" + row.Summary + "\n\n" + _selectionReason + "\n\nEnter or Left/Right expands/collapses the group.\n\n" + _overview.Coverage;
+                + $"\n\n{group.Copies.Count} copies. Select a copy below to inspect it or review a change.\n\nEnter expands or collapses the copies.";
         else if (NoObservedCopies)
             _detail.Text = "## No installed skills found\n\n"
                 + (_snapshot.IsPartial || !_snapshot.ConfiguredRootsComplete
@@ -1487,7 +1539,7 @@ internal sealed class InstalledTabView : FrameView
         else _detail.Text = _rows.Count == 0
                 ? "## No matching installed skills\n\nNo copies match the current search or filters. Choose Clear to show all observed copies.\n\n" + _selectionReason
                 : _selectionReason;
-        if (!_coverageOpen && row?.Copy is null) _detail.Text += "\n\n" + FilterDescription();
+        if (!_coverageOpen && (_showDetails || _filtersExpanded || _rows.Count == 0) && row?.Copy is null) _detail.Text += "\n\n" + FilterDescription();
         RefreshCoverage();
         if (pass is not null) pass.DetailIsCurrent = CaptureRefreshGuard(pass, pass.DetailAvailability, detail: true);
     }

@@ -359,7 +359,7 @@ public sealed partial class SkillViewApp
         var showSummary = summary.Length > 0;
         _discoverTab.FilterSummaryLabel.Text = summary;
         _discoverTab.FilterSummaryLabel.Visible = showSummary;
-        _discoverTab.ResultsTable.Y = showSummary ? 4 : 3;
+        _discoverTab.ResultsTable.Y = showSummary ? 3 : 2;
     }
 
     private string DescribeDiscoverFilters(bool includePrefix)
@@ -473,6 +473,7 @@ public sealed partial class SkillViewApp
     /// in `OpenInstallDialog`.
     private void StageInstall(bool forceAdvanced = false)
     {
+        if (_activeTab != SkillViewTab.Discover || _inDoctor || _updatesTab?.Visible == true) return;
         if (_discoverTab?.IsLoading == true) return;
         if (_resultsTable is null || _results.Count == 0)
         {

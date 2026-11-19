@@ -501,10 +501,33 @@ internal static class TuiHelpers
         );
     }
 
+    internal static Scheme CreateHeadingScheme()
+    {
+        if (CurrentTheme != AppTheme.HighContrast) return WingetTuiTheme.CreateHeadingScheme();
+        var heading = new Attribute(StandardColor.White, StandardColor.DarkGray, TextStyle.Bold);
+        return new Scheme
+        {
+            Normal = heading,
+            Focus = heading,
+            HotNormal = heading,
+            HotFocus = heading,
+            Active = heading,
+            HotActive = heading,
+            Highlight = heading,
+            Disabled = heading
+        };
+    }
+
     internal static void ConfigureTableChrome(TableView table)
     {
-        table.Style.ShowVerticalCellLineForFirstColumn = false;
-        table.Style.ShowVerticalCellLineForLastColumn = false;
+        table.Style.ShowVerticalCellLines = true;
+        table.Style.ShowVerticalCellLineForFirstColumn = true;
+        table.Style.ShowVerticalCellLineForLastColumn = true;
+        table.Style.ShowHorizontalHeaderOverline = true;
+        table.Style.ShowHorizontalHeaderUnderline = true;
+        table.Style.ShowHeaders = true;
+        table.Style.AlwaysShowHeaders = true;
+        table.Style.HeaderScheme = CreateHeadingScheme();
     }
 
     /// Keep row navigation owned by the list even when the cursor is already

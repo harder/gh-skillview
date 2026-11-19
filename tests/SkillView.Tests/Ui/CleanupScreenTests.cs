@@ -629,8 +629,11 @@ public sealed class CleanupScreenTests
         var summary = CleanupScreen.RenderDetail(candidate);
         Assert.Contains("## Multiple copies", summary);
         Assert.Contains("Inspection changes nothing.", summary);
-        Assert.Contains("Deletion has no automatic undo.", CleanupScreen.RenderDetail(candidate with
-        { Kind = CleanupClassifier.CandidateKind.Malformed, ReviewOnly = false }));
+        var removable = CleanupScreen.RenderDetail(candidate with
+        { Kind = CleanupClassifier.CandidateKind.Malformed, ReviewOnly = false });
+        Assert.Contains("Deletion has no automatic undo.", removable);
+        Assert.Contains("Choose Review removal", removable);
+        Assert.DoesNotContain("Space selects", removable);
         Assert.Contains("`` /skills/demo`copy ``", summary);
         Assert.DoesNotContain("| Field |", summary);
         Assert.DoesNotContain(candidate.Impact.Subject.InstallationId, summary);

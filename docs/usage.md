@@ -12,7 +12,7 @@ start with [Find, diagnose and fix skills](find-diagnose-fix.md). The
 
 ### TUI layout
 
-The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Issues** — plus a Doctor view reachable on demand. Discover pairs a list with contextual detail; Installed shows an expandable skill/source overview with physical-copy children. At 80×24, Enter on a copy opens full-width detail and Esc returns to the list. At 120×36, the same detail appears beside the list. Issues pairs local findings and review suggestions with captured details. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
+The TUI is organized around three primary tabs in a persistent top header — **Discover**, **Installed**, and **Issues** — plus a Doctor view reachable on demand. Discover pairs a list with contextual detail; Installed shows one row for a single physical copy, with expandable source groups only when there are multiple copies. At 80×24, Enter on a copy opens full-width detail and Esc returns to the list. At 120×36, the same detail appears beside the list. Issues pairs local findings and review suggestions with a short explanation and next step. **More actions** opens Keep both, saved choices, cleanup and guided repairs when available; F2 opens technical evidence. In Discover, the right pane keeps a compact metadata summary at the top and one main body below for description, preview, or logs. A persistent screen heading identifies the current workspace. Bold accent column headers and separator rules stay visible when focus moves to a toolbar or menu; the selected row has a separate accent fill. The active tab is highlighted in the accent color; the status bar at the bottom advertises the shortcuts available in the current view.
 
 | Tab / view | What it does | How to open |
 |---|---|---|
@@ -260,7 +260,7 @@ Discover tab:
 | `I` | Advanced install wizard for the selected result |
 | `o` | Open the repo in a browser |
 | `e` | Toggle raw / rendered preview |
-| `l` | Toggle the right pane between preview and logs |
+| `l` / `L` | Toggle preview and logs, including while logs have focus; Esc also leaves logs |
 
 Installed tab:
 
@@ -272,9 +272,10 @@ Installed tab:
 | `C` (Shift+c) | Check updates for the whole catalog, or cancel the check |
 | `u` | Hand the selected exact copy to saved update review |
 | `c` | Show Cleanup findings in Issues |
-| `Tab` / `Shift+Tab` | Reach the four visible filter selectors, Clear, Coverage and copy controls; Enter opens a selector, arrows/Enter choose, Esc cancels |
+| `Tab` / `Shift+Tab` | Reach Filters, Clear, Coverage, scrollable details and comparison controls; expand Filters to reach the four selectors; Enter opens a selector, arrows/Enter choose, Esc cancels |
 | `G` | Cycle scope (all / user / project / custom), keeping all consumers |
-| `/` or `f` | Search Installed by name, path, agent or recorded source |
+| `/` | Search Installed by name, path, agent or recorded source |
+| `f` / `F` | Expand or collapse agent, location, source and issue filters |
 | `s` | Cycle sort (name / source / location); keep the current choice across refresh |
 | `R` | Review replacement from the selected installation’s same recorded local source; reopen saved history by ID |
 | `P` | Cycle pin filter (all / pinned only / unpinned only) |
@@ -282,7 +283,9 @@ Installed tab:
 | `x` | Remove the selected skill (compact confirm; wizard if the plan needs second-confirm) |
 | `o` | Open the skill folder |
 
-Press **F2** in Installed to show or hide technical evidence (installation IDs, captured identities, exposure paths, and reload references). Ordinary detail starts with a bounded, literal-text description attributed to skill metadata (Markdown and links remain inert), followed by recorded source, exact location, version/ref evidence, pins and every recorded consumer. **More actions** exposes open, remove, package check and contextual local-source reviews. Source groups cannot run copy operations; ambiguous IDs remain inspect-only.
+Pin and scope filters mark **Filters*** while active, even when the selectors are collapsed. The coverage line also shows non-default pin, scope and sort choices.
+
+Press **F2** in Installed to show or hide technical evidence (installation IDs, captured identities, exposure paths, and reload references). Ordinary detail shows recorded source, version, exact location and consumers before a four-line literal description preview; F2 retains the full bounded description (Markdown and links remain inert). **More actions** exposes comparison, open, remove, package check and contextual local-source reviews. Source groups cannot run copy operations; ambiguous IDs remain inspect-only.
 
 TUI pin displays include contextual lockfile records as well as skill metadata. The
 **pinned only** filter includes copies with any recorded pin, including conflicting
@@ -296,15 +299,15 @@ Row summaries label update availability as **Updates:**; **Not checked** refers 
 
 The view retains selection by installation ID and exact path, expansion, search, four explicit filters, P/G filters, sort, focus and the top visible row key across refresh, checks, resize and operation return. Missing, ambiguous, filtered-out or collapsed selections disable copy actions until an exact visible copy is selected. The list shows at most 8,192 rows including source headings and an omission row; footer counts distinguish observed, filtered, shown and omitted rows. Coverage describes only captured configured/scanned roots and discovery limitations; it does not enumerate unknown projects.
 
-The four visible selectors use **captured choices** and combine independently. With Agent and Project/location both Any, G retains its legacy rule: match the copy's own scope or any recorded placement's scope, like CLI `--scope`. When either membership selector is constrained, Agent, Project/location and G must match the **same recorded placement**; selecting one consumer keeps the entire physical copy and all other consumers in detail. Locations use captured context, or the recorded discovery root/placement when context is absent. A copy without recorded consumers offers only Unknown agent and its declared scope/root; it does not imply agent availability. Source/owner matches the primary source **or any contextual owner claim**, including unknown source evidence, conflicts and managed/read-only owners. Filtering does not change the conservative primary source grouping. Groups show, for example, **1 of 2 observed copies**; the footer retains total observed copies and recorded placements.
+Open **Filters (f)** to show four selectors using **captured choices** and combine independently. With Agent and Project/location both Any, G retains its legacy rule: match the copy's own scope or any recorded placement's scope, like CLI `--scope`. When either membership selector is constrained, Agent, Project/location and G must match the **same recorded placement**; selecting one consumer keeps the entire physical copy and all other consumers in detail. Locations use captured context, or the recorded discovery root/placement when context is absent. A copy without recorded consumers offers only Unknown agent and its declared scope/root; it does not imply agent availability. Source/owner matches the primary source **or any contextual owner claim**, including unknown source evidence, conflicts and managed/read-only owners. Filtering does not change the conservative primary source grouping. Groups show, for example, **1 of 2 observed copies**; the footer retains total observed copies and recorded placements.
 
 Issue reuses local findings **only after Issues has loaded them for the same inventory capture and catalog generation**. **Issues not loaded** (also shown by `Issue:Any?`) means unknown, never clean. Visit Issues to load findings; using Installed's selectors performs no classification, package checks, hashing, scan or gh calls. A complete matching queue can offer **No local findings observed (captured scan)**; this is neither an upstream result nor a guarantee of health. Partial captures can show observed findings but cannot establish absence. Stale/mismatched results become unknown; findings without a matching physical subject remain in Issues. Each view refresh captures one Issues result and catalog generation for all rows, choices, counts and status; the next refresh observes later invalidation. Update availability continues to use the existing separate observations.
 
-Selected choices stay visible in abbreviated form; open the selector or detail for the full bounded label. `#` markers distinguish colliding shortened labels. A choice that disappears on refresh remains selected with **!missing**, zero matches and an explanation; choose Any or Clear explicitly to broaden it. **Clear** resets search, the four selectors and P/G; sort and exact-copy selection remain retained. Header P/G abbreviations mean any/pin/no and any/user/proj/dir; s:N/S/L means name/source/location.
+An asterisk on Filters marks active selectors. Expanded choices stay visible in abbreviated form; open the selector or technical detail for the full bounded label. `#` markers distinguish colliding shortened labels. A choice that disappears on refresh remains selected with **!missing**, zero matches and an explanation; choose Any or Clear explicitly to broaden it. **Clear** resets search, the four selectors and P/G; sort and exact-copy selection remain retained. Expanded P/G abbreviations mean any/pin/no and any/user/proj/dir; s:N/S/L means name/source/location.
 
 **Coverage** expands captured facts in the same detail pane (full-width at 80 columns). Esc/Back returns to the list with filters and exact selection retained. It shows configured/scanned roots, inaccessible paths as **could not be scanned**, and captured limitations. Other projects are scanned only when configured. An explicitly recorded owner context may be labeled **referenced, not scanned**; no arbitrary projects are enumerated and no scan or remote check runs. Coverage stays global when filtering. **Check updates (C)** likewise checks the whole fresh catalog, including copies outside the filters; partial coverage retains batch-8 Unknown results and starts no upstream checks. It never prepares an update plan.
 
-Installed details show the full bounded metadata description as literal text, wrapped to the current pane width. Longer descriptions scroll normally; F2 opens technical evidence. Compact source, recorded ref, scope and pin facts precede the physical-copy and recorded-placement counts. “Git tag” is used only for a recorded `refs/tags/` ref.
+Installed keeps its filter selectors collapsed until **Filters (f)** is opened; an asterisk marks active selectors. The default detail pane leads with the selected copy’s source/version, location and consumers, followed by a four-line description preview. **More actions** holds checks and repair entrypoints; focused operation reviews retain their detailed decisions and confirmations. Description previews remain literal text, wrapped to the current pane width; F2 opens the full bounded description and technical evidence. F2 retains recorded refs, pin policy, ownership claims and full placement evidence. “Git tag” is used only for a recorded `refs/tags/` ref.
 
 **Agent/profile placements (recorded)** groups exact paths, scope and captured context. Identical-looking agent/profile labels can show ×N for distinct recorded placements; one agent with two profiles can count twice. A Project placement without context says **project root not recorded**. The ordinary placement block shows up to 128 distinct memberships within 32,768 encoded characters and states the exact number omitted; headline and footer totals retain every recorded placement.
 

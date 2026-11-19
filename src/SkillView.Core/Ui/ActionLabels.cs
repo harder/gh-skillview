@@ -32,7 +32,7 @@ internal static class ActionLabels
     internal static readonly ActionLabel Cleanup = new("c", "Cleanup", "open cleanup review; no deletion without confirmation");
     internal static readonly ActionLabel Doctor = new("d", "Doctor", "show environment diagnostics", "D");
     internal static readonly ActionLabel Filters = new("f", "Filters", "open Discover filters (owner, agent, limit, hidden directories)", "F");
-    internal static readonly ActionLabel Search = new("/", "Search", "focus the Installed search field; Esc leaves it", "f", "F");
+    internal static readonly ActionLabel Search = new("/", "Search", "focus the Installed search field; Esc leaves it");
     internal static readonly ActionLabel DiscoverSearch = new("/", "Search", "focus the Discover query field; Enter or Ctrl+J submits the query");
     internal static readonly ActionLabel Preview = new("Enter", "Preview", "load the selected search result while the results list has focus", "p", "P", "v", "V", "→", "Ctrl+J");
     internal static readonly ActionLabel Install = new("i", "Install", "review the selected result in compact confirmation before installing");
@@ -43,7 +43,7 @@ internal static class ActionLabels
     internal static readonly ActionLabel Previous = new("", "Previous", "use the button to load the previous submitted search page");
     internal static readonly ActionLabel Next = new("", "Next", "use the button to load the next page when offered; paging uses the submitted query and filters");
     internal static readonly ActionLabel Logs = new("l", "Logs", "show the Discover log pane", "L");
-    internal static readonly ActionLabel ReturnPreview = Logs with { Label = "Preview", Explanation = "return from logs to the Discover preview when focus is outside the read-only log editor" };
+    internal static readonly ActionLabel ReturnPreview = Logs with { Label = "Preview", Explanation = "return from logs to the Discover preview; Esc also returns from the log pane" };
     internal static readonly ActionLabel PreviewMode = new("e", "Raw/rendered", "toggle raw / rendered Discover preview while logs are hidden", "E");
     internal static readonly ActionLabel Sort = new("s", "Sort", "cycle sort order", "S");
     internal static readonly ActionLabel Browse = new("Enter", "Details/Expand", "expand a source group or browse the selected exact copy");
@@ -58,7 +58,7 @@ internal static class ActionLabels
     internal static readonly ActionLabel KeepBoth = new("k", "Keep both", "mark the selected observed copy difference intentional; an intentional difference offers Restore suggestions instead");
     internal static readonly ActionLabel RestoreSuggestions = KeepBoth with { Label = "Restore" };
     internal static readonly ActionLabel Choices = new("K", "Choices", "review saved intentional differences; resetting them requires separate confirmation");
-    internal static readonly ActionLabel MoreActions = new("", "More actions", "open, remove, package check and contextual local-source reviews; unavailable actions explain their limits");
+    internal static readonly ActionLabel MoreActions = new("", "More actions", "compare copies, open location, remove, package check and contextual local-source reviews; unavailable actions explain their limits");
     internal static readonly ActionLabel Remove = new("x", "Remove", "review removal of the selected installed copy", "X");
     internal static readonly ActionLabel PackageCheck = new("K", "Package check", "check the selected copy without launching a client");
     internal static readonly ActionLabel Reimport = new("R", "Reimport local", "review a local reimport when applicable");
@@ -75,7 +75,7 @@ internal static class ActionLabels
             OpenRepo, Sort, showingLogs ? ReturnPreview : Logs, PreviewMode,
             new("", "Rendered Markdown", "Ctrl+A selects all; Ctrl+C copies selected text; clicking a link opens it"),
             new("r", "Refresh", "rerun the current Discover query, if one is entered", "R")],
-        ActionScreen.Installed => [Browse, Expand, Search, Details, CheckUpdates, ReviewUpdate, MoreActions, Cleanup,
+        ActionScreen.Installed => [Browse, Expand, Search, Filters with { Explanation = "show agent, location, source and issue filters" }, Details, CheckUpdates, ReviewUpdate, MoreActions, Cleanup,
             Remove, OpenPath, PackageCheck, Reimport, SwitchSource, Sort, PinFilter, ScopeFilter, Refresh],
         ActionScreen.Issues => [ReviewIssue, ReviewExactIssue, Details, CheckUpdates, KeepBoth, Choices, Guided, ReviewNext, SkipGuided, StopGuided, Refresh with { Aliases = ["R"] }, Cleanup with { Explanation = "review the selected exact cleanup finding, or filter Issues to cleanup findings; no deletion without confirmation" }, Doctor],
         ActionScreen.UpdateReview => [Details, .. sourceDiffVisible ? new[] { SourceDiff } : [], PrepareUpdate, PlanUnpin, Refresh with { Aliases = ["R"] },
@@ -92,7 +92,7 @@ internal static class ActionLabels
             ActionScreen.Discover when showingLogs => [ReturnPreview, Help, Quit],
             ActionScreen.Discover => [Tabs, Filters, Logs, Help, Quit],
             // The strip retains rightmost hints first: keep primary actions near Help.
-            ActionScreen.Installed => [Cleanup, Refresh, check, Browse, Search, Help, Quit],
+            ActionScreen.Installed => [Refresh, check, Filters, Browse, Search, Help, Quit],
             ActionScreen.Issues => [Cleanup, Doctor, Refresh, Details, check, ReviewIssue, Help, Quit],
             ActionScreen.UpdateReview => [Details, Back, Help, Quit],
             _ => [Back, Help, Quit],

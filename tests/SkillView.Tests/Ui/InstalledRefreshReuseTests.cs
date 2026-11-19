@@ -4,6 +4,7 @@ using SkillView.Ui;
 using SkillView.Ui.Tabs;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
+using Terminal.Gui.Drivers;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using Xunit;
@@ -31,7 +32,7 @@ public sealed class InstalledRefreshReuseTests
             Draw();
             var table = view.SubViews.OfType<TableView>().Single();
             var detail = view.SubViews.OfType<Markdown>().Single();
-            view.SetSelectedRowForTests(41); table.RowOffset = 30; Draw();
+            view.SetSelectedRowForTests(20); table.RowOffset = 30; Draw();
             var selected = view.SelectedKeyForTests;
             var top = view.RowsForTests[table.RowOffset].Key;
             view.FocusFilterForTests();
@@ -47,7 +48,7 @@ public sealed class InstalledRefreshReuseTests
             Assert.Equal(before + 1, captures); // no second evidence capture in the nested status refresh
             Assert.True(changed > 0); Assert.NotNull(firstTable);
             Assert.Same(firstTable, table.Table); // a second projection replaces this public table source
-            Assert.Equal(120, view.RowsForTests.Count);
+            Assert.Equal(60, view.RowsForTests.Count);
             Assert.Equal(selected, view.SelectedKeyForTests);
             Assert.Equal(snapshot.Skills[20].ResolvedPath, view.GetSelectedSkill()!.ResolvedPath);
             Assert.Equal(top, view.RowsForTests[table.RowOffset].Key);
@@ -90,7 +91,8 @@ public sealed class InstalledRefreshReuseTests
             window.Layout(); window.Draw(new DrawContext());
             var table = view.SubViews.OfType<TableView>().Single();
             var detail = view.SubViews.OfType<Markdown>().Single();
-            view.SetSelectedRowForTests(1);
+            view.SetSelectedRowForTests(0);
+            view.NewKeyDownEvent(new(KeyCode.F2));
             view.SetFilterTextForTests("absent");
             object? firstTable = null;
             var fired = false;
@@ -104,8 +106,8 @@ public sealed class InstalledRefreshReuseTests
                         Assert.True(availability.Publish(request, 1, "context", snapshot.Skills[0],
                             new(UpdateAvailabilityStatus.Available, "published during detail rendering")));
                         break;
-                    case "selection": view.SetSelectedRowForTests(3); break;
-                    case "scroll": table.RowOffset = 20; break;
+                    case "selection": view.SetSelectedRowForTests(1); break;
+                    case "scroll": table.RowOffset = 10; break;
                     case "generation": generation = 2; view.RefreshAvailability(); break;
                     case "query": view.SetFilterTextForTests("item-02"); break;
                     case "evidence": evidence = new(snapshot, 1, false, new Dictionary<(string, string), string[]>()); view.RefreshAvailability(); break;
@@ -136,7 +138,7 @@ public sealed class InstalledRefreshReuseTests
                 Assert.Equal(snapshot.Skills[1].ResolvedPath, view.GetSelectedSkill()!.ResolvedPath);
             if (change == "scroll")
             {
-                Assert.Equal(20, table.RowOffset);
+                Assert.Equal(10, table.RowOffset);
                 Assert.Equal("item-010", view.RowsForTests[table.RowOffset].Group!.Name);
             }
             if (change == "generation")
@@ -165,7 +167,7 @@ public sealed class InstalledRefreshReuseTests
         var availability = new UpdateAvailabilitySession();
         var request = availability.Begin(snapshot, 1, "context");
         using var view = Create(snapshot, availability);
-        view.LoadSeeded(snapshot); view.SetSelectedRowForTests(1);
+        view.LoadSeeded(snapshot); view.SetSelectedRowForTests(0); view.NewKeyDownEvent(new(KeyCode.F2));
         var table = view.SubViews.OfType<TableView>().Single();
         var before = table.Table;
         Assert.True(availability.Publish(request, 1, "context", snapshot.Skills[0], new(UpdateAvailabilityStatus.Available, "fresh explicit publication")));
@@ -180,7 +182,7 @@ public sealed class InstalledRefreshReuseTests
     {
         var snapshot = Snapshot();
         using var view = Create(snapshot);
-        view.LoadSeeded(snapshot); view.SetSelectedRowForTests(1);
+        view.LoadSeeded(snapshot); view.SetSelectedRowForTests(0); view.NewKeyDownEvent(new(KeyCode.F2));
         view.ToggleCoverage();
         view.SetFilterTextForTests("item");
         Assert.Contains("Captured coverage", view.DetailTextForTests);

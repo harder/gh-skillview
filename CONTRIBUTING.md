@@ -188,7 +188,7 @@ On Linux, install `clang` and `zlib1g-dev` first.
 
 The product website lives in `site/`. Its build script copies selected media
 from `assets/` into an ignored `dist/skillview-site/` output folder, so the
-repository keeps one source copy of each screenshot and GIF. See
+repository keeps one source copy of each screenshot, GIF and MP4 walkthrough. See
 [current media notes](docs/media.md) for the isolated capture setup, provenance,
 review-only sample data and image/animation limits.
 

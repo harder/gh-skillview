@@ -60,9 +60,18 @@ Read the [usage guide](docs/usage.md) for keyboard controls and configuration, t
 
 For the full range of discovery and repair options, see [Find, diagnose and fix skills](docs/find-diagnose-fix.md): add workspaces and profiles, inspect coverage and owner conflicts, check package references, compare copies, review updates or recorded restoration, and use purpose-specific local-source, unpin, removal and Move aside workflows. Guided review handles eligible items one at a time; retained-operation History supports fresh Undo/recovery and explicit retirement.
 
-![Current Installed view with physical copies, filters and coverage](assets/screenshots/05-installed.png)
+![Installed view with clear column headings, physical copies and contextual actions](assets/screenshots/05-installed.png)
 
-*The 1.1 feature set with an isolated sample inventory, captured before the version bump; see [media provenance](docs/media.md). No remote authentication or repair is implied.*
+*The current source build with the simpler browse layout and warm terminal palette, using isolated sample skills. See [media provenance](docs/media.md); review screens do not imply completed repairs.*
+
+<details>
+<summary>Watch the Installed walkthrough</summary>
+
+![Browse installed skills, check a package and return to the list](assets/animations/g2-installed.gif)
+
+</details>
+
+[More walkthroughs: GIFs, videos and step-by-step descriptions](docs/media.md#walkthroughs).
 
 The CLI offers the same core workflows:
 

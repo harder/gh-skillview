@@ -112,7 +112,7 @@ public sealed partial class SkillViewAppIntegrationTests
                     if (upDraws == 0) return true;
                     observedName = installed.GetSelectedSkill()?.Name;
                     listFocused = installed.TableHasFocusForTests;
-                    Assert.True(observedName is null && listFocused, Progress());
+                    Assert.True(observedName == "skill-000" && listFocused, Progress());
                     Assert.True(downDraws > 0 && upDraws > 0, Progress());
                     boundaryChecked = true;
                     quitRequestedAt = elapsed.Elapsed;
@@ -128,11 +128,11 @@ public sealed partial class SkillViewAppIntegrationTests
                     var down = keysSent < count * 2 + 10;
                     terminal.Keyboard.RaiseKeyDownEvent(new Key(down ? KeyCode.CursorDown : KeyCode.CursorUp));
                     keysSent++;
-                    expectedRow = down ? Math.Min(keysSent, count * 2 - 1)
-                        : Math.Max(count * 2 - 1 - (keysSent - count * 2 - 10), 0);
+                    expectedRow = down ? Math.Min(keysSent, count - 1)
+                        : Math.Max(count - 1 - (keysSent - count * 2 - 10), 0);
                     observedName = installed.GetSelectedSkill()?.Name;
                     listFocused = installed.TableHasFocusForTests;
-                    Assert.True(observedName == (expectedRow % 2 == 0 ? null : $"skill-{expectedRow / 2:D3}"), Progress());
+                    Assert.True(observedName == $"skill-{expectedRow:D3}", Progress());
                     Assert.True(listFocused, Progress());
                 }
                 return true;

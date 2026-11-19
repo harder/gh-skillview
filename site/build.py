@@ -26,6 +26,12 @@ MEDIA = {
     '14-history.png': ROOT / "assets" / "screenshots" / '14-history.png',
 }
 
+# Keep one set of media masters for the README, docs, and Pages site.
+for stem in ('g1-discover', 'g2-installed', 'g3-changes-cleanup', 'g4-doctor-help', 'g6-remove'):
+    for extension in ('gif', 'mp4'):
+        name = f"{stem}.{extension}"
+        MEDIA[name] = ROOT / "assets" / "animations" / name
+
 if OUTPUT.exists():
     shutil.rmtree(OUTPUT)
 OUTPUT.mkdir(parents=True)
@@ -46,7 +52,7 @@ class LocalReferenceParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         for name, value in attrs:
-            if name in {"src", "href", "data-image"} and value:
+            if name in {"src", "href", "data-image", "poster"} and value:
                 self.references.add(value.split("#", 1)[0])
 
 

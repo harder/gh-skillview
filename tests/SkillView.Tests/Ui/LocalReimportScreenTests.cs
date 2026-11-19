@@ -360,11 +360,16 @@ public sealed partial class LocalReimportScreenTests
                 else if (phase == 1 && retention.Enabled)
                 {
                     retention.SetFocus(); app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.Space));
+                    var reviewBody = dialog.SubViews.OfType<Editor>().Single();
+                    reviewBody.SetFocus(); app.Keyboard.RaiseKeyDownEvent(new Key(KeyCode.End | KeyCode.CtrlMask));
                     phase = 2; Press("_" + actionName + " reviewed");
                 }
                 else if (phase == 2 && requests.Count == 2 && dialog.SubViews.OfType<Button>().Single(value => value.Text == "_Prepare").Enabled)
                 {
-                    var text = dialog.SubViews.OfType<Editor>().Single().Text;
+                    var reviewBody = dialog.SubViews.OfType<Editor>().Single();
+                    Assert.Equal(0, reviewBody.CaretOffset);
+                    Assert.Equal(0, reviewBody.Viewport.Y);
+                    var text = reviewBody.Text;
                     var status = dialog.SubViews.OfType<Label>().Single(value => value.Text != "Saved plan ID:" && value.Text != "New source:").Text;
                     Assert.Contains("Retained original needs exact recovery", text);
                     Assert.Contains("Failed/refused", status);

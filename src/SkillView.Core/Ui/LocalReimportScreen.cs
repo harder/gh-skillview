@@ -199,6 +199,10 @@ internal static class LocalReimportScreen
                         status.Text = "Reconciliation partial; inspect saved evidence and refresh inventory before continuing.";
                         review = null; inspected = false;
                     }
+                    // Every replacement document starts with its outcome and
+                    // refusal reason, regardless of the previous review scroll.
+                    output.CaretOffset = 0;
+                    output.Viewport = output.Viewport with { X = 0, Y = 0 };
                     Finish();
                 });
             })) { status.Text = "Operation admission closed; inspect saved evidence before retrying."; Refresh(); return; }

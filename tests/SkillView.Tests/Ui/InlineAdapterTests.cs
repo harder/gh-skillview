@@ -269,7 +269,7 @@ public sealed class InlineAdapterTests
             foreach (var value in new[] { 'n', 's', 'x' }) { var inactive = new Key(value); Press(inactive); Assert.False(inactive.Handled); }
             var start = new Key('g'); Press(start); Assert.True(start.Handled); Assert.True(sequence.HasActiveSequence);
             var again = new Key('g'); Press(again); Assert.False(again.Handled);
-            foreach (var text in new[] { ActionLabels.Guided.ButtonText, ActionLabels.ReviewNext.ButtonText, ActionLabels.SkipGuided.ButtonText, ActionLabels.StopGuided.ButtonText })
+            foreach (var text in new[] { ActionLabels.ReviewNext.ButtonText, ActionLabels.SkipGuided.ButtonText, ActionLabels.StopGuided.ButtonText })
             {
                 var button = view.SubViews.OfType<Button>().Single(control => control.Text == text);
                 Assert.True(button.Visible); Assert.InRange(button.Frame.Right, 1, view.Viewport.Width);

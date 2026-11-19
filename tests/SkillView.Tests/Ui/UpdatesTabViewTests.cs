@@ -225,7 +225,7 @@ public sealed class UpdatesTabViewTests
 
         Assert.True(callbackCount >= 1);
         Assert.Equal(["loaded"], visibleNamesAtCallback);
-        Assert.Null(selectedSkillAtCallback); // source heading is initially selected
+        Assert.Equal("loaded", selectedSkillAtCallback?.Name); // one copy is one exact browsing row
     }
 
     private static UpdatesTabView CreateUpdatesTab(
