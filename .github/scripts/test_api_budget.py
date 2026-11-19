@@ -427,6 +427,10 @@ class ProofAndWorkflowGuards(unittest.TestCase):
         scheduling = '      # Pace live API work across isolated proofs; retain every RID and shard.\n      max-parallel: 1\n'
         self.assertEqual(restored.count(scheduling), 1)
         restored = restored.replace(scheduling, '      # Keep the original four-runner/API ceiling; schedule expensive Windows families first.\n      max-parallel: 4\n')
+        # The reviewed current gh host changes independently of the frozen proof bodies.
+        current_gh = "          python tests/native/prepare-gh-proof-tool.py --version 2.105.0 --rid '${{ matrix.rid }}' --output \".ci-native/gh-current\"\n"
+        self.assertEqual(restored.count(current_gh), 1)
+        restored = restored.replace(current_gh, current_gh.replace('2.105.0', '2.103.3'))
         self.assertEqual(hashlib.sha256(restored.encode()).hexdigest(), BASE_HASHES['.github/workflows/ci.yml'])
         native = text.split('  aot-proof:\n', 1)[1].split('  aot-smoke:\n', 1)[0]
         self.assertEqual(native.count('          - rid: '), 12)
