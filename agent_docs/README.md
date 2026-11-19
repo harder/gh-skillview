@@ -19,10 +19,12 @@ or release verdict.
   [source review](maintenance-update-source-review.md), and
   [maintenance queue](maintenance-queue.md).
 - [Version selection scope](version-selection-scope.md).
-- [November dependency/security refresh](dependency-refresh-2026-11.md) (current SDK, explicit GUI preview pair, versions and compatibility limits).
+- [November dependency/security refresh](dependency-refresh-2026-11.md) and
+  [November 19 servicing review](dependency-review-2026-11-19.md) (current SDK, explicit GUI preview pair, versions and compatibility limits).
 - [GitHub CLI 2.103.0 compatibility](gh-2.103.0-compatibility.md)
   (authentication/extension baseline) and
   [2.103.1 compatibility](gh-2.103.1-compatibility.md) (patch review).
+- [GitHub CLI 2.105.0 compatibility](gh-2.105.0-compatibility.md) (complete follow-up, authentication diagnostics and event-preview limits).
 
 Detailed subsystem invariants are indexed by the short root [AGENTS.md](../AGENTS.md).
 Active native proof tools and their tests live in [tests/native](../tests/native/README.md).

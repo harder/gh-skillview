@@ -811,7 +811,8 @@ internal sealed class InstalledTabView : FrameView
         }
         var counts = _viewRows.MatchingCopies == _overview.Copies ? $"{_overview.Copies} observed {(_overview.Copies == 1 ? "copy" : "copies")}"
             : $"{_viewRows.MatchingCopies} of {_overview.Copies} observed copies";
-        _footer.Text = $" {counts} · {InstalledScreen.PlacementCount(_overview.Placements)}"
+        _footer.Text = (_availability?.Failure is { } failure ? " " + TuiHelpers.ErrorSnippet(failure, 65) + " · " : " ")
+            + $"{counts} · {InstalledScreen.PlacementCount(_overview.Placements)}"
             + (_overview.AmbiguousCopies > 0 ? $" · {_overview.AmbiguousCopies} ambiguous" : "")
             + (_viewRows.OmittedRows > 0 ? $" · {_viewRows.ShownCopies} shown; {_viewRows.OmittedRows} rows omitted" : "")
             + (_snapshot.IsPartial || !_snapshot.ConfiguredRootsComplete ? " · Partial scan" : "");
@@ -1047,11 +1048,11 @@ internal sealed class InstalledTabView : FrameView
         var blocked = !NoObservedCopies && SelectedRow is null && _selectedKey is not null ? "Selection missing/hidden/filtered; actions disabled · "
             : SelectedRow?.Copy?.Ambiguous == true ? "Ambiguous installation ID; actions disabled · " : "";
         var partial = _snapshot is not null && (_snapshot.IsPartial || !_snapshot.ConfiguredRootsComplete);
-        _coverage.Text = blocked + (partial ? "Partial scan" : "Captured inventory")
+        _coverage.Text = (_pinFilter == PinFilter.All ? "" : "Pins: " + DescribePin(_pinFilter) + " · ")
+            + (_scopeFilter == ScopeFilter.All ? "" : "Scope: " + DescribeScope(_scopeFilter) + " · ")
+            + (_sort == SortMode.Name ? "" : "Sort: " + _sort.ToString().ToLowerInvariant() + " · ")
+            + blocked + (partial ? "Partial scan" : "Captured inventory")
             + (_snapshot is null ? "" : $" · {_snapshot.ScannedRoots.Length}/{_snapshot.ConfiguredRoots.Length} locations")
-            + (_pinFilter == PinFilter.All ? "" : " · Pins: " + DescribePin(_pinFilter))
-            + (_scopeFilter == ScopeFilter.All ? "" : " · Scope: " + DescribeScope(_scopeFilter))
-            + (_sort == SortMode.Name ? "" : " · Sort: " + _sort.ToString().ToLowerInvariant())
             + (_filtersExpanded ? " · " + _overview.Coverage : "");
     }
 

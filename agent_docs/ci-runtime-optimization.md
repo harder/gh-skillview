@@ -130,7 +130,7 @@ validation claim.
 The current native-input helper uses schema 3 (`native-producers-v3`): the current
 SDK is selected by the current checkout, while each frozen source must resolve its
 own `global.json` from that source CWD. CI installs SDKs 10.0.402 and 10.0.113 beside
-current 10.0.403. The pinned setup-dotnet action supports the multiline versions
+current 10.0.404. The pinned setup-dotnet action supports the multiline versions
 and `global-json-file` together. Planning and publication both verify actual
 versions. Source receipts bind actual frozen SDK, independently re-read source
 SDK/global/locks, source commit, recipe, RID, tracked cleanliness and binary hash;

@@ -111,6 +111,36 @@ public class GhAuthStatusParserTests
     }
 
     [Fact]
+    public void Successful_auth_retains_read_only_state_refresh_warning()
+    {
+        const string stdout = "github.com\n  ✓ Logged in to github.com account monalisa (keyring)\n  - Active account: true";
+        const string stderr = "⚠ Skipped refreshing the token of account monalisa on github.com because gh's state directory (/state/gh) is not writable.";
+
+        var status = GhAuthStatusParser.Parse(stdout, stderr, 0);
+
+        Assert.True(status.LoggedIn);
+        Assert.Equal("monalisa", status.Account);
+        Assert.Contains(stderr, status.RawOutput);
+    }
+
+    [Theory]
+    [InlineData("non-200 OK status code:  body: \"API rate limit exceeded\"")]
+    [InlineData("non-200 OK status code:  body: \"Service Unavailable\"")]
+    [InlineData("Post \"https://api.github.com/graphql\": dial tcp: no such host")]
+    public void Gh_2_104_auth_failure_retains_underlying_diagnostic(string error)
+    {
+        var output = "github.com\n  X Failed to log in to github.com using token (GH_TOKEN)\n"
+            + "  - Active account: true\n  - The token in GH_TOKEN is invalid.\n  - Error: " + error;
+
+        var status = GhAuthStatusParser.Parse(null, output, 1);
+
+        Assert.False(status.LoggedIn);
+        Assert.Null(status.Account);
+        Assert.Equal("github.com", status.ActiveHost);
+        Assert.Equal(output, status.RawOutput);
+    }
+
+    [Fact]
     public void Handles_not_logged_in()
     {
         const string stderr = "You are not logged into any GitHub hosts. Run gh auth login to authenticate.";

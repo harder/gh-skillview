@@ -10,7 +10,7 @@ that SDK, commit the updated lock files alongside `global.json`, and verify
 `dotnet restore --locked-mode` before building. CI and release workflows read
 the same `global.json`.
 
-The current pin is SDK 10.0.403 with runtime/AOT/linker 10.0.14; keep the target
+The current pin is SDK 10.0.404 with runtime/AOT/linker 10.0.15; keep the target
 framework at `net10.0`. The intentional feature-band change includes all six
 regenerated locks. Install that exact private SDK rather than relying on an
 older distribution package, and verify all four native release targets.

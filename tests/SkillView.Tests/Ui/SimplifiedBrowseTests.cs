@@ -100,12 +100,32 @@ public sealed class SimplifiedBrowseTests
     [Fact]
     public void LiteralSummaryProseCannotCreateLinksOrFormattingFromMetadata()
     {
-        var text = MarkdownTableFormatter.FormatProse("[Open](https://bad.example) **bold** <img> `code`\nnext\u001b[31m");
+        var text = MarkdownTableFormatter.FormatProse("[Open](https://bad.example) **bold** <img> `code` /skills/demo~~old~~\nnext\u001b[31m");
         var document = Markdig.Markdown.Parse(text);
         Assert.Empty(document.Descendants<LinkInline>());
         Assert.Empty(document.Descendants<EmphasisInline>());
         Assert.Empty(document.Descendants<CodeInline>());
         Assert.DoesNotContain('\u001b', text);
+        var pipeline = Markdig.MarkdownExtensions.UseAdvancedExtensions(new Markdig.MarkdownPipelineBuilder()).Build();
+        var location = Markdig.Markdown.Parse(MarkdownTableFormatter.FormatProse("/skills/demo~~old~~"), pipeline);
+        Assert.Empty(location.Descendants<EmphasisInline>());
+    }
+
+    [Theory]
+    [InlineData(200, 12)]
+    [InlineData(1, 40000)]
+    public void CompactConsumersRetainPlacementTotalAndBoundWholeLabels(int count, int agentLength)
+    {
+        var skill = InstalledOverviewTests.Copy("/skills/demo", "demo");
+        skill = skill with
+        {
+            Agents = [.. Enumerable.Range(0, count).Select(i =>
+            new AgentMembership(new string('a', agentLength) + i, skill.ResolvedPath, false))]
+        };
+        var text = InstalledScreen.RenderDetail(skill, compact: true);
+        Assert.Contains(InstalledScreen.PlacementCount(count), text);
+        Assert.Contains("omitted", text);
+        Assert.True(text.Length < 6000);
     }
 
     private static string Capture(IApplication app, int width, int height) => string.Join("\n",

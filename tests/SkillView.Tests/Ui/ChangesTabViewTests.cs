@@ -14,6 +14,27 @@ namespace SkillView.Tests.Ui;
 public sealed class ChangesTabViewTests
 {
     [Fact]
+    public async Task ExpandedCopyRowsRetainDistinguishingLabelsForLongPaths()
+    {
+        var prefix = "/skills/" + new string('a', 200);
+        var suffix = new string('z', 200) + "/demo";
+        var first = MaintenanceQueueTests.Skill(prefix + "/one/" + suffix, "https://github.com/one/repo");
+        var second = MaintenanceQueueTests.Skill(prefix + "/two/" + suffix, "https://github.com/two/repo");
+        using var view = new ChangesTabView(action => { action(); return Task.CompletedTask; },
+            _ => Task.FromResult(InventorySnapshot.Empty with { Skills = [first, second] }), static () => { });
+        await view.LoadAsync();
+        var parent = Assert.Single(view.RowsForTests);
+        var table = view.SubViews.OfType<TableView>().Single();
+        table.SetSelection(0, 0, false);
+        table.NewKeyDownEvent(Key.Enter);
+        var children = view.RowsForTests.Where(row => row.IsExactChild).ToArray();
+        Assert.Equal(2, children.Length);
+        Assert.Equal(2, children.Select(row => row.Title).Distinct().Count());
+        Assert.Equal(parent.LocationLabels.Select(label => "  " + label), children.Select(row => row.Title));
+        Assert.Equal(new[] { first.ResolvedPath, second.ResolvedPath }.Order(), children.Select(row => row.Entry.Subject.Path).Order());
+    }
+
+    [Fact]
     public async Task SummaryUsesCapturedChildHomeAndTechnicalViewKeepsExactPath()
     {
         var home = Path.GetFullPath("changes-child-home");

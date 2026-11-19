@@ -1,0 +1,2439 @@
+{
+  "reviewedAt": "2026-11-19",
+  "base": "v2.103.3",
+  "head": "v2.105.0",
+  "reviewMethod": "All subjects and changed-path inventory reviewed; relevant implementation and dependency diffs inspected; unchanged skill trees verified at every release.",
+  "releaseTrees": {
+    "v2.103.1": {
+      "commit": "64d175234b85aa7765c1f4cda058bd6353adb78f",
+      "skillsLibraryTree": "ebe70235f23e47faac50c7e7c0f64ab877cea084",
+      "skillsCommandTree": "9f69d8c735207dc614a15330429781648a8cdb89"
+    },
+    "v2.103.2": {
+      "commit": "4f2cfe92e3499f8581bf39db77e0a1431fa7b55c",
+      "skillsLibraryTree": "ebe70235f23e47faac50c7e7c0f64ab877cea084",
+      "skillsCommandTree": "9f69d8c735207dc614a15330429781648a8cdb89"
+    },
+    "v2.103.3": {
+      "commit": "63837fb778d6a39f02be0ce76ff89f2bc8d74bdc",
+      "skillsLibraryTree": "ebe70235f23e47faac50c7e7c0f64ab877cea084",
+      "skillsCommandTree": "9f69d8c735207dc614a15330429781648a8cdb89"
+    },
+    "v2.104.0": {
+      "commit": "3d5a9e355a837f2f5ee78d7484c118cc1342ad1a",
+      "skillsLibraryTree": "ebe70235f23e47faac50c7e7c0f64ab877cea084",
+      "skillsCommandTree": "9f69d8c735207dc614a15330429781648a8cdb89"
+    },
+    "v2.105.0": {
+      "commit": "e1219499a578b69e3437adaa31cd60614e23c802",
+      "skillsLibraryTree": "ebe70235f23e47faac50c7e7c0f64ab877cea084",
+      "skillsCommandTree": "9f69d8c735207dc614a15330429781648a8cdb89"
+    }
+  },
+  "binaries": {
+    "2.102.0": {
+      "version": "2.102.0",
+      "rid": "linux-x64",
+      "archiveUrl": "https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_amd64.tar.gz",
+      "checksumsUrl": "https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_checksums.txt",
+      "archiveSha256": "bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386",
+      "binarySha256": "7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b"
+    },
+    "2.104.0": {
+      "version": "2.104.0",
+      "rid": "linux-x64",
+      "archiveUrl": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_linux_amd64.tar.gz",
+      "checksumsUrl": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_checksums.txt",
+      "archiveSha256": "98cb101ad87dbbd3f6b2f2bfcbd43197ccd07643140121d8a9cfaa91eadbc24e",
+      "binarySha256": "fca7ac8a8386e3ad65c9a96a96cbf272d1dcc4f76de174dae91d54e50729e240"
+    },
+    "2.105.0": {
+      "version": "2.105.0",
+      "rid": "linux-x64",
+      "archiveUrl": "https://github.com/cli/cli/releases/download/v2.105.0/gh_2.105.0_linux_amd64.tar.gz",
+      "checksumsUrl": "https://github.com/cli/cli/releases/download/v2.105.0/gh_2.105.0_checksums.txt",
+      "archiveSha256": "79e7ab5db738c48777b696e374f8b428f0647debfb424f44d2f426370407fe2f",
+      "binarySha256": "fa7cff06d4db9eee98e00b10ac93beebfe1822109ac04a6cbbf9d806c21d0073"
+    }
+  },
+  "commits": [
+    {
+      "sha": "80256c3312f60dc13aee2b0a290df599705d3319",
+      "subject": "Replace msgpack with a minimal node ID encoder",
+      "files": [
+        "api/node_id.go",
+        "api/node_id_test.go",
+        "go.mod",
+        "go.sum",
+        "pkg/cmd/agent-task/capi/sessions.go",
+        "pkg/cmd/discussion/client/client.go"
+      ],
+      "reviewAreas": [
+        "other-commands",
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "ca436970d50f6afb3101f470c37bf12a22cbf016",
+      "subject": "chore(deps): Bump the codeql-actions group with 3 updates",
+      "files": [
+        ".github/workflows/codeql.yml",
+        ".github/workflows/govulncheck.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "87c7ab51a9fb332ee10301cb9b2c9ec7442ac0a7",
+      "subject": "Add private vulnerability report form",
+      "files": [
+        ".github/VULNERABILITY_REPORT.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "6eb83b0ea928ca65df9f9397cd55acfb4983d74d",
+      "subject": "clarify node ID template index contract",
+      "files": [
+        "api/node_id.go",
+        "api/node_id_test.go"
+      ],
+      "reviewAreas": [
+        "other-commands"
+      ]
+    },
+    {
+      "sha": "0186b810be23edeacfb50d4a43012b96c7df1d35",
+      "subject": "Merge pull request #14801 from tj-smith47/remove-msgpack",
+      "files": [
+        "api/node_id.go",
+        "api/node_id_test.go",
+        "go.mod",
+        "go.sum",
+        "pkg/cmd/agent-task/capi/sessions.go",
+        "pkg/cmd/discussion/client/client.go"
+      ],
+      "reviewAreas": [
+        "other-commands",
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "9be5608274eca527fbdf54020ead268ff605bad3",
+      "subject": "Merge pull request #14824 from cli/dependabot/github_actions/codeql-actions-52fc152648",
+      "files": [
+        ".github/workflows/codeql.yml",
+        ".github/workflows/govulncheck.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "9ca98bcfef7c794f57bf2f35cfc4e18c4563a803",
+      "subject": "Use separate Go caches for race and non-race builds",
+      "files": [
+        ".github/workflows/go.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "bd85ec1fbbf58e16cf2f3401aa6c8a61538cf044",
+      "subject": "Always run tests when reusing the race build cache",
+      "files": [
+        ".github/workflows/go.yml",
+        "docs/testing.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "b07f9b401601dcafd770be2a98842cdc1d4ead3c",
+      "subject": "Share Go setup and caching via a local action",
+      "files": [
+        ".github/actions/setup-go/action.yml",
+        ".github/workflows/go.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "5687d4ffe8191395b76b1389e74df20146037820",
+      "subject": "Merge pull request #14837 from cli/williammartin-copilot-discussion-relevance",
+      "files": [
+        ".github/actions/setup-go/action.yml",
+        ".github/workflows/go.yml",
+        "docs/testing.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "76d03ad1a42172180e6bdc7d5d128402c77e2de1",
+      "subject": "Only save Go caches from trunk",
+      "files": [
+        ".github/actions/setup-go/action.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "93d24ce9ffefb6cc86bde89b50271457bb0ef9cb",
+      "subject": "Only save Go caches from trunk (#14840)",
+      "files": [
+        ".github/actions/setup-go/action.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "7ac169aaed1712301fa6920fd7db44908adddfe3",
+      "subject": "fix(config): skip token refresh when the state directory is not writable",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go",
+        "internal/gh/gh.go",
+        "pkg/auth/credential.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    },
+    {
+      "sha": "856786ce5925a1cc05dd91ea5712b59b33e36458",
+      "subject": "fix: warn about skipped token refreshes before exiting",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go",
+        "internal/gh/gh.go",
+        "internal/ghcmd/cmd.go",
+        "internal/ghcmd/cmd_test.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    },
+    {
+      "sha": "04c4ebf52e7033a83eb38e9741c8ace05bf8617b",
+      "subject": "fix(gh auth refresh): preserve scopes when the token refresh is skipped",
+      "files": [
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    },
+    {
+      "sha": "4a64788a49b73d793419d4ffb0e416da11e2e37b",
+      "subject": "Fix local extension install test path normalization",
+      "files": [
+        "pkg/cmd/extension/command_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "674516ff39ccdaa8a525873f87552609dcda63de",
+      "subject": "Merge pull request #14854 from bobrik/ivan/normalize-tmp",
+      "files": [
+        "pkg/cmd/extension/command_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "f7a06a18a91eef5c0b218b549dab64b86f36f8b9",
+      "subject": "Merge pull request #14825 from cli/bagtoad/ghsa-submission-template",
+      "files": [
+        ".github/VULNERABILITY_REPORT.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "7bfdc1b0811d2c8cfb61f792419f116a1ac6448c",
+      "subject": "Require confirmation before deleting a private repo's forks",
+      "files": [
+        "pkg/cmd/repo/delete/delete.go",
+        "pkg/cmd/repo/delete/delete_test.go",
+        "pkg/cmd/repo/delete/http.go"
+      ],
+      "reviewAreas": [
+        "other-commands"
+      ]
+    },
+    {
+      "sha": "4948470b5a97a7fd839df5389527f575070ab2f8",
+      "subject": "Accept cascading fork deletion in acceptance cleanup",
+      "files": [
+        ".github/skills/writing-acceptance-tests/SKILL.md",
+        "acceptance/testdata/pr/pr-checkout-with-url-from-fork.txtar",
+        "acceptance/testdata/pr/pr-checkout-worktree-from-fork.txtar",
+        "acceptance/testdata/pr/pr-create-guesses-remote-from-sha-with-branch-name-slash.txtar",
+        "acceptance/testdata/pr/pr-create-guesses-remote-from-sha.txtar",
+        "acceptance/testdata/pr/pr-create-push-default-upstream-no-merge-ref-fork.txtar",
+        "acceptance/testdata/pr/pr-create-remote-ref-with-branch-name-slash.txtar",
+        "acceptance/testdata/pr/pr-create-respects-branch-pushremote.txtar",
+        "acceptance/testdata/pr/pr-create-respects-push-destination.txtar",
+        "acceptance/testdata/pr/pr-create-respects-remote-pushdefault.txtar",
+        "acceptance/testdata/pr/pr-create-respects-user-colon-branch-syntax.txtar",
+        "acceptance/testdata/pr/pr-status-respects-cross-org.txtar",
+        "acceptance/testdata/pr/pr-view-same-org-fork.txtar",
+        "acceptance/testdata/pr/pr-view-status-respects-branch-pushremote.txtar",
+        "acceptance/testdata/pr/pr-view-status-respects-remote-pushdefault.txtar",
+        "acceptance/testdata/repo/repo-fork-sync.txtar",
+        "acceptance/testdata/secret/secret-require-remote-disambiguation.txtar"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "b17c1554e635b794ff9dbb6607e15575bd9ea387",
+      "subject": "Add acceptance test for deleting a private repo with forks",
+      "files": [
+        "acceptance/testdata/repo/repo-delete-private-forks.txtar"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "8553724d157cd73dd42c937c79c51787f86e814a",
+      "subject": "Merge pull request #14858 from cli/bagtoad/private-fork-deletion-guard",
+      "files": [
+        ".github/skills/writing-acceptance-tests/SKILL.md",
+        "acceptance/testdata/pr/pr-checkout-with-url-from-fork.txtar",
+        "acceptance/testdata/pr/pr-checkout-worktree-from-fork.txtar",
+        "acceptance/testdata/pr/pr-create-guesses-remote-from-sha-with-branch-name-slash.txtar",
+        "acceptance/testdata/pr/pr-create-guesses-remote-from-sha.txtar",
+        "acceptance/testdata/pr/pr-create-push-default-upstream-no-merge-ref-fork.txtar",
+        "acceptance/testdata/pr/pr-create-remote-ref-with-branch-name-slash.txtar",
+        "acceptance/testdata/pr/pr-create-respects-branch-pushremote.txtar",
+        "acceptance/testdata/pr/pr-create-respects-push-destination.txtar",
+        "acceptance/testdata/pr/pr-create-respects-remote-pushdefault.txtar",
+        "acceptance/testdata/pr/pr-create-respects-user-colon-branch-syntax.txtar",
+        "acceptance/testdata/pr/pr-status-respects-cross-org.txtar",
+        "acceptance/testdata/pr/pr-view-same-org-fork.txtar",
+        "acceptance/testdata/pr/pr-view-status-respects-branch-pushremote.txtar",
+        "acceptance/testdata/pr/pr-view-status-respects-remote-pushdefault.txtar",
+        "acceptance/testdata/repo/repo-delete-private-forks.txtar",
+        "acceptance/testdata/repo/repo-fork-sync.txtar",
+        "acceptance/testdata/secret/secret-require-remote-disambiguation.txtar",
+        "pkg/cmd/repo/delete/delete.go",
+        "pkg/cmd/repo/delete/delete_test.go",
+        "pkg/cmd/repo/delete/http.go"
+      ],
+      "reviewAreas": [
+        "other-commands",
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "bc612ed3d618e6ce6ec9d1f1f66d2d112373e914",
+      "subject": "Test git client with real repositories",
+      "files": [
+        "git/client_test.go",
+        "git/test.go",
+        "git/test_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "ebb46dabbb6a7b9190f3c2644f7a2e66226f66d2",
+      "subject": "Refactor git graph tests to use real repos",
+      "files": [
+        "git/client_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "2720566f305f87dd99bbede991511994612d37ef",
+      "subject": "Test git transports with local remotes",
+      "files": [
+        "git/client_test.go",
+        "git/command_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "5714558c97ab317e32e319ebb75e6d1ea9761e68",
+      "subject": "Improve git client tests",
+      "files": [
+        "git/client_test.go",
+        "git/command_test.go",
+        "git/url_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "934db7e6623e7b5c7a3ccb6a26e91ec4eb1a9002",
+      "subject": "Remove obsolete Git test seams",
+      "files": [
+        "git/client.go",
+        "git/client_test.go",
+        "git/command.go",
+        "git/command_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "0c5e7e910fe9d09586dc3fdbc3fe9d981a081812",
+      "subject": "chore(deps): Bump google.golang.org/grpc from 1.84.0 to 1.85.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "30eb70ca63a800733d9b802cc69862579478b0c3",
+      "subject": "Merge pull request #14878 from cli/dependabot/go_modules/google.golang.org/grpc-1.85.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "443baeba055cc78a0ff9fd9308dfc26aec860b87",
+      "subject": "Merge pull request #14355 from cli/williammartin-clean-git-test-seams",
+      "files": [
+        "git/client.go",
+        "git/client_test.go",
+        "git/command.go",
+        "git/command_test.go",
+        "git/test.go",
+        "git/test_test.go",
+        "git/url_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "f59a50225f9aa8f4907c718963be3616fa48fdd5",
+      "subject": "Test ShowRefs option separator",
+      "files": [
+        "git/client_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "9490d204a2ba95434153dedce99898ce9f281426",
+      "subject": "Merge pull request #14879 from cli/bagtoad/show-refs-option-like-ref-test",
+      "files": [
+        "git/client_test.go"
+      ],
+      "reviewAreas": [
+        "git-and-extension"
+      ]
+    },
+    {
+      "sha": "da8b8d3afafb6b5bb53e241343b1a8e6665aa162",
+      "subject": "chore(deps): Bump github.com/sigstore/sigstore-go from 1.3.0 to 1.4.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "7ed464c372b68460df8c2a6b63828a2b7adf6579",
+      "subject": "chore(deps): Bump charm.land/bubbletea/v2 from 2.1.0 to 2.1.1",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "ec3ebb7ae96c22450bdc9d6d9e6327b103b386bf",
+      "subject": "chore(deps): Bump github.com/yuin/goldmark from 1.8.6 to 1.8.7",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "7e97c4c4f5124f5e74611c099a610989315f128b",
+      "subject": "Merge pull request #14906 from cli/dependabot/go_modules/charm.land/bubbletea/v2-2.1.1",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "d06cd7d3e8925e9437ea6ac3029dd728a60c97fc",
+      "subject": "Merge pull request #14905 from cli/dependabot/go_modules/github.com/sigstore/sigstore-go-1.4.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "9c399f1520a45f1bffb968d7d6565ea4112937fa",
+      "subject": "Merge pull request #14907 from cli/dependabot/go_modules/github.com/yuin/goldmark-1.8.7",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "d7ef60c60e9590daf94022f95ebf2b72f5306c5e",
+      "subject": "chore: regenerate triage workflows with gh-aw v1.0.1",
+      "files": [
+        ".github/aw/actions-lock.json",
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "287907632527bf0a138569cb0eaa8f744d6f336d",
+      "subject": "Merge branch 'trunk' into tidy-dev-merge-blocker",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "6a79004e03cf5efc85a8d27dca55937e745f8b20",
+      "subject": "chore: align repository gh-aw installers with v1.0.1",
+      "files": [
+        ".github/aw/actions-lock.json",
+        ".github/workflows/agentics-maintenance.yml",
+        ".github/workflows/copilot-setup-steps.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "c4513d446bf98cfcbe72ed83f17cd3220174d88f",
+      "subject": "Merge pull request #14910 from cli/tidy-dev-merge-blocker",
+      "files": [
+        ".github/aw/actions-lock.json",
+        ".github/workflows/agentics-maintenance.yml",
+        ".github/workflows/copilot-setup-steps.yml",
+        ".github/workflows/dependabot-triage.lock.yml",
+        ".github/workflows/issue-triage.lock.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "0fafae6df3857ba116026b3cc056f1383c1fc9f6",
+      "subject": "Clarify which hosts use GH_ENTERPRISE_TOKEN",
+      "files": [
+        "pkg/cmd/root/help_topic.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "f7fd1d490b7edbccc21e0349ad16f09b6af08637",
+      "subject": "Clarify token hosts in `gh api` help",
+      "files": [
+        "pkg/cmd/api/api.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "f44bd1dcc58a718327a4d1df89ea3d1145c827b2",
+      "subject": "Mention github.localhost in GH_TOKEN help",
+      "files": [
+        "pkg/cmd/api/api.go",
+        "pkg/cmd/root/help_topic.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "eeb44bc432c0107de002dadd34a61b4e2bd15882",
+      "subject": "Merge pull request #14918 from cli/bagtoad/gh-help-environment-fix",
+      "files": [
+        "pkg/cmd/api/api.go",
+        "pkg/cmd/root/help_topic.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "89e71a427f63fdb99f3584a92182e4f76ca8ea34",
+      "subject": "Add a fake GitHub API runner",
+      "files": [
+        "script/ghmock/go.mod",
+        "script/ghmock/go.sum",
+        "script/ghmock/log.go",
+        "script/ghmock/log_test.go",
+        "script/ghmock/main.go",
+        "script/ghmock/report.go",
+        "script/ghmock/request.go",
+        "script/ghmock/request_test.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/server.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/set.go",
+        "script/ghmock/set_test.go",
+        "script/ghmock/store.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "ee91c585ce16be31623ea437015489e529e79432",
+      "subject": "Correct request selection and run comparisons",
+      "files": [
+        "script/ghmock/go.mod",
+        "script/ghmock/go.sum",
+        "script/ghmock/log.go",
+        "script/ghmock/log_test.go",
+        "script/ghmock/main.go",
+        "script/ghmock/report.go",
+        "script/ghmock/request.go",
+        "script/ghmock/request_test.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/server.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/set.go",
+        "script/ghmock/set_test.go",
+        "script/ghmock/store.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "366f9c658e090ce52771a05058ea3561d85fc67f",
+      "subject": "Remove unused runner members",
+      "files": [
+        "script/ghmock/request_test.go",
+        "script/ghmock/run.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/store.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "df029a5787fa63b940519aaa5ba81bbee4fc01e5",
+      "subject": "Validate mock API requests and responses",
+      "files": [
+        "script/ghmock/checker.go",
+        "script/ghmock/checker_test.go",
+        "script/ghmock/go.mod",
+        "script/ghmock/go.sum",
+        "script/ghmock/graphqlcheck.go",
+        "script/ghmock/log.go",
+        "script/ghmock/log_test.go",
+        "script/ghmock/main.go",
+        "script/ghmock/report.go",
+        "script/ghmock/restcheck.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/schemacmd.go",
+        "script/ghmock/schemacmd_test.go",
+        "script/ghmock/schemafiles.go",
+        "script/ghmock/schemafiles_test.go",
+        "script/ghmock/server.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/set.go",
+        "script/ghmock/set_test.go",
+        "script/ghmock/store.go",
+        "script/ghmock/testdata/rest.json",
+        "script/ghmock/testdata/schema.graphql"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "00e268c0cf3e1aa39e637fe3963e5660694df838",
+      "subject": "Correct GraphQL query and response validation",
+      "files": [
+        "script/ghmock/checker.go",
+        "script/ghmock/checker_test.go",
+        "script/ghmock/graphqlcheck.go",
+        "script/ghmock/main.go",
+        "script/ghmock/set.go",
+        "script/ghmock/set_test.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "0f95a906f44f80ce4c718d664bc238e4e8cee8b6",
+      "subject": "Remove unused GraphQL checker plumbing",
+      "files": [
+        "script/ghmock/checker.go",
+        "script/ghmock/graphqlcheck.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "74053322190330bead9f2b3e3a67af815c47c003",
+      "subject": "Scaffold and export mock API fixtures",
+      "files": [
+        "script/ghmock/checker.go",
+        "script/ghmock/checker_test.go",
+        "script/ghmock/export.go",
+        "script/ghmock/export_test.go",
+        "script/ghmock/gqlscaffold.go",
+        "script/ghmock/graphqlcheck.go",
+        "script/ghmock/introspection.go",
+        "script/ghmock/log.go",
+        "script/ghmock/log_test.go",
+        "script/ghmock/main.go",
+        "script/ghmock/report.go",
+        "script/ghmock/restcheck.go",
+        "script/ghmock/restscaffold.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/scaffold.go",
+        "script/ghmock/scaffold_test.go",
+        "script/ghmock/schemacmd.go",
+        "script/ghmock/schemacmd_test.go",
+        "script/ghmock/schemafiles.go",
+        "script/ghmock/schemafiles_test.go",
+        "script/ghmock/server.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/store.go",
+        "script/ghmock/testdata/rest.json",
+        "script/ghmock/testdata/schema.graphql",
+        "script/ghmock/trim.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "896de9fc23115fb739f5b4eb0116826d730604ae",
+      "subject": "Repair fixture generation and platform checks",
+      "files": [
+        "script/ghmock/gqlscaffold.go",
+        "script/ghmock/introspection.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/scaffold.go",
+        "script/ghmock/scaffold_test.go",
+        "script/ghmock/server.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/trim.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "d407d7b443c4f034250df748e34b1cffae3934c3",
+      "subject": "Align fixture consumers with request selection",
+      "files": [
+        "script/ghmock/gqlscaffold.go",
+        "script/ghmock/log.go",
+        "script/ghmock/main.go",
+        "script/ghmock/report.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/scaffold.go",
+        "script/ghmock/scaffold_test.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/trim.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "d675e340e79dde5430b624a7f1dafb7946b61c0e",
+      "subject": "Update scaffold checker result binding",
+      "files": [
+        "script/ghmock/scaffold.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "10656420196d79209a9035c888bbc1af254c1c5d",
+      "subject": "Support HTTPS and terminal prompts in ghmock",
+      "files": [
+        "script/ghmock/checker.go",
+        "script/ghmock/go.mod",
+        "script/ghmock/go.sum",
+        "script/ghmock/gqlscaffold.go",
+        "script/ghmock/log.go",
+        "script/ghmock/log_test.go",
+        "script/ghmock/main.go",
+        "script/ghmock/report.go",
+        "script/ghmock/request.go",
+        "script/ghmock/request_test.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/scaffold.go",
+        "script/ghmock/scaffold_test.go",
+        "script/ghmock/schemacmd.go",
+        "script/ghmock/server.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/set.go",
+        "script/ghmock/set_test.go",
+        "script/ghmock/store.go",
+        "script/ghmock/terminal.go",
+        "script/ghmock/terminal_test.go",
+        "script/ghmock/tls.go",
+        "script/ghmock/tls_test.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "099532ac9727f41f2b1c9b92aad30aabce012c4a",
+      "subject": "Retain complete terminal interaction evidence",
+      "files": [
+        "script/ghmock/main.go",
+        "script/ghmock/report.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/store.go",
+        "script/ghmock/terminal.go",
+        "script/ghmock/terminal_common.go",
+        "script/ghmock/terminal_windows.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "885d70b690f139c6f544769918bc6e325ae463ce",
+      "subject": "Remove unused terminal waiting state",
+      "files": [
+        "script/ghmock/export_test.go",
+        "script/ghmock/report.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/store.go",
+        "script/ghmock/terminal_common.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "e1ec2a14fe4593a3f2b4d4cd5eed4e4f7b56a549",
+      "subject": "Add Git and configuration fixtures to ghmock",
+      "files": [
+        "script/ghmock/archive.go",
+        "script/ghmock/checker.go",
+        "script/ghmock/configfixture.go",
+        "script/ghmock/export.go",
+        "script/ghmock/export_test.go",
+        "script/ghmock/gitcmd.go",
+        "script/ghmock/gitcmd_test.go",
+        "script/ghmock/gitfixture.go",
+        "script/ghmock/gittransport.go",
+        "script/ghmock/log.go",
+        "script/ghmock/log_test.go",
+        "script/ghmock/main.go",
+        "script/ghmock/process_unix.go",
+        "script/ghmock/process_windows.go",
+        "script/ghmock/report.go",
+        "script/ghmock/restcheck.go",
+        "script/ghmock/restscaffold.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/scaffold.go",
+        "script/ghmock/scaffold_test.go",
+        "script/ghmock/server.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/set.go",
+        "script/ghmock/set_test.go",
+        "script/ghmock/store.go",
+        "script/ghmock/testdata/rest.json"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "c379213db8fc57c2336e915b53867cf4abc03983",
+      "subject": "Preserve fixture paths and transport evidence",
+      "files": [
+        "script/ghmock/archive.go",
+        "script/ghmock/export_test.go",
+        "script/ghmock/gitcmd.go",
+        "script/ghmock/gitcmd_test.go",
+        "script/ghmock/gitfixture.go",
+        "script/ghmock/gittransport.go",
+        "script/ghmock/log_test.go",
+        "script/ghmock/run.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/store.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "972fb938a57a183cfd47f0963efe75b61d87c8df",
+      "subject": "Remove duplicate fixture regression checks",
+      "files": [
+        "script/ghmock/run_test.go",
+        "script/ghmock/server_test.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "3946c1415f2b45bd607282bee658d79745e50585",
+      "subject": "Reproduce issue reports with ghmock",
+      "files": [
+        ".github/agents/agentic-workflows.md",
+        ".github/scripts/issue-triage-ghmock.sh",
+        ".github/skills/agentic-workflows/SKILL.md",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "93152e35cd55eb1bbc70dbd3ca81b097fcc906b6",
+      "subject": "Correct reproduction evidence and source labels",
+      "files": [
+        ".github/scripts/issue-triage-ghmock.sh",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "0bd1e64dc197176cc2447dc8f99f730a9dc44f8f",
+      "subject": "Keep triage comments short and attach reports",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/README.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "4cf6472870511ca02f10dbb5b22f7f2eae08199c",
+      "subject": "Repair triage publication retries",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "8f4f216fc17f9ed822c4c7dd8d09455abb65a641",
+      "subject": "Use the issue comment update endpoint",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "810eba8083328420293efab653503c506dd76dc7",
+      "subject": "Add ghmock reproduction skill",
+      "files": [
+        ".github/skills/ghmock/SKILL.md",
+        "AGENTS.md",
+        "docs/README.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "205239fd8fa51df92ab47bd93b62aa2b230a07be",
+      "subject": "Merge pull request #14960 from cli/bagtoad/triage-ghmock-skill",
+      "files": [
+        ".github/agents/agentic-workflows.md",
+        ".github/scripts/issue-triage-ghmock.sh",
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        ".github/skills/agentic-workflows/SKILL.md",
+        ".github/skills/ghmock/SKILL.md",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "AGENTS.md",
+        "docs/README.md",
+        "docs/issue-triage.md",
+        "script/ghmock/archive.go",
+        "script/ghmock/checker.go",
+        "script/ghmock/checker_test.go",
+        "script/ghmock/configfixture.go",
+        "script/ghmock/export.go",
+        "script/ghmock/export_test.go",
+        "script/ghmock/gitcmd.go",
+        "script/ghmock/gitcmd_test.go",
+        "script/ghmock/gitfixture.go",
+        "script/ghmock/gittransport.go",
+        "script/ghmock/go.mod",
+        "script/ghmock/go.sum",
+        "script/ghmock/gqlscaffold.go",
+        "script/ghmock/graphqlcheck.go",
+        "script/ghmock/introspection.go",
+        "script/ghmock/log.go",
+        "script/ghmock/log_test.go",
+        "script/ghmock/main.go",
+        "script/ghmock/process_unix.go",
+        "script/ghmock/process_windows.go",
+        "script/ghmock/report.go",
+        "script/ghmock/request.go",
+        "script/ghmock/request_test.go",
+        "script/ghmock/restcheck.go",
+        "script/ghmock/restscaffold.go",
+        "script/ghmock/run.go",
+        "script/ghmock/run_test.go",
+        "script/ghmock/scaffold.go",
+        "script/ghmock/scaffold_test.go",
+        "script/ghmock/schemacmd.go",
+        "script/ghmock/schemacmd_test.go",
+        "script/ghmock/schemafiles.go",
+        "script/ghmock/schemafiles_test.go",
+        "script/ghmock/server.go",
+        "script/ghmock/server_test.go",
+        "script/ghmock/set.go",
+        "script/ghmock/set_test.go",
+        "script/ghmock/store.go",
+        "script/ghmock/terminal.go",
+        "script/ghmock/terminal_common.go",
+        "script/ghmock/terminal_test.go",
+        "script/ghmock/terminal_windows.go",
+        "script/ghmock/testdata/rest.json",
+        "script/ghmock/testdata/schema.graphql",
+        "script/ghmock/tls.go",
+        "script/ghmock/tls_test.go",
+        "script/ghmock/trim.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "3e6aeafb1b796b862389c1abe4deba5e60fa0b01",
+      "subject": "Remove accidental triage model pin",
+      "files": [
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "c235ae31c77c5aa99abdf947503b4f3649330938",
+      "subject": "Merge pull request #14972 from cli/bagtoad/triage-ghmock-skill",
+      "files": [
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "86ef059323d9d802959ca79d5db769d5d152114d",
+      "subject": "Use a synthetic namespace for triage fixtures",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        ".github/skills/ghmock/SKILL.md",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md",
+        "script/ghmock/gitcmd_test.go",
+        "script/ghmock/gqlscaffold.go",
+        "script/ghmock/main.go",
+        "script/ghmock/scaffold_test.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "6ceb78a575d98dbe06ac366e42501c67aee2b1c4",
+      "subject": "Fix fixture URL boundaries in triage reports",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "736c68f674113337685e3eb1f908602a03b8f99b",
+      "subject": "Merge pull request #14976 from cli/bagtoad/triage-ghmock-skill",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        ".github/skills/ghmock/SKILL.md",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md",
+        "script/ghmock/gitcmd_test.go",
+        "script/ghmock/gqlscaffold.go",
+        "script/ghmock/main.go",
+        "script/ghmock/scaffold_test.go"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "e6ac17f41d2fc43581c1c50550a708f085177b0a",
+      "subject": "Provide verified build versions to triage",
+      "files": [
+        ".github/scripts/issue-triage-ghmock.sh",
+        ".github/scripts/issue-triage-ghmock.test.cjs",
+        ".github/skills/ghmock/SKILL.md",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "106c1d0d474e9d5025d2f03d1cff87b43fd0a954",
+      "subject": "chore(deps): Bump golang.org/x/sync from 0.24.0 to 0.25.0 (#14998)",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "7c981936881a9e27d0a462d5ee9675701c1dfdbd",
+      "subject": "Apply issue triage labels directly",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "9f68e8ce820825e0798dfe387fc0d22af1df9968",
+      "subject": "chore(deps): Bump github.com/spf13/pflag from 1.0.10 to 1.1.0 (#14963)",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "8c4f7f722179f5c4ef6e75bface0505019ccc67f",
+      "subject": "Provide verified build versions to triage (#15000)",
+      "files": [
+        ".github/scripts/issue-triage-ghmock.sh",
+        ".github/scripts/issue-triage-ghmock.test.cjs",
+        ".github/skills/ghmock/SKILL.md",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "7cb09713ccfa5305ebc81448a0b89c347a8bd36f",
+      "subject": "Fix repeated Dependabot triage assessments",
+      "files": [
+        ".github/scripts/dependabot-triage.sh",
+        ".github/scripts/dependabot-triage.test.cjs",
+        "docs/testing.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "18138654f3598ebe031ad7b661c903188f0f1dc9",
+      "subject": "Merge pull request #15002 from cli/bagtoad/dependabot-triage-deduplication",
+      "files": [
+        ".github/scripts/dependabot-triage.sh",
+        ".github/scripts/dependabot-triage.test.cjs",
+        "docs/testing.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "40c0ec1cdd19108c8bb4912548d0d6b8f5f7c7a1",
+      "subject": "Initial plan",
+      "files": [],
+      "reviewAreas": [
+        "empty-commit"
+      ]
+    },
+    {
+      "sha": "e8022e837d4d422370059c3ea954d13e11ebeeaf",
+      "subject": "Show underlying auth status errors on terminal stderr",
+      "files": [
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    },
+    {
+      "sha": "942c1f88e95df8a026170ca90add8b074ee80416",
+      "subject": "Render auth status errors consistently in authEntry.String",
+      "files": [
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    },
+    {
+      "sha": "b557a2327d684e3e400c59b8d875229074d0d742",
+      "subject": "chore(deps): Bump golang.org/x/sys from 0.49.0 to 0.50.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "ebec795004b5c21bff38ab524e971f4022bd618c",
+      "subject": "Merge trunk and fix triage review findings",
+      "files": [
+        ".github/scripts/dependabot-triage.sh",
+        ".github/scripts/dependabot-triage.test.cjs",
+        ".github/scripts/issue-triage-ghmock.sh",
+        ".github/scripts/issue-triage-ghmock.test.cjs",
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        ".github/skills/ghmock/SKILL.md",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md",
+        "docs/testing.md",
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies",
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "11858a4e2bbbf79a5cec0862b794ecba0bdeaaf2",
+      "subject": "Merge pull request #14845 from cli/babakks/skip-refresh-ro-lock",
+      "files": [
+        "internal/config/config.go",
+        "internal/config/refreshable.go",
+        "internal/config/refreshable_test.go",
+        "internal/gh/gh.go",
+        "internal/ghcmd/cmd.go",
+        "internal/ghcmd/cmd_test.go",
+        "pkg/auth/credential.go",
+        "pkg/cmd/auth/refresh/refresh.go",
+        "pkg/cmd/auth/refresh/refresh_test.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    },
+    {
+      "sha": "679ca5fe610203a982caea4b50f3a396f5a825d6",
+      "subject": "Merge pull request #15009 from cli/copilot/fix-gh-auth-status-errors",
+      "files": [
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    },
+    {
+      "sha": "18374541e44ad568208c2f45b14cc51c201121bd",
+      "subject": "Merge pull request #15001 from cli/bagtoad/direct-triage-labels",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "06e666b930ecd87e4146db42cef1addf8361dc76",
+      "subject": "Bump Go to 1.27.4",
+      "files": [
+        "go.mod"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "233b470d3a189e89cf6fa69624e11c3fa9387d81",
+      "subject": "Merge pull request #15028 from cli/bump-go-1.27.4",
+      "files": [
+        "go.mod"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "f0231a2e26c2369ea05adab71e0b18986af5178e",
+      "subject": "chore(deps): Bump the codeql-actions group across 1 directory with 3 updates",
+      "files": [
+        ".github/workflows/codeql.yml",
+        ".github/workflows/govulncheck.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "61a1bcdf2165cd4c1b79c8a1b0f6954f2c053750",
+      "subject": "chore(deps): Bump charm.land/lipgloss/v2 from 2.0.6 to 2.1.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "52af47bd6b2510eb60ba8b9daaa62d45c0b4871e",
+      "subject": "chore(deps): Bump github.com/klauspost/compress from 1.20.3 to 1.20.4",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "d49685754b8b2c4c8b9b18d3dfd96c95629c97d2",
+      "subject": "Use REST to apply triage labels",
+      "files": [
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "cbb5fd1673aa6bc8009241cba532d21f3d9f0c1b",
+      "subject": "Merge pull request #15040 from cli/dependabot/go_modules/github.com/klauspost/compress-1.20.4",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "25ac34e815becf325ba9986058dbce7db6172dff",
+      "subject": "Merge pull request #15010 from cli/dependabot/go_modules/golang.org/x/sys-0.50.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "f5a73ef26fc48215eb3bd12d09b7a1f63d9d4a46",
+      "subject": "Merge pull request #14964 from cli/dependabot/github_actions/codeql-actions-92276e7fb0",
+      "files": [
+        ".github/workflows/codeql.yml",
+        ".github/workflows/govulncheck.yml"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "e1110093f516b3e595cae3bef8a20c7bf39c2d14",
+      "subject": "Merge pull request #15041 from cli/bagtoad/direct-triage-labels",
+      "files": [
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "3d5a9e355a837f2f5ee78d7484c118cc1342ad1a",
+      "subject": "Merge pull request #15039 from cli/dependabot/go_modules/charm.land/lipgloss/v2-2.1.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "b13e6c6ba770547fd5f799c1e7598ee182e1b4c6",
+      "subject": "chore(deps): Bump golang.org/x/text from 0.43.0 to 0.44.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "f219d43648a38f528a207c6f707a678e986dc079",
+      "subject": "Make triage formatting checks nonblocking",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "776f26887ae16804c067f8a3fbc01a111a370986",
+      "subject": "Merge pull request #15049 from cli/dependabot/go_modules/golang.org/x/text-0.44.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "ad910e01596fb45e5a5b44a02a95b92a4526ba77",
+      "subject": "chore(deps): Bump golang.org/x/term from 0.47.0 to 0.48.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "da064e10918e720fcdb81faef9fc0da86bab5476",
+      "subject": "Merge pull request #15048 from cli/dependabot/go_modules/golang.org/x/term-0.48.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "96a81f6658e3f2c6ae2a84902e63d42c328346ae",
+      "subject": "chore(deps): Bump golang.org/x/crypto from 0.58.0 to 0.59.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "4e71d58d4f567282a1ec2dfe4a60a17eead59308",
+      "subject": "Merge pull request #15064 from cli/dependabot/go_modules/golang.org/x/crypto-0.59.0",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ],
+      "reviewAreas": [
+        "upstream-dependencies"
+      ]
+    },
+    {
+      "sha": "8c5c0c96c649ec145cd24819d29f5cd755797dee",
+      "subject": "Check fallback comment sizes before uploads",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "0536d5e5288458c696ccbeac0e68d87128300069",
+      "subject": "Merge pull request #15052 from cli/bagtoad/triage-ghmock-skill",
+      "files": [
+        ".github/scripts/issue-triage-report.cjs",
+        ".github/scripts/issue-triage-report.test.cjs",
+        ".github/workflows/issue-triage.lock.yml",
+        ".github/workflows/issue-triage.md",
+        "docs/issue-triage.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "46868c21d8051f2249b593ab68fd4b89b634ba33",
+      "subject": "feat(eventstream): add a server-sent events frame reader",
+      "files": [
+        "internal/eventstream/sse.go",
+        "internal/eventstream/sse_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "343b7c3a1b9e901bcb0458ba45e671d362624d13",
+      "subject": "feat(event/client): add an Event Subscriptions API client",
+      "files": [
+        "pkg/cmd/event/client/client.go",
+        "pkg/cmd/event/client/client_mock.go",
+        "pkg/cmd/event/client/client_test.go",
+        "pkg/cmd/event/client/types.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "2f5b7225604692ebe7fe378ea0362631f6251d73",
+      "subject": "feat(event/shared): add shared helpers for event commands",
+      "files": [
+        "pkg/cmd/event/shared/client.go",
+        "pkg/cmd/event/shared/completion.go",
+        "pkg/cmd/event/shared/completion_test.go",
+        "pkg/cmd/event/shared/help.go",
+        "pkg/cmd/event/shared/subscription.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "8f727353c8a751b08b37dfaa6ba90af3138be6be",
+      "subject": "feat(event listen): add gh event listen",
+      "files": [
+        "pkg/cmd/event/event.go",
+        "pkg/cmd/event/listen/listen.go",
+        "pkg/cmd/event/listen/listen_test.go",
+        "pkg/cmd/root/root.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent",
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "960ab335b2a9c916d48ec9add3c30aa6cb406f0b",
+      "subject": "feat(event subscription list): add gh event subscription list",
+      "files": [
+        "pkg/cmd/event/event.go",
+        "pkg/cmd/event/subscription/list/list.go",
+        "pkg/cmd/event/subscription/list/list_test.go",
+        "pkg/cmd/event/subscription/subscription.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "9930bede814062f16ca5e52d862f98ea3642b06f",
+      "subject": "feat(event subscription create): add gh event subscription create",
+      "files": [
+        "pkg/cmd/event/subscription/create/create.go",
+        "pkg/cmd/event/subscription/create/create_test.go",
+        "pkg/cmd/event/subscription/subscription.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "95fe983c53d0fb436cfbc0e27e7970953e1719ba",
+      "subject": "feat(event subscription view): add gh event subscription view",
+      "files": [
+        "pkg/cmd/event/subscription/subscription.go",
+        "pkg/cmd/event/subscription/view/view.go",
+        "pkg/cmd/event/subscription/view/view_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "60049b824a0a3b6198428dfc88b27e61d2e9c802",
+      "subject": "feat(event subscription delete): add gh event subscription delete",
+      "files": [
+        "pkg/cmd/event/subscription/delete/delete.go",
+        "pkg/cmd/event/subscription/delete/delete_test.go",
+        "pkg/cmd/event/subscription/subscription.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "86e546ccd003748fb6ccb9d505d082d9619d631e",
+      "subject": "feat(event/shared): add a listen hint for agents",
+      "files": [
+        "pkg/cmd/event/shared/hint.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "5c3c5fcaabc9b5bf4530dbb1c394bdb1788e0850",
+      "subject": "feat(pr): suggest gh event listen to agents in pr view, pr create and pr help",
+      "files": [
+        "pkg/cmd/pr/create/create.go",
+        "pkg/cmd/pr/create/create_test.go",
+        "pkg/cmd/pr/pr.go",
+        "pkg/cmd/pr/view/hint.go",
+        "pkg/cmd/pr/view/view.go",
+        "pkg/cmd/pr/view/view_test.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "5a631e922c58349b3eb5d57d096c7047ad78e3e8",
+      "subject": "feat(gh api): suggest gh event listen to agents for pull request endpoints",
+      "files": [
+        "pkg/cmd/api/api.go",
+        "pkg/cmd/api/api_test.go",
+        "pkg/cmd/api/hint.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "298a1d82f20620a04ffc47ee58a554db97e79325",
+      "subject": "docs(skills): document gh event listen in the gh skill",
+      "files": [
+        "skills/gh/SKILL.md"
+      ],
+      "reviewAreas": [
+        "upstream-skill-content"
+      ]
+    },
+    {
+      "sha": "fb3f617184340834324d97a64ecced7bdebff465",
+      "subject": "chore(evals): add the agent eval harness and event scenarios",
+      "files": [
+        "evals/.gitignore",
+        "evals/README.md",
+        "evals/cleanup",
+        "evals/package-lock.json",
+        "evals/package.json",
+        "evals/replay",
+        "evals/run",
+        "evals/running-evals.md",
+        "evals/smoke",
+        "evals/src/cleanup.test.ts",
+        "evals/src/cleanup.ts",
+        "evals/src/commands.test.ts",
+        "evals/src/core/actor.ts",
+        "evals/src/core/calls.ts",
+        "evals/src/core/errors.ts",
+        "evals/src/core/evidence.ts",
+        "evals/src/core/executor.ts",
+        "evals/src/core/github.ts",
+        "evals/src/core/home.ts",
+        "evals/src/core/io.ts",
+        "evals/src/core/observer.ts",
+        "evals/src/core/sandbox.ts",
+        "evals/src/core/session.ts",
+        "evals/src/core/suite.ts",
+        "evals/src/core/trial-cleanup.ts",
+        "evals/src/executor-plugin.ts",
+        "evals/src/github.test.ts",
+        "evals/src/grader-plugin.ts",
+        "evals/src/graders.test.ts",
+        "evals/src/graders/copilot-review.ts",
+        "evals/src/graders/result.ts",
+        "evals/src/graders/review.ts",
+        "evals/src/harness.test.ts",
+        "evals/src/replay.test.ts",
+        "evals/src/replay.ts",
+        "evals/src/review-loop.test.ts",
+        "evals/src/review.test.ts",
+        "evals/src/skills.test.ts",
+        "evals/src/smoke.test.ts",
+        "evals/src/smoke.ts",
+        "evals/src/suites/events/actor.ts",
+        "evals/src/suites/events/commands.ts",
+        "evals/src/suites/events/domain.ts",
+        "evals/src/suites/events/fixtures.ts",
+        "evals/src/suites/events/github.ts",
+        "evals/src/suites/events/grading/analysis.ts",
+        "evals/src/suites/events/grading/evidence.ts",
+        "evals/src/suites/events/grading/index.ts",
+        "evals/src/suites/events/grading/observations.ts",
+        "evals/src/suites/events/grading/polling.ts",
+        "evals/src/suites/events/grading/route.ts",
+        "evals/src/suites/events/grading/task.ts",
+        "evals/src/suites/events/limit.ts",
+        "evals/src/suites/events/scenarios.ts",
+        "evals/src/suites/events/scenarios/definition.ts",
+        "evals/src/suites/events/scenarios/full-delegation.ts",
+        "evals/src/suites/events/scenarios/listen-at-limit.ts",
+        "evals/src/suites/events/scenarios/notify-review.ts",
+        "evals/src/suites/events/scenarios/pull-after-close.ts",
+        "evals/src/suites/events/scenarios/pull-after-merge.ts",
+        "evals/src/suites/events/scenarios/review-loop.ts",
+        "evals/src/suites/events/smoke-protocol.ts",
+        "evals/src/suites/events/suite.ts",
+        "evals/src/suites/index.ts",
+        "evals/suites/events/README.md",
+        "evals/suites/events/full-delegation/eval.yml",
+        "evals/suites/events/listen-at-limit/eval.yml",
+        "evals/suites/events/notify-review/eval.yml",
+        "evals/suites/events/pull-after-close/eval.yml",
+        "evals/suites/events/pull-after-merge/eval.yml",
+        "evals/suites/events/review-loop/eval.yml",
+        "evals/testdata/replays/persistent-review-loop.json",
+        "evals/tsconfig.json",
+        "run-evals"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "e6f5bf31bdc41ec62d50c0aa81234740f350786a",
+      "subject": "docs(evals): add skills for running and writing evals",
+      "files": [
+        ".github/skills/running-evals/SKILL.md",
+        ".github/skills/running-evals/references/credentials.md",
+        ".github/skills/running-evals/references/execution-modes.md",
+        ".github/skills/writing-evals/SKILL.md",
+        ".github/skills/writing-evals/references/design-notes.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "31cb520f31b277c342b80548bab4fa78b1a567b6",
+      "subject": "docs(event): document the event listening preview",
+      "files": [
+        "docs/README.md",
+        "docs/event-listen-preview.md"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "6e052f4d2000dcd69e5c1f17b8eb009d50202617",
+      "subject": "fix(event listen): print each event without waiting for the next heartbeat",
+      "files": [
+        "pkg/cmd/event/listen/listen.go",
+        "pkg/cmd/event/listen/listen_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "8e6e626a1bb800763ea9f67b991f38e50e9f18ae",
+      "subject": "fix(event listen): report a deleted subscription clearly",
+      "files": [
+        "docs/event-listen-preview.md",
+        "pkg/cmd/event/listen/listen.go",
+        "pkg/cmd/event/listen/listen_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview",
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "7aaff5cf6eb33f0b7330cde175693fc32ac6369f",
+      "subject": "feat(event): support check suite status events",
+      "files": [
+        "docs/event-listen-preview.md",
+        "pkg/cmd/event/listen/listen.go",
+        "pkg/cmd/event/shared/completion_test.go",
+        "pkg/cmd/event/shared/help.go",
+        "skills/gh/SKILL.md"
+      ],
+      "reviewAreas": [
+        "event-preview",
+        "upstream-skill-content",
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "8a46b4ed8669cf886f27656ecc32210159c880cb",
+      "subject": "feat(run): point agents watching pull request runs at gh event listen",
+      "files": [
+        "docs/event-listen-preview.md",
+        "pkg/cmd/event/shared/hint.go",
+        "pkg/cmd/run/view/hint.go",
+        "pkg/cmd/run/view/view.go",
+        "pkg/cmd/run/view/view_test.go",
+        "pkg/cmd/run/watch/watch.go",
+        "pkg/cmd/run/watch/watch_test.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent",
+        "event-preview",
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "4be67a7009cd25fb24704b462e8a7f5dabba13f0",
+      "subject": "fix(eventstream): split a buffered line after a skipped LF",
+      "files": [
+        "internal/eventstream/sse.go",
+        "internal/eventstream/sse_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "026b833a3a5226705e07592bcc898c067875f89a",
+      "subject": "fix(event listen): honor an HTTP date in Retry-After",
+      "files": [
+        "pkg/cmd/event/listen/listen.go",
+        "pkg/cmd/event/listen/listen_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "6484e474c36d73c74000e8d6f9067a31f00e5a93",
+      "subject": "test(event subscription list): cover the configured default host",
+      "files": [
+        "pkg/cmd/event/subscription/list/list_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "03d2aec78e2aa345f2c66dafecc9d5505e0b2259",
+      "subject": "test(event subscription create): cover stdout and stderr TTY states apart",
+      "files": [
+        "pkg/cmd/event/subscription/create/create_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "f493420ecee1767ec9777f25fba77f425c16b18f",
+      "subject": "test(event subscription view): cover argument parsing",
+      "files": [
+        "pkg/cmd/event/subscription/view/view_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "5c5e22f7fd6cd086d47381e5bfd0d3b4c53cc3a6",
+      "subject": "test(event subscription delete): cover argument parsing",
+      "files": [
+        "pkg/cmd/event/subscription/delete/delete_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "c2b4feabcad4124b9a1fd67f55b7f58d7dabc5d3",
+      "subject": "test(api): check the error in the gh event listen hint tests",
+      "files": [
+        "pkg/cmd/api/api_test.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "8c4d6048cd977e25f0393a5e658bd2c0c0ce3f54",
+      "subject": "test(event listen): cover sanitizing the end of stream frame",
+      "files": [
+        "pkg/cmd/event/listen/listen_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "1e7c7b78bddb239930e8c288da5ee7299985d08f",
+      "subject": "fix(evals): default the fixture identity when retrying cleanup",
+      "files": [
+        "run-evals"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "91c13965ef8357ec9a52494daed501fa4d9bd1b9",
+      "subject": "test(event): cover completing the check suite event type",
+      "files": [
+        "pkg/cmd/event/shared/completion_test.go"
+      ],
+      "reviewAreas": [
+        "event-preview"
+      ]
+    },
+    {
+      "sha": "3b6dc22697699fd03a05836b75f2e2aafca03397",
+      "subject": "fix(evals): run only the raw-API graders when replaying raw-API trials",
+      "files": [
+        "evals/src/replay.test.ts",
+        "evals/src/replay.ts"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "f531d07274f1f2384ed26a69ced6a42cd13f7c87",
+      "subject": "fix(evals): tell apart GraphQL status reads by their variables",
+      "files": [
+        "evals/src/commands.test.ts",
+        "evals/src/suites/events/commands.ts"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "b5e0d50c3292a53972fdbbfd054ce154985fdcf3",
+      "subject": "test(run watch): stop the hint test when watching fails",
+      "files": [
+        "pkg/cmd/run/watch/watch_test.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "7699716ec08d1531938b06c4c22b3348010879df",
+      "subject": "test(run watch): cover agent runs that get no event hint",
+      "files": [
+        "pkg/cmd/run/watch/watch_test.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "e22082cd29589d158d468c92748b2c4bcb5787b2",
+      "subject": "test(run view): cover agent JSON views that get no event hint",
+      "files": [
+        "pkg/cmd/run/view/view_test.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent"
+      ]
+    },
+    {
+      "sha": "42d52b4c1a70bd2f8ec34cb1533df2487a2165d9",
+      "subject": "Merge pull request #15083 from cli/babakks/event-copilot-review",
+      "files": [
+        ".github/skills/running-evals/SKILL.md",
+        ".github/skills/running-evals/references/credentials.md",
+        ".github/skills/running-evals/references/execution-modes.md",
+        ".github/skills/writing-evals/SKILL.md",
+        ".github/skills/writing-evals/references/design-notes.md",
+        "docs/README.md",
+        "docs/event-listen-preview.md",
+        "evals/.gitignore",
+        "evals/README.md",
+        "evals/cleanup",
+        "evals/package-lock.json",
+        "evals/package.json",
+        "evals/replay",
+        "evals/run",
+        "evals/running-evals.md",
+        "evals/smoke",
+        "evals/src/cleanup.test.ts",
+        "evals/src/cleanup.ts",
+        "evals/src/commands.test.ts",
+        "evals/src/core/actor.ts",
+        "evals/src/core/calls.ts",
+        "evals/src/core/errors.ts",
+        "evals/src/core/evidence.ts",
+        "evals/src/core/executor.ts",
+        "evals/src/core/github.ts",
+        "evals/src/core/home.ts",
+        "evals/src/core/io.ts",
+        "evals/src/core/observer.ts",
+        "evals/src/core/sandbox.ts",
+        "evals/src/core/session.ts",
+        "evals/src/core/suite.ts",
+        "evals/src/core/trial-cleanup.ts",
+        "evals/src/executor-plugin.ts",
+        "evals/src/github.test.ts",
+        "evals/src/grader-plugin.ts",
+        "evals/src/graders.test.ts",
+        "evals/src/graders/copilot-review.ts",
+        "evals/src/graders/result.ts",
+        "evals/src/graders/review.ts",
+        "evals/src/harness.test.ts",
+        "evals/src/replay.test.ts",
+        "evals/src/replay.ts",
+        "evals/src/review-loop.test.ts",
+        "evals/src/review.test.ts",
+        "evals/src/skills.test.ts",
+        "evals/src/smoke.test.ts",
+        "evals/src/smoke.ts",
+        "evals/src/suites/events/actor.ts",
+        "evals/src/suites/events/commands.ts",
+        "evals/src/suites/events/domain.ts",
+        "evals/src/suites/events/fixtures.ts",
+        "evals/src/suites/events/github.ts",
+        "evals/src/suites/events/grading/analysis.ts",
+        "evals/src/suites/events/grading/evidence.ts",
+        "evals/src/suites/events/grading/index.ts",
+        "evals/src/suites/events/grading/observations.ts",
+        "evals/src/suites/events/grading/polling.ts",
+        "evals/src/suites/events/grading/route.ts",
+        "evals/src/suites/events/grading/task.ts",
+        "evals/src/suites/events/limit.ts",
+        "evals/src/suites/events/scenarios.ts",
+        "evals/src/suites/events/scenarios/definition.ts",
+        "evals/src/suites/events/scenarios/full-delegation.ts",
+        "evals/src/suites/events/scenarios/listen-at-limit.ts",
+        "evals/src/suites/events/scenarios/notify-review.ts",
+        "evals/src/suites/events/scenarios/pull-after-close.ts",
+        "evals/src/suites/events/scenarios/pull-after-merge.ts",
+        "evals/src/suites/events/scenarios/review-loop.ts",
+        "evals/src/suites/events/smoke-protocol.ts",
+        "evals/src/suites/events/suite.ts",
+        "evals/src/suites/index.ts",
+        "evals/suites/events/README.md",
+        "evals/suites/events/full-delegation/eval.yml",
+        "evals/suites/events/listen-at-limit/eval.yml",
+        "evals/suites/events/notify-review/eval.yml",
+        "evals/suites/events/pull-after-close/eval.yml",
+        "evals/suites/events/pull-after-merge/eval.yml",
+        "evals/suites/events/review-loop/eval.yml",
+        "evals/testdata/replays/persistent-review-loop.json",
+        "evals/tsconfig.json",
+        "internal/eventstream/sse.go",
+        "internal/eventstream/sse_test.go",
+        "pkg/cmd/api/api.go",
+        "pkg/cmd/api/api_test.go",
+        "pkg/cmd/api/hint.go",
+        "pkg/cmd/event/client/client.go",
+        "pkg/cmd/event/client/client_mock.go",
+        "pkg/cmd/event/client/client_test.go",
+        "pkg/cmd/event/client/types.go",
+        "pkg/cmd/event/event.go",
+        "pkg/cmd/event/listen/listen.go",
+        "pkg/cmd/event/listen/listen_test.go",
+        "pkg/cmd/event/shared/client.go",
+        "pkg/cmd/event/shared/completion.go",
+        "pkg/cmd/event/shared/completion_test.go",
+        "pkg/cmd/event/shared/help.go",
+        "pkg/cmd/event/shared/hint.go",
+        "pkg/cmd/event/shared/subscription.go",
+        "pkg/cmd/event/subscription/create/create.go",
+        "pkg/cmd/event/subscription/create/create_test.go",
+        "pkg/cmd/event/subscription/delete/delete.go",
+        "pkg/cmd/event/subscription/delete/delete_test.go",
+        "pkg/cmd/event/subscription/list/list.go",
+        "pkg/cmd/event/subscription/list/list_test.go",
+        "pkg/cmd/event/subscription/subscription.go",
+        "pkg/cmd/event/subscription/view/view.go",
+        "pkg/cmd/event/subscription/view/view_test.go",
+        "pkg/cmd/pr/create/create.go",
+        "pkg/cmd/pr/create/create_test.go",
+        "pkg/cmd/pr/pr.go",
+        "pkg/cmd/pr/view/hint.go",
+        "pkg/cmd/pr/view/view.go",
+        "pkg/cmd/pr/view/view_test.go",
+        "pkg/cmd/root/root.go",
+        "pkg/cmd/run/view/hint.go",
+        "pkg/cmd/run/view/view.go",
+        "pkg/cmd/run/view/view_test.go",
+        "pkg/cmd/run/watch/watch.go",
+        "pkg/cmd/run/watch/watch_test.go",
+        "run-evals",
+        "skills/gh/SKILL.md"
+      ],
+      "reviewAreas": [
+        "command-adjacent",
+        "event-preview",
+        "upstream-skill-content",
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "b0fc1943b038565ae4dc5462b6dc7ad5ebf5fe33",
+      "subject": "chore(deps): Bump hono from 4.13.13 to 4.13.19 in /evals",
+      "files": [
+        "evals/package-lock.json"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "b5fbd098bb8339c2663f3bf09394c66f5bfcdb59",
+      "subject": "chore(deps): Bump @hono/node-server from 2.1.5 to 2.1.9 in /evals",
+      "files": [
+        "evals/package-lock.json"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "616f7be49e70960841c2796ca21cfe64f8e97d16",
+      "subject": "chore(deps): Bump zod from 4.3.6 to 4.6.6 in /evals",
+      "files": [
+        "evals/package-lock.json",
+        "evals/package.json"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "d85ae0e521e44b5ae82a9b95dba7b2ea6c6ee45d",
+      "subject": "Merge pull request #15086 from cli/dependabot/npm_and_yarn/evals/zod-4.6.6",
+      "files": [
+        "evals/package-lock.json",
+        "evals/package.json"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "a60bb586a9949e45b4682076f84ee686ea38adc2",
+      "subject": "Merge pull request #15085 from cli/dependabot/npm_and_yarn/evals/hono/node-server-2.1.9",
+      "files": [
+        "evals/package-lock.json"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    },
+    {
+      "sha": "e1219499a578b69e3437adaa31cd60614e23c802",
+      "subject": "Merge pull request #15084 from cli/dependabot/npm_and_yarn/evals/hono-4.13.19",
+      "files": [
+        "evals/package-lock.json"
+      ],
+      "reviewAreas": [
+        "upstream-tests-docs-and-automation"
+      ]
+    }
+  ],
+  "olderOpenAlerts": [
+    {
+      "sha": "fa812ef2b1ab1240ca023b7a4b720cbeef7fbdcd",
+      "subject": "Allow installation tokens to attach files",
+      "files": [
+        "internal/attachments/client.go",
+        "internal/attachments/client_test.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/create/create_test.go",
+        "pkg/cmd/issue/edit/edit_test.go",
+        "pkg/cmd/pr/create/create_test.go",
+        "pkg/cmd/pr/edit/edit_test.go",
+        "pkg/cmd/pr/shared/commentable_test.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent",
+        "other-commands"
+      ]
+    },
+    {
+      "sha": "059f4975b5fa17303c483425cb50e19b709a3d63",
+      "subject": "Merge pull request #14804 from martinajir/attach-installation-tokens",
+      "files": [
+        "internal/attachments/client.go",
+        "internal/attachments/client_test.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/create/create_test.go",
+        "pkg/cmd/issue/edit/edit_test.go",
+        "pkg/cmd/pr/create/create_test.go",
+        "pkg/cmd/pr/edit/edit_test.go",
+        "pkg/cmd/pr/shared/commentable_test.go"
+      ],
+      "reviewAreas": [
+        "command-adjacent",
+        "other-commands"
+      ]
+    },
+    {
+      "sha": "17ac598e6afc43bb6206f074b05de9d63563a42f",
+      "subject": "Defer --attach credential checks to the server",
+      "files": [
+        "internal/attachments/client.go",
+        "internal/attachments/client_test.go",
+        "internal/attachments/doc.go",
+        "internal/config/config.go",
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/comment/comment.go",
+        "pkg/cmd/issue/comment/comment_test.go",
+        "pkg/cmd/issue/create/create.go",
+        "pkg/cmd/issue/create/create_test.go",
+        "pkg/cmd/issue/edit/edit.go",
+        "pkg/cmd/issue/edit/edit_test.go",
+        "pkg/cmd/pr/comment/comment.go",
+        "pkg/cmd/pr/comment/comment_test.go",
+        "pkg/cmd/pr/create/create.go",
+        "pkg/cmd/pr/create/create_test.go",
+        "pkg/cmd/pr/edit/edit.go",
+        "pkg/cmd/pr/edit/edit_test.go",
+        "pkg/cmd/pr/shared/commentable.go",
+        "pkg/cmd/pr/shared/commentable_test.go",
+        "skills/gh/SKILL.md"
+      ],
+      "reviewAreas": [
+        "authentication",
+        "command-adjacent",
+        "other-commands",
+        "upstream-skill-content"
+      ]
+    },
+    {
+      "sha": "4f2cfe92e3499f8581bf39db77e0a1431fa7b55c",
+      "subject": "Merge pull request #14805 from cli/bagtoad/attach-with-installation-tokens",
+      "files": [
+        "internal/attachments/client.go",
+        "internal/attachments/client_test.go",
+        "internal/attachments/doc.go",
+        "internal/config/config.go",
+        "pkg/cmd/issue/artifact/create/create.go",
+        "pkg/cmd/issue/artifact/create/create_test.go",
+        "pkg/cmd/issue/artifact/edit/edit.go",
+        "pkg/cmd/issue/artifact/edit/edit_test.go",
+        "pkg/cmd/issue/artifact/shared/shared.go",
+        "pkg/cmd/issue/artifact/shared/shared_test.go",
+        "pkg/cmd/issue/comment/comment.go",
+        "pkg/cmd/issue/comment/comment_test.go",
+        "pkg/cmd/issue/create/create.go",
+        "pkg/cmd/issue/create/create_test.go",
+        "pkg/cmd/issue/edit/edit.go",
+        "pkg/cmd/issue/edit/edit_test.go",
+        "pkg/cmd/pr/comment/comment.go",
+        "pkg/cmd/pr/comment/comment_test.go",
+        "pkg/cmd/pr/create/create.go",
+        "pkg/cmd/pr/create/create_test.go",
+        "pkg/cmd/pr/edit/edit.go",
+        "pkg/cmd/pr/edit/edit_test.go",
+        "pkg/cmd/pr/shared/commentable.go",
+        "pkg/cmd/pr/shared/commentable_test.go",
+        "skills/gh/SKILL.md"
+      ],
+      "reviewAreas": [
+        "authentication",
+        "command-adjacent",
+        "other-commands",
+        "upstream-skill-content"
+      ]
+    },
+    {
+      "sha": "29013b709fc074e90edbca22f58c82fafe10f73c",
+      "subject": "fix(gh auth status): explain expired expiring tokens with --no-refresh",
+      "files": [
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    },
+    {
+      "sha": "ab3efc24f8e74f7588f06d0d368d31279166950d",
+      "subject": "fix(gh auth status): only diagnose token expiry after HTTP 401",
+      "files": [
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    },
+    {
+      "sha": "63837fb778d6a39f02be0ce76ff89f2bc8d74bdc",
+      "subject": "Merge pull request #14815 from cli/babakks/auth-status-expired-hint",
+      "files": [
+        "pkg/cmd/auth/status/status.go",
+        "pkg/cmd/auth/status/status_test.go"
+      ],
+      "reviewAreas": [
+        "authentication"
+      ]
+    }
+  ],
+  "verification": {
+    "contracts": {
+      "2.102.0": {
+        "passed": 19,
+        "failed": 0,
+        "skipped": 0
+      },
+      "2.104.0": {
+        "passed": 19,
+        "failed": 0,
+        "skipped": 0
+      },
+      "2.105.0": {
+        "passed": 19,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "agents": 48,
+    "authFixturesPassed": 18,
+    "helpDifferences": "boolean [=true|false] annotation and alignment only",
+    "standalone": [
+      "doctor",
+      "search",
+      "versioned-preview"
+    ],
+    "extension": "GH_PATH selects invoking 2.105.0 with minimum first on PATH",
+    "nativeInputOfflineTests": 29,
+    "limits": [
+      "No forced OAuth rotation",
+      "Event preview explicitly unavailable to account",
+      "Hosted CI qualification separate"
+    ]
+  }
+}

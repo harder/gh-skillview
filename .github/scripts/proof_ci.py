@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 
-IMAGE = 'mcr.microsoft.com/dotnet/sdk:10.0.403'
+IMAGE = 'mcr.microsoft.com/dotnet/sdk:10.0.404'
 LABELS = ('registry_tool', 'container_prerequisite') + tuple(
     f'{prefix}_{i:02}' for prefix, count in [('api_primary', 18), ('native_check', 12)]
     for i in range(1, count + 1))

@@ -116,7 +116,7 @@ public sealed class GhMetadataContractTests
                 Assert.True(string.IsNullOrEmpty(record.Version));
                 Assert.Equal("local", skill.SourceIdentity.Provider);
                 Assert.Contains($"- **Local source:** `{raw.FrontMatter.LocalPath}`", detail);
-                Assert.Contains("- **Version:** 1.0", detail);
+                Assert.Contains("- **Authored version:** 1.0", detail);
                 Assert.Contains(description, detail);
                 Assert.DoesNotContain("- **Repository ref:**", detail);
             }
@@ -132,7 +132,7 @@ public sealed class GhMetadataContractTests
                 Assert.Equal(raw.FrontMatter.GithubRef, row.GetProperty("repositoryRef").GetString());
                 Assert.Equal(raw.FrontMatter.Upstream, row.GetProperty("source").GetString());
                 Assert.Equal(raw.FrontMatter.PinnedRef, row.GetProperty("pinnedRef").GetString());
-                Assert.Contains("- **Upstream:** [https://github.com/cli/cli](https://github.com/cli/cli)", detail);
+                Assert.Contains("- **Upstream:** [Open upstream](https://github.com/cli/cli) · `https://github.com/cli/cli`", detail);
                 Assert.Contains($"- **Repository ref:** `{raw.FrontMatter.GithubRef}`", detail);
                 Assert.Contains("- **Source path:** `skills/gh-skill`", detail);
             }

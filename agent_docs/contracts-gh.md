@@ -30,7 +30,8 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   GHSA-39wj-f2f4-978v fixes symlink-destination writes. The previously required
   2.97.0 command surface is retained; keep one `gh skill --help` smoke check,
   not per-flag probes. A prerelease is not evidence of a patched stable release.
-  Recommend 2.103.3; checksum-pinned current proof tools use that version.
+  Recommend 2.105.0; checksum-pinned current proof tools use that version.
+  The complete follow-up review is in [gh 2.105 compatibility](gh-2.105.0-compatibility.md).
 
 - Recorded-tree materialization requests use `gh api --cache 1h` only for full
   immutable tree/blob IDs. Keep mutable ref resolution uncached. Cache data is
@@ -73,7 +74,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   not waive SkillView source/retention approval.
 
 - `InstallAgentCatalog` tracks the full `gh skill install --help` `--agent`
-  list verified through `gh` 2.103.3 (48 entries; gh 2.97.0 replaced `windsurf`
+  list verified through `gh` 2.105.0 (48 entries; gh 2.97.0 replaced `windsurf`
   with `devin` and added `grok`, cli/cli#13987 and cli/cli#13864; gh 2.99.0
   makes Pi's `PI_CODING_AGENT_DIR` override authoritative).
   `HomeRelativePath` is best-effort and
@@ -233,3 +234,9 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   regressions cover nonzero stdout/stderr and mixed-account output without
   launching auth commands, reading credentials or rotating accounts. gh 2.103.2's
   installation-token file-attachment change is not a skill-install quota fix.
+
+- gh 2.104.0 adds underlying auth errors and can skip token refresh when its
+  state directory is read-only. Preserve raw diagnostics and delegate credential
+  management to gh; a warning on stderr does not change a successful exit code.
+  gh 2.105.0 event hints apply to pull-request API reads, not our immutable
+  tree/blob requests. The account-gated event preview is not a product dependency.

@@ -499,7 +499,7 @@ def unpack(rid):
     for spec in specs():
         verify_producer(ROOT / '.ci-native/baselines' / spec['family'], spec, manifest['cacheKey'], rid,
                         manifest['producerInputs'][spec['family']])
-    for version, name in [('2.102.0', 'minimum'), ('2.103.3', 'current')]:
+    for version, name in [('2.102.0', 'minimum'), ('2.105.0', 'current')]:
         directory = ROOT / ('.ci-native/gh-' + name)
         receipt = json.loads((directory / 'source.json').read_text(encoding='utf-8'))
         binary = directory / ('gh.exe' if rid.startswith('win-') else 'gh')
