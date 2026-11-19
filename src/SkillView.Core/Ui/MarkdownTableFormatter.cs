@@ -9,7 +9,7 @@ internal static class MarkdownTableFormatter
         var text = new System.Text.StringBuilder();
         foreach (var c in NormalizeTableValue(value))
         {
-            if ("\\`*_{}[]<>|&#!".Contains(c, StringComparison.Ordinal)) text.Append('\\');
+            if ("\\`*_{}[]<>|&#!~".Contains(c, StringComparison.Ordinal)) text.Append('\\');
             text.Append(c);
         }
         return text.ToString();

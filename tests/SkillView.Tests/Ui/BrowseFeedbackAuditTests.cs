@@ -69,12 +69,48 @@ public sealed class BrowseFeedbackAuditTests
             Assert.Contains(view.SubViews.OfType<Label>(), label => label.Text.Contains("Scope: user", StringComparison.Ordinal));
             app.Keyboard.RaiseKeyDownEvent(new Key('s'));
             Assert.Contains(view.SubViews.OfType<Label>(), label => label.Text.Contains("Sort: source", StringComparison.Ordinal));
+            app.LayoutAndDraw(true);
+            var grid = string.Join("\n", Enumerable.Range(0, height).Select(y => string.Concat(
+                Enumerable.Range(0, width).Select(x => app.Driver.Contents![y, x].Grapheme))));
+            Assert.Contains("Pins: pinned", grid);
+            Assert.Contains("Scope: user", grid);
+            Assert.Contains("Sort: source", grid);
             var clear = view.SubViews.OfType<Button>().Single(button => button.Text == "Clear");
             clear.InvokeCommand(Command.Accept);
             Assert.Equal("Filters (f)", filters.Text);
             Assert.Single(view.RowsForTests);
             Assert.DoesNotContain(view.SubViews.OfType<Label>(), label => label.Text.Contains("Pins: pinned", StringComparison.Ordinal)
                 || label.Text.Contains("Scope: user", StringComparison.Ordinal));
+        }
+        finally { app.End(session!); }
+    }
+
+    [Fact]
+    public void UpdateCheckStartupFailureRemainsVisibleAtMinimumWidth()
+    {
+        using var app = Application.Create().Init("ansi");
+        app.Driver!.SetScreenSize(80, 24);
+        var snapshot = InventorySnapshot.Empty with { Skills = [InstalledOverviewTests.Copy("/skills/demo", "demo")] };
+        var availability = new UpdateAvailabilitySession();
+        using var window = new Window { Width = Dim.Fill(), Height = Dim.Fill() };
+        using var view = new InstalledTabView(action => { action(); return Task.CompletedTask; }, (_, _) => { },
+            _ => Task.FromResult(snapshot), (_, _, _) => Task.CompletedTask, () => { }, availability: availability)
+        { Width = Dim.Fill(), Height = Dim.Fill() };
+        window.Add(view);
+        view.LoadSeeded(snapshot);
+        var session = app.Begin(window);
+        try
+        {
+            availability.Start();
+            availability.Fail("gh could not start");
+            view.RefreshAvailability();
+            app.LayoutAndDraw(true);
+            var grid = string.Join("\n", Enumerable.Range(0, 24).Select(y => string.Concat(
+                Enumerable.Range(0, 80).Select(x => app.Driver.Contents![y, x].Grapheme))));
+            Assert.Contains("Update check failed: gh could not start", grid);
+            availability.Start();
+            view.RefreshAvailability();
+            Assert.DoesNotContain("failed", view.FooterTextForTests);
         }
         finally { app.End(session!); }
     }

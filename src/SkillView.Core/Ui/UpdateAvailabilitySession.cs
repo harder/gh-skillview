@@ -13,6 +13,7 @@ internal sealed class UpdateAvailabilitySession
     private long _catalogGeneration;
     private string? _context;
     private string? _failure;
+    internal string? Failure => _failure;
     internal bool Running { get; private set; }
     internal bool Stopping { get; private set; }
     internal int Completed { get; private set; }

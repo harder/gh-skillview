@@ -116,7 +116,10 @@ public static class InstalledScreen
             var locationLines = descriptionWidth is > 0
                 ? TextFormatter.WordWrapText(location, descriptionWidth.Value, tabWidth: 4) : [location];
             sb.AppendLine("\n**Location:**\n\n" + string.Join("  \n", locationLines.Select(MarkdownTableFormatter.FormatProse)));
-            sb.AppendLine("\n**Used by:** " + Literal(string.Join(", ", s.Agents.Select(a => a.AgentId + " (" + (a.Scope ?? s.Scope) + ")").Distinct())));
+            if (s.Agents.Length <= 8 && s.Agents.All(a => a.AgentId.Length <= 128))
+                sb.AppendLine("\n**Used by:** " + Literal(string.Join(", ", s.Agents.Select(a => a.AgentId + " (" + (a.Scope ?? s.Scope) + ")").Distinct())));
+            else
+                sb.Append("\n**Used by:**\n\n" + RenderPlacements(s, maxPlacements: 8, maxCharacters: 2048));
             if (s.AllOwnershipClaims.Any(o => o.ReadOnly || o.InstallationMode == "managed-read-only"))
                 sb.AppendLine("\nRead-only — maintained by its owning package or agent.");
             if (s.Validity != ValidityState.Valid) sb.AppendLine("\nMetadata needs review. Open Issues or F2 for the finding.");
@@ -300,7 +303,7 @@ public static class InstalledScreen
 
     private static string Literal(string value) => MarkdownTableFormatter.FormatCodeSpan(NormalizeLiteral(value));
 
-    internal static string RenderPlacements(InstalledSkill skill)
+    internal static string RenderPlacements(InstalledSkill skill, int maxPlacements = MaxRecordedPlacements, int maxCharacters = MaxPlacementCharacters)
     {
         // Equality remains the existing structural AgentMembership record equality.
         // Grouping and normalized labels never change the observed denominator.
@@ -314,11 +317,11 @@ public static class InstalledScreen
             .ThenBy(a => a, Comparer<AgentMembership>.Create(CompareMemberships)).ToArray();
         var included = new List<AgentMembership>();
         var block = PlacementBlock(skill, included);
-        foreach (var member in ordered.Take(MaxRecordedPlacements))
+        foreach (var member in ordered.Take(maxPlacements))
         {
             included.Add(member);
             var candidate = PlacementBlock(skill, included);
-            if (candidate.Length > MaxPlacementCharacters - PlacementNoticeReserve)
+            if (candidate.Length > maxCharacters - PlacementNoticeReserve)
             {
                 included.RemoveAt(included.Count - 1);
                 break;

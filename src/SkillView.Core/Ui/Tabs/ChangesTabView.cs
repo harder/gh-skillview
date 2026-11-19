@@ -845,7 +845,8 @@ internal sealed class ChangesTabView : FrameView
     }
 
     private static ChangesQueueRow ChildRow(ChangesQueueRow parent, MaintenanceQueueEntry entry, int index) =>
-        new("Copy", "  " + CopyLocationLabel(entry.Subject), [entry])
+        new("Copy", "  " + (index < parent.LocationLabels.Count ? parent.LocationLabels[index]
+            : $"Copy {index + 1} · " + CopyLocationLabel(entry.Subject)), [entry])
         { Finding = parent.Finding, IsExactChild = true, ParentKey = parent.Key };
 
     private static string CopyLocationLabel(OperationSubject subject)
