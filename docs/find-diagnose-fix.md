@@ -52,7 +52,8 @@ empty list or a successful process exit as proof that every skill is healthy.
 
 ## Current screens
 
-The screenshots below are fresh captures of the built app using an isolated,
+The screenshots below show the current source build’s simpler layout and warm
+terminal palette using an isolated,
 credential-free sample inventory. They illustrate the UI, not live upstream results
 or proof that a repair succeeded.
 
