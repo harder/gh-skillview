@@ -82,3 +82,9 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   binaries in the current SDK `10.0.404` container. Its execution image is separate
   from frozen producer SDK selection and must not rewrite historical globals or
   locks. Microsoft does not publish the former `10.0.113` container tag.
+
+- Regenerate SDK/compiler/linker locks in a private `NUGET_PACKAGES` directory
+  against the intended official feed. A shared cache can contain distro packages
+  from `/usr/lib/dotnet/library-packs` with the same version and different bytes or
+  dependency metadata. A warm-cache locked restore is insufficient evidence;
+  verify the regenerated locks against the private official-source cache and CI.

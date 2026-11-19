@@ -87,7 +87,7 @@ class NativeProofInputsTests(unittest.TestCase):
         for relative in ('dist/app/skillview', 'dist/ext/gh-skillview',
                          'tests/SkillView.MaintenanceProof/bin/Release/net10.0/SkillView.MaintenanceProof.dll'):
             self.write(relative, relative).chmod(0o755)
-        for version, name in [('2.102.0', 'minimum'), ('2.103.3', 'current')]:
+        for version, name in [('2.102.0', 'minimum'), ('2.105.0', 'current')]:
             binary = self.write('.ci-native/gh-' + name + '/gh', version)
             binary.chmod(0o755)
             native.write_json(binary.parent / 'source.json', dict(version=version, rid='linux-x64',
@@ -161,8 +161,9 @@ class NativeProofInputsTests(unittest.TestCase):
             self.assertEqual([call.kwargs['cwd'] for call in selected.call_args_list], [self.root, self.frozen])
             self.assertEqual(run.call_count, 1)
             self.assertEqual(run.call_args.args[0][-1], '--version')
-        with patch.object(native, 'checkout', side_effect=ValueError('dirty frozen source')):
-            with self.assertRaises(ValueError):
+        with patch.object(native.subprocess, 'check_output', return_value='10.0.403\n'), patch.object(
+                native, 'checkout', side_effect=ValueError('dirty frozen source')):
+            with self.assertRaisesRegex(ValueError, 'dirty frozen source'):
                 native.prepare('linux-x64')
 
     def test_artifact_round_trip_binds_file_bytes_and_preserves_executable_modes(self):

@@ -286,7 +286,7 @@ jobs:
         run: |
           set -euo pipefail
           python tests/native/prepare-gh-proof-tool.py --version 2.102.0 --rid '${{ matrix.rid }}' --output ".ci-native/gh-minimum"
-          python tests/native/prepare-gh-proof-tool.py --version 2.103.3 --rid '${{ matrix.rid }}' --output ".ci-native/gh-current"
+          python tests/native/prepare-gh-proof-tool.py --version 2.105.0 --rid '${{ matrix.rid }}' --output ".ci-native/gh-current"
       - name: Smoke-test native binaries
         shell: bash
         run: |

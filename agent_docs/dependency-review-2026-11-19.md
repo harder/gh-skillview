@@ -22,6 +22,13 @@ SDK deliberately regenerates all six lock files, including all four native RIDs;
 frozen historical producers keep their own SDKs and locks. The current privileged
 registry-proof execution image moves to 10.0.404 independently of those inputs.
 
+Initial hosted verification rejected compiler/linker hashes (NU1403) and missing
+compiler runtime entries (NU1102). The local shared cache had supplied distro
+packages from `/usr/lib/dotnet/library-packs` at the same version. Regenerating
+with the verified SDK, a private package directory and nuget.org restores the
+official hashes and all four RID graphs. Preserve the original failed runs;
+do not bypass hash validation or use the warm-cache result as clean-feed proof.
+
 The test SDK release notes distinguish the VSTest CLI artifact-processing security
 fix from `Microsoft.NET.Test.Sdk`: updating only the package does not patch the CLI
 shipped in an older SDK. The SDK servicing update is therefore included. New
@@ -49,6 +56,11 @@ patch PRs (#156–#158) are consolidated so the roots and lock files stay aligne
 PR #159's recorded Linux restore failure is NU1004: only the Core lock changed,
 leaving consuming project locks inconsistent. That failure alone does not prove
 an API incompatibility; the complete 23.0.0 graph is evaluated in this follow-up.
+
+The later duplicate alerts (#162–#169) are also disposed: #162/#164 defer the
+same .NET 11 BCL major; the remaining six testing-platform patches are included
+in the coordinated 2.5.3 update. The [GH CLI review](gh-2.105.0-compatibility.md)
+records the dependency issues and every intervening upstream commit.
 
 Future test-platform updates are grouped with the test SDK/xUnit. No experimental
 APIs, new UI framework stream, .NET major migration, release tag, or relaxation of
