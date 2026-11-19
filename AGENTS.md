@@ -55,8 +55,8 @@ subsystem rules in these guides; keep this root file short. The
 
 ## Build and verification
 
-- Keep .NET runtime/AOT at **10.0.14** and the SDK selected by `global.json`
-  (**10.0.403**, roll-forward disabled). SDK changes require intentional lock-file
+- Keep .NET runtime/AOT at **10.0.15** and the SDK selected by `global.json`
+  (**10.0.404**, roll-forward disabled). SDK changes require intentional lock-file
   regeneration because compiler/linker package versions come from the SDK.
 - All six projects commit NuGet locks covering the four supported native RIDs.
   Use `dotnet restore --locked-mode`. Dependency changes require intentional

@@ -16,9 +16,9 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   regression. Failure diagnostics must retain the final native refusal reason.
 
 - Current package compatibility: SkillView is pinned to Terminal.Gui `2.5.1-develop.183`
-  and Terminal.Gui.Editor `2.5.8-develop.6`. Test projects use `Microsoft.NET.Test.Sdk` `18.11.0`, `xunit.v3`
-  `4.0.2`, and `xunit.runner.visualstudio` `4.0.1`. The compatible Microsoft Testing Platform
-  components are explicitly serviced at `2.5.2`, and test-only BCL async interfaces at `10.0.14`. If tests fail to compile on
+  and Terminal.Gui.Editor `2.5.8-develop.6`. Test projects use `Microsoft.NET.Test.Sdk` `18.12.0`, `xunit.v3`
+  `4.0.3`, and `xunit.runner.visualstudio` `4.0.1`. The compatible Microsoft Testing Platform
+  components are explicitly serviced at `2.5.3`, and test-only BCL async interfaces at `10.0.15`. If tests fail to compile on
   missing `TestContext`, rerun `dotnet restore` so stale xUnit 2.x assets are
   replaced. `tests/SkillView.Tests/Build/PackageReferenceTests.cs` and
   `CliDispatcherHelpTests.VersionFlag_IncludesTerminalGuiVersion` hardcode the
@@ -67,7 +67,7 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   a preview by version order alone: the older `2.6.0-develop.61` is not the chosen
   published stream. Preserve real-package Markdown partial/full styled-grid,
   Unicode, raw Editor document/selection/read-only, owned modal and teardown tests.
-- Current products use SDK `10.0.403` and runtime/AOT/linker `10.0.14`. Frozen
+- Current products use SDK `10.0.404` and runtime/AOT/linker `10.0.15`. Frozen
   native producers retain their own exact SDKs (`10.0.402` or `10.0.113`) and
   immutable globals/locks. Verify the actual SDK in each source CWD, and bind
   source SDK/global/lock hashes separately from current tools in schema-3 receipts.
@@ -79,6 +79,6 @@ for related workflows and [AGENTS.md](../AGENTS.md) for repository-wide rules.
   runtime guide for exact guards and current-run evidence boundaries.
 
 - The privileged registry restore/retirement launcher executes already-built
-  binaries in the current SDK `10.0.403` container. Its execution image is separate
+  binaries in the current SDK `10.0.404` container. Its execution image is separate
   from frozen producer SDK selection and must not rewrite historical globals or
   locks. Microsoft does not publish the former `10.0.113` container tag.

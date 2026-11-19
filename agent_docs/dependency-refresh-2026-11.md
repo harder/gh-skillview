@@ -1,5 +1,8 @@
 # November 2026 dependency and security refresh
 
+The original refresh below is historical. For the November 19 servicing and PR
+review follow-up, see [dependency review](dependency-review-2026-11-19.md).
+
 This refresh starts from main `6b08afd8`. It does not include the unqualified
 rank2/R0 experiments or unrelated unmerged UI/CI repairs. The October refresh and
 older compatibility/performance receipts remain historical records, not results

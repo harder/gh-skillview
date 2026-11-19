@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # A root NuGet scan discovers all five nested project files. Keep the two
+  # A root NuGet scan discovers all six nested project files. Keep the two
   # Terminal.Gui packages together while reviewing their API changes manually.
   - package-ecosystem: nuget
     directory: /
@@ -13,11 +13,20 @@ updates:
       - dependency-type: all
     assignees: [harder]
     open-pull-requests-limit: 10
+    # Keep the .NET 10 servicing family together; major migrations are deliberate.
+    ignore:
+      - dependency-name: "Microsoft.Extensions.*"
+        versions: [">=11.0.0"]
+      - dependency-name: "Microsoft.Bcl.AsyncInterfaces"
+        versions: [">=11.0.0"]
+      # MTP 2.x requires the three-argument TrackEvent API removed in 3.x.
+      - dependency-name: "Microsoft.ApplicationInsights"
+        versions: [">=3.0.0"]
     groups:
       terminal-gui:
         patterns: ["Terminal.Gui", "Terminal.Gui.Editor"]
       test-platform:
-        patterns: ["xunit*", "Microsoft.NET.Test.Sdk"]
+        patterns: ["xunit*", "Microsoft.NET.Test.Sdk", "Microsoft.Testing.*"]
 
   - package-ecosystem: github-actions
     directory: /
