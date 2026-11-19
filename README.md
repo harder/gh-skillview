@@ -8,7 +8,7 @@
 [![Release](https://github.com/harder/gh-skillview/actions/workflows/release.yml/badge.svg)](https://github.com/harder/gh-skillview/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
 
-SkillView **1.1.0** adds clearer discovery, diagnosis and reviewed maintenance workflows. See the [release notes](docs/releases/1.1.0.md) for highlights and upgrade instructions. Check `skillview --version` and `skillview --help` for your installed version.
+SkillView **1.1.1** restores simpler terminal browsing and updates the supported .NET 10 dependencies. See the [release notes](docs/releases/1.1.1.md) for highlights and upgrade instructions. Check `skillview --version` and `skillview --help` for your installed version.
 
 ## Install
 
