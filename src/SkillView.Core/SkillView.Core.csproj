@@ -8,7 +8,7 @@
          referenced project with PublishAot propagated from the host. -->
     <PublishAot>true</PublishAot>
     <TerminalGuiVersion Condition="'$(TerminalGuiVersion)' == ''">2.5.1-develop.183</TerminalGuiVersion>
-    <TerminalGuiEditorVersion Condition="'$(TerminalGuiEditorVersion)' == ''">2.5.8-develop.6</TerminalGuiEditorVersion>
+    <TerminalGuiEditorVersion Condition="'$(TerminalGuiEditorVersion)' == ''">2.5.8-develop.7</TerminalGuiEditorVersion>
     <!-- Terminal.Gui is centrally pinned here so CI can override it via
          MSBuild while the app host keeps the modern AOT-safe lifecycle and the
          gh extension's separate TG2 NoWarn review stays local to that project. -->
